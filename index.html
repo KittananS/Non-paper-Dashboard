@@ -139,7 +139,7 @@
                 s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=0&single=true&output=csv',
                 s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=840326660&single=true&output=csv',
                 bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=676992950&single=true&output=csv',
-                bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=676992950&single=true&output=csv'
+                bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=1671676832&single=true&output=csv'
             },
             'DAOS': {
                 s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTqXyVL3DuTVqQnP8o7oZ-fQIU7wIeeRtRkcSbUkRHn4XTKHM-0-Xf43YqSsSUMX-7l3UHTro3XxRgu/pub?gid=0&single=true&output=csv',
@@ -150,7 +150,7 @@
             'DASP&Q': {
                 s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=1670436585&single=true&output=csv',
                 s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=632732784&single=true&output=csv',
-                bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=632732784&single=true&output=csv',
+                bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=2001882698&single=true&output=csv',
                 bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=503774950&single=true&output=csv'
             },
             'DALIFESTYLE': {
@@ -303,49 +303,57 @@
                             fetchCSV(sources.bPr).catch(() => null)
                         ]);
 
+                        // FIX: Use .concat() instead of spread operator (...array) to avoid "Maximum call stack size exceeded"
+                        // Spread operators turn array elements into arguments, which has a stack limit in JS engines.
                         if (s25Raw) {
-                            allSales.push(...s25Raw.map(row => ({
+                            const mapped = s25Raw.map(row => ({
                                 Month: row['Month'], ProductGroup: groupName, Channel: row['Channel'], SubChannel: row['Sub-channel'] || row['Sub-Channel'],
                                 SoldToParty: row['Sold-to party'] || row['Sold-To Party'], MaterialNumber: row['Material Number'], ProductName: row['Product Name'],
                                 SubProductGroup: row['Sub-product group'] || row['Sub-Product Group'], GroupSKU: row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'],
                                 NetPrice: cleanCurrency(row['Net Price']), Year: '2025'
-                            })).filter(r => r.ProductGroup && r.Month));
+                            })).filter(r => r.ProductGroup && r.Month);
+                            allSales = allSales.concat(mapped);
                             currentStatus[groupName].s25 = 'success';
                         } else currentStatus[groupName].s25 = 'error';
 
                         if (s26Raw) {
-                            allSales.push(...s26Raw.map(row => ({
+                            const mapped = s26Raw.map(row => ({
                                 Month: row['Month'], ProductGroup: groupName, Channel: row['Channel'], SubChannel: row['Sub-channel'] || row['Sub-Channel'],
                                 SoldToParty: row['Sold-to party'] || row['Sold-To Party'], MaterialNumber: row['Material Number'], ProductName: row['Product Name'],
                                 SubProductGroup: row['Sub-product group'] || row['Sub-Product Group'], GroupSKU: row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'],
                                 NetPrice: cleanCurrency(row['Net Price']), Year: '2026'
-                            })).filter(r => r.ProductGroup && r.Month));
+                            })).filter(r => r.ProductGroup && r.Month);
+                            allSales = allSales.concat(mapped);
                             currentStatus[groupName].s26 = 'success';
                         } else currentStatus[groupName].s26 = 'error';
 
                         if (bChRaw) {
-                            allBudgetChannel.push(...bChRaw.map(row => ({
+                            const mapped = bChRaw.map(row => ({
                                 ProductGroup: groupName, Channel: row['Channel'], 
                                 Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
                                 Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
                                 Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
-                            })).filter(r => r.Channel && r.Channel !== 'TOTAL'));
+                            })).filter(r => r.Channel && r.Channel !== 'TOTAL');
+                            allBudgetChannel = allBudgetChannel.concat(mapped);
                             currentStatus[groupName].bCh = 'success';
                         } else currentStatus[groupName].bCh = 'error';
 
                         if (bPrRaw) {
-                            allBudgetProduct.push(...bPrRaw.map(row => ({
+                            const mapped = bPrRaw.map(row => ({
                                 ProductGroup: groupName, SubProductGroup: row['Sub-product Group'] || row['Sub-Product Group'], 
                                 Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
                                 Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
                                 Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
-                            })).filter(r => r.SubProductGroup && r.SubProductGroup !== 'TOTAL'));
+                            })).filter(r => r.SubProductGroup && r.SubProductGroup !== 'TOTAL');
+                            allBudgetProduct = allBudgetProduct.concat(mapped);
                             currentStatus[groupName].bPr = 'success';
                         } else currentStatus[groupName].bPr = 'error';
 
                         setFilesStatus({...currentStatus});
                     } catch (error) {
                         console.error(`Unexpected error syncing ${groupName}:`, error);
+                        currentStatus[groupName] = { s25: 'error', s26: 'error', bCh: 'error', bPr: 'error' };
+                        setFilesStatus({...currentStatus});
                     }
                 }
 
