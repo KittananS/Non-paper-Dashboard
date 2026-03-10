@@ -1,1153 +1,947 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
-  PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, ComposedChart, LabelList
-} from 'recharts';
-import { 
-  Upload, TrendingUp, Target, Users, DollarSign, LayoutDashboard, 
-  PieChart as PieIcon, X, Search, ChevronDown, Calendar, Layers, ShoppingBag,
-  Trophy, Medal, Store, ArrowLeft, Grid3X3, AlertCircle, MapPin, Lightbulb, Sparkles, ArrowRightCircle, Package, Check
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Non-paper Dashboard</title>
 
-// --- Types ---
-interface SalesRecord {
-  Month: string;
-  ProductGroup: string;
-  Channel: string;
-  SubChannel: string;
-  SoldToParty: string;
-  MaterialNumber: string;
-  ProductName: string;
-  SubProductGroup: string;
-  GroupSKU: string;
-  NetPrice: number;
-  Year: string;
-}
+    <script src="https://cdn.tailwindcss.com"></script>
 
-interface BudgetChannel {
-  ProductGroup: string;
-  Channel: string;
-  Target2026: number; 
-  Plan2027: number;   
-  Forecast2026: number;
-}
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 
-interface BudgetProduct {
-  ProductGroup: string;
-  SubProductGroup: string;
-  Target2026: number;
-  Plan2027: number;
-  Forecast2026: number;
-}
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 
-// --- Hooks ---
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-  useEffect(() => {
-    const handler = setTimeout(() => setDebouncedValue(value), delay);
-    return () => clearTimeout(handler);
-  }, [value, delay]);
-  return debouncedValue;
-}
+    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
 
-// --- Helpers ---
-const cleanCurrency = (val: string | number): number => {
-  if (typeof val === 'number') return val;
-  if (!val) return 0;
-  return parseFloat(val.toString().replace(/[฿",]/g, '').trim()) || 0;
-};
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-const parseCSV = (text: string): any[] => {
-  const lines = text.split('\n').filter(l => l.trim() !== '');
-  const headers = lines[0].split(',').map(h => h.trim());
-  return lines.slice(1).map(line => {
-    let row: string[] = [];
-    let inQuote = false;
-    let current = '';
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"') { inQuote = !inQuote; } 
-      else if (char === ',' && !inQuote) { row.push(current); current = ''; } 
-      else { current += char; }
-    }
-    row.push(current);
-    const obj: any = {};
-    headers.forEach((h, i) => {
-      obj[h] = row[i]?.replace(/^"|"$/g, '').trim();
-    });
-    return obj;
-  });
-};
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
 
-const isChainBasedChannel = (channel: string) => {
-  const upper = channel?.toUpperCase() || '';
-  return ['MT', 'INTER COMPANY', 'ONLINE', 'BJC'].includes(upper);
-};
+    <script type="text/babel" data-presets="react,typescript">
+        const { useState, useMemo, useEffect, useRef } = React;
+        const { 
+          BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+          PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, ComposedChart, LabelList 
+        } = window.Recharts;
 
-// --- Sub-components ---
-const FilterDropdown = ({ label, value, options, onChange, icon }: any) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 px-3 py-2 rounded hover:border-blue-400 hover:text-blue-600 transition-colors shadow-sm min-w-[160px] justify-between">
-        <div className="flex items-center gap-2">{icon}<span className="text-slate-500">{label}:</span><span className="text-blue-700 font-bold truncate max-w-[100px]">{value}</span></div>
-        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-      {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
-          <div className="sticky top-0 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">Select {label}</div>
-          {options.length > 0 ? options.map((opt: string) => (
-            <button key={opt} className={`w-full text-left px-4 py-3 text-sm hover:bg-blue-50 transition-colors flex justify-between items-center ${opt === value ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-600'}`} onClick={() => { onChange(opt); setIsOpen(false); }}>
-              {opt}{opt === value && <div className="w-2 h-2 rounded-full bg-blue-600"></div>}
-            </button>
-          )) : <div className="px-4 py-3 text-sm text-slate-400 text-center italic">No options available</div>}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// --- Main Component ---
-export default function Dashboard() {
-  const [salesData, setSalesData] = useState<SalesRecord[]>([]);
-  const [budgetChannel, setBudgetChannel] = useState<BudgetChannel[]>([]);
-  const [budgetProduct, setBudgetProduct] = useState<BudgetProduct[]>([]);
-  
-  const [selectedGroup, setSelectedGroup] = useState('ALL'); 
-  const [showUpload, setShowUpload] = useState(false);
-  
-  // Search States
-  const [searchTerm, setSearchTerm] = useState('');
-  const [topPerfSearch, setTopPerfSearch] = useState('');
-  const [coverageSearch, setCoverageSearch] = useState('');
-
-  // Debounce
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const debouncedTopPerfSearch = useDebounce(topPerfSearch, 300);
-  const debouncedCoverageSearch = useDebounce(coverageSearch, 300);
-  
-  const [filterSubProduct, setFilterSubProduct] = useState('All');
-  const [filterChannel, setFilterChannel] = useState('All');
-  const [filterMonth, setFilterMonth] = useState('All');
-  
-  const [coverageDrillChannel, setCoverageDrillChannel] = useState<string | null>(null);
-  
-  // Status for 4 groups x 4 files = 16 files
-  // keys: s25 (2025 Sales), s26 (2026 Sales), bCh (Budget Channel), bPr (Budget Product)
-  const [filesStatus, setFilesStatus] = useState({
-    DACARE: { s25: false, s26: false, bCh: false, bPr: false },
-    DAOS: { s25: false, s26: false, bCh: false, bPr: false },
-    'DASP&Q': { s25: false, s26: false, bCh: false, bPr: false },
-    DALIFESTYLE: { s25: false, s26: false, bCh: false, bPr: false },
-  });
-  const [uploadTab, setUploadTab] = useState('DACARE');
-
-  const dashboardRef = useRef<HTMLDivElement>(null);
-
-  // Initialize with empty data (No Mock Data)
-  useEffect(() => {
-    // Clean start
-  }, []);
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, groupName: string, type: string) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const rawData = parseCSV(text);
-      setFilesStatus(prev => ({...prev, [groupName]: { ...prev[groupName as keyof typeof prev], [type]: true }}));
-      
-      // Data Processing Logic for 2025/2026
-      if (type === 's25' || type === 's26') {
-        const year = type === 's25' ? '2025' : '2026';
-        const formatted: SalesRecord[] = rawData.map(row => ({
-          Month: row['Month'], 
-          ProductGroup: groupName, 
-          Channel: row['Channel'], SubChannel: row['Sub-channel'],
-          SoldToParty: row['Sold-to party'], MaterialNumber: row['Material Number'], ProductName: row['Product Name'],
-          SubProductGroup: row['Sub-product group'], GroupSKU: row['Group SKU'] || row['Sub-product group'],
-          NetPrice: cleanCurrency(row['Net Price']), Year: year
-        })).filter(r => r.ProductGroup);
-        
-        setSalesData(prev => {
-           // Remove old data for THIS group and THIS year only
-           const others = prev.filter(r => !(r.ProductGroup === groupName && r.Year === year));
-           return [...others, ...formatted];
-        });
-      } else if (type === 'bCh') {
-         const formatted: BudgetChannel[] = rawData.map(row => ({
-          ProductGroup: groupName, 
-          Channel: row['Channel'], 
-          Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
-          Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
-          Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
-        })).filter(r => r.Channel !== 'TOTAL' && r.Channel);
-        
-        setBudgetChannel(prev => [...prev.filter(r => r.ProductGroup !== groupName), ...formatted]);
-      } else if (type === 'bPr') {
-         const formatted: BudgetProduct[] = rawData.map(row => ({
-          ProductGroup: groupName, 
-          SubProductGroup: row['Sub-product Group'], 
-          Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
-          Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
-          Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
-        })).filter(r => r.SubProductGroup);
-        
-        setBudgetProduct(prev => [...prev.filter(r => r.ProductGroup !== groupName), ...formatted]);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const availableSubProducts = useMemo(() => {
-    const base = selectedGroup === 'ALL' ? salesData : salesData.filter(d => d.ProductGroup === selectedGroup);
-    return Array.from(new Set(base.map(d => d.SubProductGroup || '').filter(Boolean))).sort();
-  }, [salesData, selectedGroup]);
-
-  const availableChannels = useMemo(() => {
-    const base = selectedGroup === 'ALL' ? salesData : salesData.filter(d => d.ProductGroup === selectedGroup);
-    return Array.from(new Set(base.map(d => d.Channel || '').filter(Boolean))).sort();
-  }, [salesData, selectedGroup]);
-
-  const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-  const filteredData = useMemo(() => {
-    return salesData.filter(d => {
-      const matchGroup = selectedGroup === 'ALL' || d.ProductGroup === selectedGroup;
-      const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
-      const matchChannel = filterChannel === 'All' || d.Channel === filterChannel;
-      const matchMonth = filterMonth === 'All' || (d.Month && d.Month.startsWith(filterMonth));
-      return matchGroup && matchSub && matchChannel && matchMonth;
-    });
-  }, [salesData, selectedGroup, filterSubProduct, filterChannel, filterMonth]);
-
-  // --- KPI Calculation (Apple-to-Apple YTD) ---
-  const kpi = useMemo(() => {
-    const filterFn = (d: SalesRecord) => {
-      const matchGroup = selectedGroup === 'ALL' || d.ProductGroup === selectedGroup;
-      const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
-      const matchChannel = filterChannel === 'All' || d.Channel === filterChannel;
-      const matchMonth = filterMonth === 'All' || (d.Month && d.Month.startsWith(filterMonth));
-      return matchGroup && matchSub && matchChannel && matchMonth;
-    };
-
-    // 1. Current Year (2026)
-    const data2026 = salesData.filter(d => d.Year === '2026' && filterFn(d));
-    const s26 = data2026.reduce((a, b) => a + b.NetPrice, 0);
-
-    // 2. Identify available months in 2026 for accurate comparison
-    const monthsPresentIn2026 = new Set(data2026.map(d => d.Month.split('-')[0])); 
-
-    // 3. Previous Year (2025) - Matching Months Only
-    const s25_YTD = salesData
-      .filter(d => d.Year === '2025' && filterFn(d) && monthsPresentIn2026.has(d.Month.split('-')[0]))
-      .reduce((a, b) => a + b.NetPrice, 0);
-
-    const growthYoY = s25_YTD > 0 ? ((s26 - s25_YTD) / s25_YTD) * 100 : 0;
-
-    let target26: number | null = 0;
-    let forecast26: number | null = 0;
-    let plan27: number | null = 0;
-
-    const isSubFiltered = filterSubProduct !== 'All';
-    const isChannelFiltered = filterChannel !== 'All';
-
-    if (isSubFiltered && isChannelFiltered) {
-      target26 = null; forecast26 = null; plan27 = null;
-    } else if (isSubFiltered) {
-       const relevant = budgetProduct.filter(b => (selectedGroup === 'ALL' || b.ProductGroup === selectedGroup) && b.SubProductGroup === filterSubProduct);
-       if (relevant.length === 0) { target26 = null; forecast26 = null; plan27 = null; }
-       else { 
-         target26 = relevant.reduce((a,b) => a + b.Target2026, 0); 
-         forecast26 = relevant.reduce((a,b) => a + b.Forecast2026, 0); 
-         plan27 = relevant.reduce((a,b) => a + b.Plan2027, 0); 
-       }
-    } else if (isChannelFiltered) {
-       const relevant = budgetChannel.filter(b => (selectedGroup === 'ALL' || b.ProductGroup === selectedGroup) && b.Channel === filterChannel);
-       if (relevant.length === 0) { target26 = null; forecast26 = null; plan27 = null; }
-       else { 
-         target26 = relevant.reduce((a,b) => a + b.Target2026, 0); 
-         forecast26 = relevant.reduce((a,b) => a + b.Forecast2026, 0); 
-         plan27 = relevant.reduce((a,b) => a + b.Plan2027, 0); 
-       }
-    } else {
-       const relevant = budgetChannel.filter(b => (selectedGroup === 'ALL' || b.ProductGroup === selectedGroup));
-       target26 = relevant.reduce((a,b) => a + b.Target2026, 0); 
-       forecast26 = relevant.reduce((a,b) => a + b.Forecast2026, 0); 
-       plan27 = relevant.reduce((a,b) => a + b.Plan2027, 0);
-    }
-    const progress = (target26 && target26 > 0) ? (s26 / target26) * 100 : 0;
-    const growthPlan = (target26 && plan27 && target26 > 0) ? ((plan27 - target26) / target26) * 100 : 0;
-    
-    return { s26, s25_YTD, growthYoY, target26, forecast26, plan27, progress, growthPlan };
-  }, [salesData, budgetChannel, budgetProduct, selectedGroup, filterSubProduct, filterChannel, filterMonth]);
-
-  // --- Charts Logic ---
-  const trendChartData = useMemo(() => {
-    const base2026 = filteredData.filter(d => d.Year === '2026');
-    if (selectedGroup === 'ALL') {
-      return monthsList.map(m => {
-        const monthData = base2026.filter(d => d.Month.startsWith(m));
-        const dacare = monthData.filter(d => d.ProductGroup === 'DACARE').reduce((s, r) => s + r.NetPrice, 0);
-        const daos = monthData.filter(d => d.ProductGroup === 'DAOS').reduce((s, r) => s + r.NetPrice, 0);
-        const dasp = monthData.filter(d => d.ProductGroup === 'DASP&Q').reduce((s, r) => s + r.NetPrice, 0);
-        const dalife = monthData.filter(d => d.ProductGroup === 'DALIFESTYLE').reduce((s, r) => s + r.NetPrice, 0);
-        const total = dacare + daos + dasp + dalife;
-        return {
-          name: m,
-          'DACARE': dacare,
-          'DAOS': daos,
-          'DASP&Q': dasp,
-          'DALIFESTYLE': dalife,
-          total: total === 0 ? null : total
+        // --- ระบบแปลง Vanilla Lucide ให้เป็น React Components ---
+        const createIcon = (iconName) => (props) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (window.lucide && iconRef.current) {
+                    window.lucide.createIcons({ root: iconRef.current.parentElement });
+                }
+            });
+            return <i ref={iconRef} data-lucide={iconName} className={props.className} style={props.style}></i>;
         };
-      });
-    } else {
-      const base2025 = salesData.filter(d => d.ProductGroup === selectedGroup && d.Year === '2025' && (filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct) && (filterChannel === 'All' || d.Channel === filterChannel));
-      return monthsList.map(m => {
-        const val2025 = base2025.filter(d => d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
-        const val2026 = base2026.filter(d => d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
-        return {
-          name: m,
-          '2025': val2025,
-          '2026': val2026 === 0 ? null : val2026,
-        };
-      });
-    }
-  }, [salesData, filteredData, selectedGroup, filterSubProduct, filterChannel]);
 
-  const channelMix = useMemo(() => {
-    const data: any = {};
-    filteredData.filter(d => d.Year === '2026').forEach(d => { data[d.Channel] = (data[d.Channel] || 0) + d.NetPrice; });
-    return Object.keys(data).map(k => ({ name: k, value: data[k] })).sort((a, b) => b.value - a.value);
-  }, [filteredData]);
+        const Upload = createIcon("upload");
+        const TrendingUp = createIcon("trending-up");
+        const Target = createIcon("target");
+        const Users = createIcon("users");
+        const DollarSign = createIcon("dollar-sign");
+        const LayoutDashboard = createIcon("layout-dashboard");
+        const PieIcon = createIcon("pie-chart");
+        const X = createIcon("x");
+        const Search = createIcon("search");
+        const ChevronDown = createIcon("chevron-down");
+        const Calendar = createIcon("calendar");
+        const Layers = createIcon("layers");
+        const ShoppingBag = createIcon("shopping-bag");
+        const Trophy = createIcon("trophy");
+        const Medal = createIcon("medal");
+        const Store = createIcon("store");
+        const ArrowLeft = createIcon("arrow-left");
+        const Grid3X3 = createIcon("grid-3x3");
+        const AlertCircle = createIcon("alert-circle");
+        const MapPin = createIcon("map-pin");
+        const Lightbulb = createIcon("lightbulb");
+        const Sparkles = createIcon("sparkles");
+        const ArrowRightCircle = createIcon("arrow-right-circle");
+        const Package = createIcon("package");
+        const Check = createIcon("check");
 
-  // --- Top Performers ---
-  const topPerformers = useMemo(() => {
-    const skuMap: Record<string, { totalSales: number, products: Record<string, number> }> = {};
-    filteredData.filter(d => d.Year === '2026').forEach(d => {
-        const key = d.GroupSKU || 'Unknown';
-        if (!skuMap[key]) skuMap[key] = { totalSales: 0, products: {} };
-        skuMap[key].totalSales += d.NetPrice;
-        const pName = d.ProductName || 'Unknown';
-        skuMap[key].products[pName] = (skuMap[key].products[pName] || 0) + d.NetPrice;
-    });
-    let list = Object.entries(skuMap).map(([sku, data]) => {
-        let bestProd = sku;
-        let maxS = -1;
-        Object.entries(data.products).forEach(([pName, s]) => { if (s > maxS) { maxS = s; bestProd = pName; } });
-        return { sku: sku, name: bestProd, value: data.totalSales };
-    });
-    if (debouncedTopPerfSearch.length >= 2) {
-      const term = debouncedTopPerfSearch.toLowerCase();
-      list = list.filter(item => item.sku.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
-    }
-    return list.sort((a, b) => b.value - a.value).slice(0, 10);
-  }, [filteredData, debouncedTopPerfSearch]);
-
-  // --- Coverage Analysis Grid ---
-  const coverageGrid = useMemo(() => {
-    const base2026 = salesData.filter(d => d.Year === '2026' && (selectedGroup === 'ALL' || d.ProductGroup === selectedGroup));
-    const rowsBase = filterSubProduct !== 'All' ? base2026.filter(d => d.SubProductGroup === filterSubProduct) : base2026;
-
-    const skuStats: Record<string, number> = {};
-    rowsBase.forEach(d => { if (d.GroupSKU) skuStats[d.GroupSKU] = (skuStats[d.GroupSKU] || 0) + d.NetPrice; });
-    let sortedRows = Object.keys(skuStats).sort((a, b) => skuStats[b] - skuStats[a]);
-
-    if (debouncedCoverageSearch.length >= 2) {
-      const term = debouncedCoverageSearch.toLowerCase();
-      const skuChannels: Record<string, Set<string>> = {};
-      base2026.forEach(d => {
-         const k = d.GroupSKU;
-         if(!skuChannels[k]) skuChannels[k] = new Set();
-         skuChannels[k].add(d.Channel?.toLowerCase() || '');
-         skuChannels[k].add(d.SubChannel?.toLowerCase() || '');
-      });
-      sortedRows = sortedRows.filter(sku => {
-         if (sku.toLowerCase().includes(term)) return true;
-         const chans = skuChannels[sku];
-         if (!chans) return false;
-         for (let c of chans) if (c.includes(term)) return true;
-         return false;
-      });
-    }
-
-    const colStats: Record<string, number> = {};
-    if (coverageDrillChannel) {
-      const drillBase = base2026.filter(d => d.Channel === coverageDrillChannel);
-      drillBase.forEach(d => { if (d.SubChannel) colStats[d.SubChannel] = (colStats[d.SubChannel] || 0) + d.NetPrice; });
-    } else {
-      base2026.forEach(d => { if (d.Channel) colStats[d.Channel] = (colStats[d.Channel] || 0) + d.NetPrice; });
-    }
-    const columns = Object.keys(colStats).sort((a, b) => colStats[b] - colStats[a]);
-
-    const matrix: Record<string, Record<string, { sales: number, count: number }>> = {};
-    const columnTotals: Record<string, { sales: number, count: number }> = {};
-    const rowTotals: Record<string, number> = {};
-    
-    sortedRows.forEach(r => { matrix[r] = {}; rowTotals[r] = 0; });
-    columns.forEach(c => { columnTotals[c] = { sales: 0, count: 0 }; });
-
-    const colSet = new Set(columns);
-    const rowSet = new Set(sortedRows);
-    
-    const colUniqueItemsForHeader: Record<string, Set<string>> = {};
-    const colSalesForHeader: Record<string, number> = {};
-    columns.forEach(c => { 
-        colUniqueItemsForHeader[c] = new Set(); 
-        colSalesForHeader[c] = 0;
-    });
-
-    const allowedSKUs = new Set(sortedRows);
-    const cellUniqueItems: Record<string, Record<string, Set<string>>> = {};
-
-    base2026.forEach(d => {
-       const sku = d.GroupSKU;
-       let col = '';
-       if (coverageDrillChannel) {
-         col = d.Channel === coverageDrillChannel ? d.SubChannel : '';
-       } else {
-         col = d.Channel;
-       }
-       if (!col || !colSet.has(col)) return;
-
-       if (allowedSKUs.has(sku)) {
-           colSalesForHeader[col] += d.NetPrice;
-           if (!coverageDrillChannel) {
-               if (isChainBasedChannel(col)) colUniqueItemsForHeader[col].add(d.SubChannel);
-               else colUniqueItemsForHeader[col].add(d.SoldToParty);
-           }
-       }
-
-       if (!sku || !rowSet.has(sku)) return;
-
-       if (!cellUniqueItems[sku]) cellUniqueItems[sku] = {};
-       if (!cellUniqueItems[sku][col]) {
-          cellUniqueItems[sku][col] = new Set();
-          matrix[sku][col] = { sales: 0, count: 0 };
-       }
-       matrix[sku][col].sales += d.NetPrice;
-
-       const uniqueKey = (coverageDrillChannel || isChainBasedChannel(coverageDrillChannel ? d.Channel : col)) 
-          ? (coverageDrillChannel ? d.SoldToParty : d.SubChannel)
-          : d.SoldToParty;
-
-       if (uniqueKey) {
-          cellUniqueItems[sku][col].add(uniqueKey);
-       }
-    });
-
-    sortedRows.forEach(sku => {
-       columns.forEach(col => {
-          if (cellUniqueItems[sku]?.[col]) {
-             const count = coverageDrillChannel ? (matrix[sku][col].sales > 0 ? 1 : 0) : cellUniqueItems[sku][col].size;
-             matrix[sku][col].count = count;
-             rowTotals[sku] += count;
-          } else {
-             matrix[sku][col] = { sales: 0, count: 0 };
-          }
-       });
-    });
-
-    columns.forEach(col => {
-       let totalCount = 0;
-       if (coverageDrillChannel) {
-          sortedRows.forEach(sku => { if (matrix[sku][col] && matrix[sku][col].sales > 0) totalCount++; });
-       } else {
-          totalCount = colUniqueItemsForHeader[col].size;
-       }
-       columnTotals[col] = { sales: colSalesForHeader[col], count: totalCount };
-    });
-
-    return { rows: sortedRows, columns, matrix, columnTotals, rowTotals };
-  }, [salesData, selectedGroup, filterSubProduct, coverageDrillChannel, debouncedCoverageSearch]);
-
-  // --- Universal Search Logic ---
-  const searchResults = useMemo(() => {
-    if (!debouncedSearchTerm || debouncedSearchTerm.length < 2) return [];
-    const term = debouncedSearchTerm.toLowerCase();
-    const agg: Record<string, { sales: number, channels: Set<string>, subSales: Record<string, number> }> = {};
-    salesData.forEach(d => {
-      if (d.Year !== '2026') return;
-      const match = (d.GroupSKU && d.GroupSKU.toLowerCase().includes(term)) || 
-                    (d.ProductName && d.ProductName.toLowerCase().includes(term)) ||
-                    (d.SoldToParty && d.SoldToParty.toLowerCase().includes(term)) ||
-                    (d.Channel && d.Channel.toLowerCase().includes(term));
-      if (match) {
-         const pName = d.ProductName;
-         if (!agg[pName]) agg[pName] = { sales: 0, channels: new Set(), subSales: {} };
-         agg[pName].sales += d.NetPrice;
-         agg[pName].channels.add(d.Channel);
-         if (isChainBasedChannel(d.Channel) && d.SubChannel) {
-            if (!agg[pName].subSales[d.SubChannel]) agg[pName].subSales[d.SubChannel] = 0;
-            agg[pName].subSales[d.SubChannel] += d.NetPrice;
-         }
-      }
-    });
-    return Object.entries(agg)
-      .map(([name, data]) => {
-        const channelList = Array.from(data.channels);
-        const chainChannels = channelList.filter(c => isChainBasedChannel(c));
-        const otherChannels = channelList.filter(c => !isChainBasedChannel(c));
-        let locText = "";
-        if (chainChannels.length > 0) {
-           const topSubs = Object.entries(data.subSales).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]).join(', ');
-           const chainText = `${chainChannels.join('/')} (${topSubs}${Object.keys(data.subSales).length > 3 ? '...' : ''})`;
-           locText = otherChannels.length > 0 ? `${otherChannels.join(', ')}, ${chainText}` : chainText;
-        } else {
-           locText = channelList.join(', ');
+        // --- Types ---
+        interface SalesRecord {
+          Month: string;
+          ProductGroup: string;
+          Channel: string;
+          SubChannel: string;
+          SoldToParty: string;
+          MaterialNumber: string;
+          ProductName: string;
+          SubProductGroup: string;
+          GroupSKU: string;
+          NetPrice: number;
+          Year: string;
         }
-        return { name, val: data.sales, location: locText };
-      })
-      .sort((a, b) => b.val - a.val);
-  }, [salesData, debouncedSearchTerm]);
 
-  // --- Dynamic Recommendations ---
-  const dynamicRecommendations = useMemo(() => {
-    const isGrowthPositive = kpi.growthYoY >= 0;
-    const topCh = channelMix.length > 0 ? channelMix[0].name : 'N/A';
-    const growthVal = Math.abs(kpi.growthYoY).toFixed(1);
-    let contextTitle = `Overview`;
-    if (filterSubProduct !== 'All') contextTitle = filterSubProduct;
-    else if (selectedGroup !== 'ALL') contextTitle = selectedGroup;
+        interface BudgetChannel {
+          ProductGroup: string;
+          Channel: string;
+          Target2026: number; 
+          Plan2027: number;   
+          Forecast2026: number;
+        }
 
-    const subProductRecs: Record<string, { head: string, desc: string }[]> = {
-        'Tissue': [
-            { head: "Premium Softness War", desc: "ตลาดทิชชู่แข่งกันที่ 'ความนุ่ม'. ควรออกรุ่น Premium Soft Pack ที่เน้นสัมผัสผิวหน้าโดยเฉพาะ เจาะกลุ่มผู้หญิงวัยทำงาน" },
-            { head: "On-the-Go Hygiene", desc: "ขยายไลน์ Pocket Tissue หรือ Mini Handkerchief ที่พกพาสะดวก ลายลิขสิทธิ์น่ารัก เพื่อวางขายหน้า Counter ใน CVS" },
-            { head: "Kitchen Towel Value", desc: "ดันยอด Kitchen Towel แบบแผ่นใหญ่หนาพิเศษในช่องทาง MT เพื่อจับกลุ่มแม่บ้านที่เน้นความคุ้มค่าและดูดซับมันดีเยี่ยม" }
-        ],
-        'Mask': [
-            { head: "PM2.5 Seasonal Push", desc: "เตรียมสต็อกและสื่อโฆษณา Mask ป้องกัน PM2.5 ล่วงหน้าก่อนเข้าฤดูฝุ่น (ธ.ค.-มี.ค.) เพื่อชิงส่วนแบ่งการตลาดช่วง High Season" },
-            { head: "Fashion & Function", desc: "Mask ไม่ใช่แค่ป้องกันแต่เป็นแฟชั่น. ออกสีใหม่ Earth Tone หรือ Pastel และรูปทรง 3D ที่ใส่แล้วหน้าเรียว เจาะกลุ่ม Gen Z" },
-            { head: "Kids Medical Grade", desc: "ตลาดหน้ากากเด็กยังต้องการ Medical Grade ที่ลายน่ารักและใส่สบาย พ่อแม่ยินดีจ่ายแพงเพื่อความปลอดภัยของลูก" }
-        ],
-        'Wipes': [
-            { head: "Sanitizing vs Baby", desc: "แยกเซกเมนต์ให้ชัด: Wipes แอลกอฮอล์สำหรับวัยทำงาน (เน้นฆ่าเชื้อ) และ Water Wipes สำหรับแม่และเด็ก (เน้นอ่อนโยน 99% น้ำเปล่า)" },
-            { head: "Adult Care Boom", desc: "ออก Wipes แผ่นใหญ่หนานุ่มสำหรับผู้สูงอายุ รองรับ Aging Society ขายคู่กับผ้าอ้อมผู้ใหญ่ในช่องทาง Pharmacy/MT" },
-            { head: "Flushable Innovation", desc: "นวัตกรรมทิชชู่เปียกที่ทิ้งลงชักโครกได้ (Flushable) เป็น Gap ใหม่ในตลาดคอนโดและออฟฟิศเกรด A" }
-        ],
-        'Stapler': [
-            { head: "Ergonomic & Force Reduction", desc: "เน้นจุดขาย 'เย็บเบาแรง' (Effortless) และดีไซน์ที่จับถนัดมือ ลดอาการปวดนิ้วสำหรับพนักงานออฟฟิศที่ใช้งานหนัก" },
-            { head: "Color Series Collection", desc: "ออกคอลเลกชันสีตามเทรนด์ (เช่น Pantone ประจำปี) เพื่อกระตุ้นให้ลูกค้าซื้อใหม่แม้ของเดิมยังไม่พัง" },
-            { head: "Bundle Strategy", desc: "ขายคู่ลูกแม็กคุณภาพสูงใน Pack เดียว (Starter Kit) เพื่อแก้ปัญหาลูกแม็กติดขัดและสร้าง Brand Loyalty" }
-        ],
-        'Glue': [
-            { head: "Non-Toxic for Kids", desc: "ชูจุดขาย 'ไร้สารพิษ & ล้างออกง่าย' สำหรับกาวแท่งเจาะกลุ่มโรงเรียนและผู้ปกครอง สร้างความมั่นใจเรื่องความปลอดภัย" },
-            { head: "Precision Application", desc: "พัฒนากาวหัวปากกาหรือกาวเทป (Glue Tape) สำหรับงานประดิษฐ์และ Planner ที่ต้องการความเนี้ยบ ไม่เลอะเทอะ" },
-            { head: "Office Bulk Pack", desc: "ทำ Pack ประหยัดสุดคุ้มสำหรับสำนักงาน (B2B) เพื่อแย่งส่วนแบ่งจาก House Brand ในแคตตาล็อกจัดซื้อ" }
-        ]
-    };
+        interface BudgetProduct {
+          ProductGroup: string;
+          SubProductGroup: string;
+          Target2026: number;
+          Plan2027: number;
+          Forecast2026: number;
+        }
 
-    const getGenericProductRecs = (prodName: string) => [
-        { head: `Expand ${prodName} Distribution`, desc: `สินค้า ${prodName} มีศักยภาพในการขยายไปยังช่องทาง ${topCh} เพิ่มเติม ตรวจสอบ Gap Analysis เพื่อดูสาขาที่ยังไม่วางจำหน่าย` },
-        { head: `${prodName} Value Pack`, desc: `กระตุ้นยอดขายต่อบิลด้วยการทำ Bundle Pack หรือ Family Pack สำหรับ ${prodName} ในช่องทาง Online และ Hypermarket` },
-        { head: "Cross-Category Promo", desc: `จัดโปรโมชั่นซื้อ ${prodName} คู่กับสินค้าขายดีตัวอื่นในพอร์ต (เช่น กระดาษ A4) เพื่อแนะนำสินค้าให้ลูกค้าเดิมทดลองใช้` }
-    ];
+        // --- Hooks ---
+        function useDebounce<T>(value: T, delay: number): T {
+          const [debouncedValue, setDebouncedValue] = useState(value);
+          useEffect(() => {
+            const handler = setTimeout(() => setDebouncedValue(value), delay);
+            return () => clearTimeout(handler);
+          }, [value, delay]);
+          return debouncedValue;
+        }
 
-    let items = [];
-    if (filterSubProduct !== 'All') {
-        items = subProductRecs[filterSubProduct] || getGenericProductRecs(filterSubProduct);
-    } else {
-        const getGeneralRecs = () => [
-            { head: isGrowthPositive ? "2026 Growth Momentum" : "2026 Turnaround", desc: isGrowthPositive ? `ปี 2026 เริ่มต้นดีโต ${growthVal}% YoY. รักษา Momentum ในช่องทาง ${topCh} แล้วขยายสินค้า Hero ไปยังช่องทางรอง` : `ปี 2026 ยอดขายชะลอตัว ${growthVal}%. ต้องเร่งทบทวนแผนช่องทางหลักและอัดโปรโมชั่นดึงยอดคืนในไตรมาสถัดไป` },
-            { head: "Channel Optimization", desc: `ช่องทาง ${topCh} ยังคงเป็นเส้นเลือดใหญ่ (${kpi.s26 ? (channelMix[0]?.value/kpi.s26*100).toFixed(0) : 0}%). ควรกระจายความเสี่ยงไป Online หรือ MT อื่นๆ` },
-            { head: "Profit Focus", desc: "เน้นสินค้า High Margin ในกลุ่ม DAOS เพื่อชดเชยการแข่งขันราคาในตลาด Mass ของ DACARE" }
-        ];
-
-        const groupRecs: any = {
-            'DACARE': [
-                { head: "Premium Hygiene 2026", desc: "เทรนด์ปีนี้คือ Premium Hygiene ผู้บริโภคยอมจ่ายแพงเพื่อสินค้าที่ดูดีและอ่อนโยนกว่าเดิม" },
-                { head: "Aging Society", desc: "ตลาดผู้สูงอายุโตต่อเนื่อง ดันสินค้า Wipes สำหรับผู้ใหญ่เข้า MT/Pharmacy ให้มากขึ้น" },
-                { head: "Travel Recovery", desc: "ท่องเที่ยวฟื้นตัว 100% จัดเซ็ต Travel Kit วางขาย CVS ดักนักท่องเที่ยว" }
-            ],
-            'DAOS': [
-                { head: "Smart Hybrid Work", desc: "สินค้าออฟฟิศต้องเบาและพกพาได้ ตอบโจทย์การทำงานแบบ Hybrid Work ที่ยังคงอยู่" },
-                { head: "Green Office", desc: "B2B มองหา Green Supply Chain. ชูจุดขายสินค้ารักษ์โลกเพื่อปิดดีล Corporate ใหญ่" },
-                { head: "Gen Z Aesthetic", desc: "ดีไซน์ Minimal/Pastel ยังครองใจ Gen Z. ออกคอลเลกชันใหม่กระตุ้นการซื้อซ้ำ" }
-            ],
-            'DASP&Q': [
-                { head: "Channel Pack Size", desc: "CVS = Pack เล็ก, Online = Bulk Pack. แยก SKU ให้ชัดเพื่อไม่ให้แย่งยอดกันเอง" },
-                { head: "Collab Marketing", desc: "Collab กับ Artist หรือ Character ดังเพื่อสร้างสีสันให้สินค้ากระดาษธรรมดาดูน่าสะสม" },
-                { head: "Planner Niche", desc: "เจาะตลาดสมุด Planner/Journal ที่ยังมี Loyalty สูงและ Margin ดี" }
-            ],
-            'DALIFESTYLE': [
-                { head: "Eco-Lifestyle", desc: "ชูจุดขาย Eco-friendly สำหรับสินค้าไลฟ์สไตล์ (ถุงผ้า/แก้วน้ำ) ตอบโจทย์เทรนด์รักษ์โลก 2026" },
-                { head: "Corporate Gift", desc: "บุกตลาดของพรีเมียมองค์กร (Corporate Gift) ใช้จุดแข็ง Brand Double A สร้างความน่าเชื่อถือ" },
-                { head: "Online Driven", desc: "ใช้ Social Commerce (TikTok/Shopee Live) เป็นช่องทางหลักในการขายสินค้ากลุ่มนี้เพื่อเข้าถึงคนรุ่นใหม่" }
-            ]
+        // --- Helpers ---
+        const cleanCurrency = (val: string | number): number => {
+          if (typeof val === 'number') return val;
+          if (!val) return 0;
+          return parseFloat(val.toString().replace(/[฿",]/g, '').trim()) || 0;
         };
-        items = selectedGroup === 'ALL' ? getGeneralRecs() : (groupRecs[selectedGroup] || getGeneralRecs());
-    }
 
-    return { title: `AI Strategic Insights: ${contextTitle} (BETA)`, items: items };
-  }, [selectedGroup, filterSubProduct, kpi, channelMix]);
+        const parseCSV = (text: string): any[] => {
+          const lines = text.split('\n').filter(l => l.trim() !== '');
+          const headers = lines[0].split(',').map(h => h.trim());
+          return lines.slice(1).map(line => {
+            let row: string[] = [];
+            let inQuote = false;
+            let current = '';
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              if (char === '"') { inQuote = !inQuote; } 
+              else if (char === ',' && !inQuote) { row.push(current); current = ''; } 
+              else { current += char; }
+            }
+            row.push(current);
+            const obj: any = {};
+            headers.forEach((h, i) => {
+              obj[h] = row[i]?.replace(/^"|"$/g, '').trim();
+            });
+            return obj;
+          });
+        };
 
-  const COLORS = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-  const BLUE_PALETTE = ['#1e3a8a', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
+        const isChainBasedChannel = (channel: string) => {
+          const upper = channel?.toUpperCase() || '';
+          return ['MT', 'INTER COMPANY', 'ONLINE', 'BJC'].includes(upper);
+        };
 
-  const renderCustomLabel = (props: any) => {
-    const { x, y, width, value } = props;
-    if (value === 0 || value === undefined || value === null) return null;
-    const cx = (width && !isNaN(width)) ? x + width / 2 : x;
-    const cy = !isNaN(y) ? y - 10 : y;
-    if (isNaN(cx) || isNaN(cy)) return null;
-    const valInM = Number(value) / 1000000;
-    const formatted = valInM < 1 ? `${valInM.toFixed(2)}M` : `${valInM.toFixed(1)}M`;
-    return <text x={cx} y={cy} fill="#64748b" textAnchor="middle" fontSize={10}>{formatted}</text>;
-  };
+        // --- Sub-components ---
+        const FilterDropdown = ({ label, value, options, onChange, icon }: any) => {
+          const [isOpen, setIsOpen] = useState(false);
+          const dropdownRef = useRef<HTMLDivElement>(null);
 
-  return (
-    <div ref={dashboardRef} className={`bg-slate-50 min-h-screen font-sans text-slate-800 pb-10 w-full`}>
-      
-      {/* Header */}
-      <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
-        <div className="w-full px-6 h-16 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <LayoutDashboard className="w-6 h-6 text-blue-400" />
-            <div>
-              <h1 className="text-lg font-semibold tracking-wide">Non-paper Performance Dashboard <span className="text-blue-400">2026</span> <span className="text-blue-400 text-sm">(BETA)</span></h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex bg-slate-800 rounded-md p-1">
-              {['ALL', 'DACARE', 'DAOS', 'DASP&Q', 'DALIFESTYLE'].map(group => (
-                <button key={group} onClick={() => { setSelectedGroup(group); setFilterSubProduct('All'); }} className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${selectedGroup === group ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-white'}`}>
-                  {group}
-                </button>
-              ))}
-            </div>
-            <button onClick={() => setShowUpload(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors">
-              <Upload className="w-4 h-4" /> <span className="hidden md:inline">Import Data</span>
-            </button>
-          </div>
-        </div>
-        
-        {/* Filter Bar */}
-        <div className="bg-white border-b border-slate-200 py-3 relative z-40">
-          <div className="w-full px-6 flex flex-wrap gap-4 items-center">
-            <span className="text-sm font-bold text-slate-500 uppercase flex items-center gap-2">
-              <Layers className="w-4 h-4" /> Filters:
-            </span>
-            <FilterDropdown label="Product" value={filterSubProduct} options={['All', ...availableSubProducts]} onChange={setFilterSubProduct} icon={<ShoppingBag className="w-4 h-4" />} />
-            <FilterDropdown label="Channel" value={filterChannel} options={['All', ...availableChannels]} onChange={setFilterChannel} icon={<Users className="w-4 h-4" />} />
-            <FilterDropdown label="Month" value={filterMonth} options={['All', ...monthsList]} onChange={setFilterMonth} icon={<Calendar className="w-4 h-4" />} />
-            {(filterSubProduct !== 'All' || filterChannel !== 'All' || filterMonth !== 'All') && (
-              <button onClick={() => { setFilterSubProduct('All'); setFilterChannel('All'); setFilterMonth('All'); }} className="text-sm text-red-500 hover:text-red-700 font-medium ml-auto flex items-center gap-1 px-3 py-1.5 border border-red-100 rounded bg-red-50 hover:bg-red-100 transition-colors">
-                <X className="w-4 h-4" /> Reset Filters
+          useEffect(() => {
+            const handleClickOutside = (event: MouseEvent) => {
+              if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsOpen(false);
+            };
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+          }, []);
+
+          return (
+            <div className="relative" ref={dropdownRef}>
+              <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 px-3 py-2 rounded hover:border-blue-400 hover:text-blue-600 transition-colors shadow-sm min-w-[160px] justify-between">
+                <div className="flex items-center gap-2">{icon}<span className="text-slate-500">{label}:</span><span className="text-blue-700 font-bold truncate max-w-[100px]">{value}</span></div>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
               </button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="w-full px-6 py-6 space-y-6">
-        
-        {/* KPI Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full">
-            <div>
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-sm font-bold text-slate-500 uppercase">YTD Actual 2026</span>
-                <DollarSign className="w-5 h-5 text-blue-600" />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-3xl font-bold text-slate-900">฿{kpi.s26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</h3>
-              <div className={`text-sm mt-2 font-bold flex items-center gap-1 ${kpi.growthYoY >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {kpi.growthYoY >= 0 ? '▲' : '▼'} {Math.abs(kpi.growthYoY).toFixed(1)}% vs 2025 YTD
-              </div>
-            </div>
-          </div>
-
-          <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.target26 === null ? 'opacity-70 grayscale' : ''}`}>
-             <div className="flex justify-between items-start mb-1">
-               <span className="text-sm font-bold text-slate-500 uppercase">Target 2026</span>
-               <Target className="w-5 h-5 text-purple-600" />
-             </div>
-             <div>
-               {kpi.target26 !== null ? (
-                 <>
-                   <div className="flex justify-between items-end mb-1">
-                     <h3 className="text-3xl font-bold text-slate-900">
-                        {kpi.target26 === 0 ? 'TBC' : `฿${kpi.target26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
-                     </h3>
-                     {kpi.target26 > 0 && <span className={`text-sm font-bold ${kpi.progress >= 100 ? 'text-green-600' : 'text-blue-600'}`}>{kpi.progress.toFixed(1)}%</span>}
-                   </div>
-                   {kpi.target26 > 0 && (
-                     <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                       <div className={`h-full rounded-full transition-all duration-500 ${kpi.progress >= 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(kpi.progress, 100)}%` }}></div>
-                     </div>
-                   )}
-                 </>
-               ) : (
-                  <div className="h-full flex items-center justify-center text-slate-400 text-sm italic py-2">
-                    N/A (Filtered)
-                  </div>
-               )}
-             </div>
-          </div>
-
-          <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.forecast26 === null ? 'opacity-70 grayscale' : ''}`}>
-             <div className="flex justify-between items-start mb-2">
-               <span className="text-sm font-bold text-slate-500 uppercase">Forecast 2026 (L.E.)</span>
-               <TrendingUp className="w-5 h-5 text-orange-600" />
-             </div>
-             <div>
-                {kpi.forecast26 !== null ? (
-                    <h3 className="text-3xl font-bold text-slate-900">
-                      {kpi.forecast26 === 0 ? 'TBC' : `฿${kpi.forecast26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
-                    </h3>
-                ) : (
-                    <div className="text-3xl font-bold text-slate-300">N/A</div>
-                )}
-                <p className="text-sm text-slate-400 mt-2">Latest Estimate</p>
-             </div>
-          </div>
-
-          <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.plan27 === null ? 'opacity-70 grayscale' : ''}`}>
-             <div className="flex justify-between items-start mb-2">
-               <span className="text-sm font-bold text-slate-500 uppercase">Plan 2027</span>
-               <Target className="w-5 h-5 text-emerald-600" />
-             </div>
-             <div>
-                {kpi.plan27 !== null ? (
-                    <>
-                      <h3 className="text-3xl font-bold text-slate-900">
-                        {kpi.plan27 === 0 ? 'TBC' : `฿${kpi.plan27.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
-                      </h3>
-                      {kpi.plan27 > 0 && (
-                        <div className={`text-sm mt-2 font-bold flex items-center gap-1 ${kpi.growthPlan >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {kpi.growthPlan >= 0 ? '▲' : '▼'} {Math.abs(kpi.growthPlan).toFixed(1)}% vs Target 26
-                        </div>
-                      )}
-                    </>
-                ) : (
-                    <>
-                      <div className="text-3xl font-bold text-slate-300">N/A</div>
-                      <p className="text-sm text-slate-400 mt-2">Next Year Goal</p>
-                    </>
-                )}
-             </div>
-          </div>
-        </div>
-
-        {/* Charts Row 1: Trend & Channel Mix */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Dynamic Sales Trend */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
-            <div className="flex justify-between items-center mb-6">
-               <h3 className="text-base font-bold text-slate-700 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-blue-600" /> 
-                  {selectedGroup === 'ALL' ? '2026 Monthly Trend (Stacked)' : 'Sales Trend 2025 vs 2026'}
-               </h3>
-            </div>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                {selectedGroup === 'ALL' ? (
-                  <ComposedChart data={trendChartData} barSize={24}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="name" tick={{fontSize: 12}} axisLine={false} tickLine={false} />
-                    <YAxis tick={{fontSize: 12}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
-                    <Tooltip 
-                      cursor={{fill: '#f8fafc'}}
-                      contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}}
-                      formatter={(v: any) => `฿${(v/1000000).toFixed(2)}M`}
-                    />
-                    <Legend wrapperStyle={{fontSize: '12px'}} />
-                    <Bar dataKey="DACARE" stackId="a" fill="#3b82f6" />
-                    <Bar dataKey="DAOS" stackId="a" fill="#f59e0b" />
-                    <Bar dataKey="DASP&Q" stackId="a" fill="#10b981" />
-                    <Bar dataKey="DALIFESTYLE" stackId="a" fill="#8b5cf6" />
-                    <Line type="monotone" dataKey="total" stroke="none" dot={false} activeDot={false}>
-                      <LabelList dataKey="total" position="top" content={renderCustomLabel} />
-                    </Line>
-                  </ComposedChart>
-                ) : (
-                  <LineChart data={trendChartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="name" tick={{fontSize: 12}} axisLine={false} tickLine={false} />
-                    <YAxis tick={{fontSize: 12}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
-                    <Tooltip 
-                      contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}}
-                      formatter={(v: any) => `฿${(v/1000000).toFixed(2)}M`}
-                    />
-                    <Legend wrapperStyle={{fontSize: '12px'}} />
-                    <Line type="monotone" dataKey="2026" stroke="#2563eb" strokeWidth={3} dot={{r:4}}>
-                      <LabelList dataKey="2026" position="top" content={renderCustomLabel} />
-                    </Line>
-                    <Line type="monotone" dataKey="2025" stroke="#94a3b8" strokeDasharray="5 5" strokeWidth={2} dot={{r:4}} />
-                  </LineChart>
-                )}
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Channel Mix 2026 */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
-            <h3 className="text-base font-bold text-slate-700 mb-4 flex items-center gap-2">
-              <PieIcon className="w-5 h-5 text-blue-600" /> Channel Mix 2026
-            </h3>
-            <div className="h-48 relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={channelMix} innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value">
-                    {channelMix.map((entry, index) => <Cell key={`cell-${index}`} fill={BLUE_PALETTE[index % BLUE_PALETTE.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={(v: any) => `฿${(v/1000000).toFixed(2)}M`} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                 <div className="text-center">
-                    <div className="text-xs text-slate-400">Total</div>
-                    <div className="text-sm font-bold text-slate-700">{(kpi.s26/1000000).toFixed(1)}M</div>
-                 </div>
-              </div>
-            </div>
-            
-            <div className="mt-4 space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
-              {channelMix.map((item, idx) => {
-                 const percent = kpi.s26 > 0 ? (item.value / kpi.s26 * 100).toFixed(1) : "0";
-                 return (
-                  <div key={item.name} className="flex justify-between items-center text-sm border-b border-slate-50 pb-2 last:border-0">
-                     <div className="flex items-center gap-2">
-                       <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: BLUE_PALETTE[idx % BLUE_PALETTE.length]}}></div>
-                       <span className="text-slate-600 font-medium">{item.name}</span>
-                     </div>
-                     <div className="text-right">
-                       <span className="font-bold text-slate-800 block">฿{(item.value/1000000).toFixed(1)}M</span>
-                       <span className="text-xs text-slate-400 font-medium">({percent}%)</span>
-                     </div>
-                  </div>
-                 );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Charts Row 2: Top Performers & Universal Search */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Top Performers */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2 flex flex-col">
-             <div className="flex justify-between items-center mb-6">
-               <div className="flex items-center gap-2">
-                 <Trophy className="w-5 h-5 text-yellow-500" />
-                 <h3 className="text-base font-bold text-slate-700">Top Performers 2026 (Group SKU)</h3>
-               </div>
-               
-               <div className="relative w-56">
-                 <input 
-                   type="text" 
-                   placeholder="Filter list..." 
-                   className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:outline-none focus:border-blue-400"
-                   value={topPerfSearch}
-                   onChange={(e) => setTopPerfSearch(e.target.value)}
-                 />
-                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-               </div>
-             </div>
-
-             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 max-h-72">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-slate-400 border-b border-slate-100 font-medium">
-                    <tr>
-                      <th className="py-3 pl-3">Rank</th>
-                      <th className="py-3">Group SKU / Top Product Name</th>
-                      <th className="py-3 text-right">Sales (YTD 2026)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topPerformers.map((item, idx) => {
-                      let rankIcon = <span className="text-slate-400 w-6 text-center inline-block">#{idx + 1}</span>;
-                      let rowClass = "border-b border-slate-50 hover:bg-slate-50 transition-colors";
-                      
-                      if (idx === 0) {
-                        rankIcon = <Trophy className="w-5 h-5 text-yellow-500 inline-block" />;
-                        rowClass = "bg-yellow-50/50 border-b border-yellow-100";
-                      } else if (idx === 1) {
-                        rankIcon = <Medal className="w-5 h-5 text-slate-400 inline-block" />;
-                      } else if (idx === 2) {
-                        rankIcon = <Medal className="w-5 h-5 text-orange-400 inline-block" />;
-                      }
-
-                      return (
-                        <tr key={idx} className={rowClass}>
-                          <td className="py-3.5 pl-3 font-bold">{rankIcon}</td>
-                          <td className="py-3.5">
-                            <div className="font-semibold text-slate-700">{item.sku}</div>
-                            <div className="text-xs text-slate-500 truncate max-w-[300px] mt-0.5" title={item.name}>
-                               <span className="text-slate-400 mr-1">Top Item:</span> {item.name}
-                            </div>
-                          </td>
-                          <td className="py-3.5 text-right font-bold text-blue-700">
-                             ฿{(item.value/1000000).toFixed(2)}M
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-             </div>
-          </div>
-
-          {/* Universal Search */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
-            <h3 className="text-base font-bold text-slate-700 mb-4 flex items-center gap-2">
-              <Search className="w-5 h-5 text-blue-600" /> Universal Search
-            </h3>
-            <div className="relative mb-4">
-              <input 
-                type="text" 
-                placeholder="Search Product, Store, Channel..." 
-                className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 transition-colors"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
-            </div>
-            <div className="flex-1 overflow-y-auto pr-2 max-h-60 custom-scrollbar">
-              {debouncedSearchTerm.length < 2 ? (
-                <div className="text-center text-slate-400 text-sm py-12">Type to search...</div>
-              ) : searchResults.length === 0 ? (
-                <div className="text-center text-slate-400 text-sm py-12">No results found</div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="text-xs text-slate-400 uppercase font-bold px-1 mb-2">Found Products & Locations (2026)</div>
-                  {searchResults.map((item, idx) => (
-                    <div key={idx} className="flex flex-col text-sm border-b border-slate-50 pb-3 last:border-0 hover:bg-slate-50 p-2 rounded transition-colors">
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="text-slate-800 font-semibold truncate w-2/3" title={item.name}>{item.name}</span>
-                        <span className="text-blue-700 font-bold">฿{(item.val/1000000).toFixed(2)}M</span>
-                      </div>
-                      <div className="flex items-start gap-1.5 text-slate-500">
-                        <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                        <span className="text-xs leading-snug line-clamp-2" title={item.location}>
-                          {item.location}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+              {isOpen && (
+                <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 custom-scrollbar">
+                  <div className="sticky top-0 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">Select {label}</div>
+                  {options.length > 0 ? options.map((opt: string) => (
+                    <button key={opt} className={`w-full text-left px-4 py-3 text-sm hover:bg-blue-50 transition-colors flex justify-between items-center ${opt === value ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-600'}`} onClick={() => { onChange(opt); setIsOpen(false); }}>
+                      {opt}{opt === value && <div className="w-2 h-2 rounded-full bg-blue-600"></div>}
+                    </button>
+                  )) : <div className="px-4 py-3 text-sm text-slate-400 text-center italic">No options available</div>}
                 </div>
               )}
             </div>
+          );
+        };
+
+        const UploadSlot = ({ label, status, onChange }: any) => (
+          <div className={`flex items-center justify-between p-3 rounded-lg border border-slate-200 transition-all ${status ? 'bg-blue-50 border-blue-200' : 'bg-white hover:border-blue-300'}`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-2.5 h-2.5 rounded-full ${status ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-slate-300'}`}></div>
+              <span className="text-sm font-medium text-slate-700">{label}</span>
+            </div>
+            <label className="cursor-pointer text-xs bg-white border border-slate-200 hover:border-blue-400 text-slate-600 hover:text-blue-600 font-medium px-3 py-1.5 rounded transition-colors">
+              {status ? 'Replace' : 'Upload'}
+              <input type="file" accept=".csv" className="hidden" onChange={onChange} />
+            </label>
           </div>
-        </div>
+        );
 
-        {/* Charts Row 3: Channel Coverage Grid */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-             <div className="flex items-center gap-3">
-               <Grid3X3 className="w-6 h-6 text-orange-600" />
-               <div>
-                 <h3 className="text-base font-bold text-slate-700">Channel Coverage Gap Analysis (2026)</h3>
-                 <p className="text-xs text-slate-400 mt-0.5">
-                   {coverageDrillChannel ? `Drilled down: ${coverageDrillChannel}` : 'Overview by Main Channel'}
-                   {' • '}Click column header to drill down
-                 </p>
-               </div>
-             </div>
-             
-             <div className="flex items-center gap-3">
-               {coverageDrillChannel && (
-                 <button 
-                   onClick={() => setCoverageDrillChannel(null)}
-                   className="flex items-center gap-1.5 text-sm text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors font-medium border border-blue-100"
-                 >
-                   <ArrowLeft className="w-4 h-4" /> Back
-                 </button>
-               )}
-               <div className="relative">
-                 <input 
-                   type="text" 
-                   placeholder="Search SKU or Channel..." 
-                   className="w-56 pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 transition-colors"
-                   value={coverageSearch}
-                   onChange={(e) => setCoverageSearch(e.target.value)}
-                 />
-                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-               </div>
-             </div>
-           </div>
+        // --- Main Component ---
+        function Dashboard() {
+          const [salesData, setSalesData] = useState<SalesRecord[]>([]);
+          const [budgetChannel, setBudgetChannel] = useState<BudgetChannel[]>([]);
+          const [budgetProduct, setBudgetProduct] = useState<BudgetProduct[]>([]);
+          
+          const [selectedGroup, setSelectedGroup] = useState('ALL'); 
+          const [showUpload, setShowUpload] = useState(false);
+          
+          const [searchTerm, setSearchTerm] = useState('');
+          const [topPerfSearch, setTopPerfSearch] = useState('');
+          const [coverageSearch, setCoverageSearch] = useState('');
 
-           <div className="overflow-x-auto custom-scrollbar max-h-[600px]">
-             <table className="w-full text-sm text-left border-collapse min-w-[800px]">
-               <thead className="sticky top-0 bg-slate-50 z-10 shadow-sm">
-                 <tr className="border-b border-slate-200">
-                   <th className="py-4 px-4 font-semibold text-slate-600 w-1/3 min-w-[250px]">
-                     Group SKU
-                     <div className="text-[10px] font-normal text-slate-400">Sorted by Sales (High-Low)</div>
-                   </th>
-                   {coverageGrid.columns.map(col => {
-                     const total = coverageGrid.columnTotals[col];
-                     const isChain = !coverageDrillChannel && isChainBasedChannel(col);
-                     return (
-                       <th 
-                         key={col} 
-                         className={`py-4 px-3 font-semibold text-center min-w-[120px] ${!coverageDrillChannel ? 'cursor-pointer hover:bg-blue-50 text-blue-600' : 'text-slate-600'}`}
-                         onClick={() => !coverageDrillChannel && setCoverageDrillChannel(col)}
-                         title={!coverageDrillChannel ? "Click to drill down" : ""}
-                       >
-                         <div className="flex flex-col items-center">
-                           <div className="flex items-center gap-1.5 mb-1">
-                             {col}
-                             {!coverageDrillChannel && <ChevronDown className="w-3.5 h-3.5 opacity-50" />}
+          const debouncedSearchTerm = useDebounce(searchTerm, 300);
+          const debouncedTopPerfSearch = useDebounce(topPerfSearch, 300);
+          const debouncedCoverageSearch = useDebounce(coverageSearch, 300);
+          
+          const [filterSubProduct, setFilterSubProduct] = useState('All');
+          const [filterChannel, setFilterChannel] = useState('All');
+          const [filterMonth, setFilterMonth] = useState('All');
+          
+          const [coverageDrillChannel, setCoverageDrillChannel] = useState<string | null>(null);
+          
+          const [filesStatus, setFilesStatus] = useState({
+            DACARE: { s25: false, s26: false, bCh: false, bPr: false },
+            DAOS: { s25: false, s26: false, bCh: false, bPr: false },
+            'DASP&Q': { s25: false, s26: false, bCh: false, bPr: false },
+            DALIFESTYLE: { s25: false, s26: false, bCh: false, bPr: false },
+          });
+          const [uploadTab, setUploadTab] = useState('DACARE');
+
+          const dashboardRef = useRef<HTMLDivElement>(null);
+
+          const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, groupName: string, type: string) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const text = e.target?.result as string;
+              const rawData = parseCSV(text);
+              setFilesStatus(prev => ({...prev, [groupName]: { ...prev[groupName as keyof typeof prev], [type]: true }}));
+              
+              if (type === 's25' || type === 's26') {
+                const year = type === 's25' ? '2025' : '2026';
+                const formatted: SalesRecord[] = rawData.map(row => ({
+                  Month: row['Month'], 
+                  ProductGroup: groupName, 
+                  Channel: row['Channel'], SubChannel: row['Sub-channel'],
+                  SoldToParty: row['Sold-to party'], MaterialNumber: row['Material Number'], ProductName: row['Product Name'],
+                  SubProductGroup: row['Sub-product group'], GroupSKU: row['Group SKU'] || row['Sub-product group'],
+                  NetPrice: cleanCurrency(row['Net Price']), Year: year
+                })).filter(r => r.ProductGroup);
+                
+                setSalesData(prev => {
+                   const others = prev.filter(r => !(r.ProductGroup === groupName && r.Year === year));
+                   return [...others, ...formatted];
+                });
+              } else if (type === 'bCh') {
+                 const formatted: BudgetChannel[] = rawData.map(row => ({
+                  ProductGroup: groupName, 
+                  Channel: row['Channel'], 
+                  Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
+                  Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
+                  Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
+                })).filter(r => r.Channel !== 'TOTAL' && r.Channel);
+                
+                setBudgetChannel(prev => [...prev.filter(r => r.ProductGroup !== groupName), ...formatted]);
+              } else if (type === 'bPr') {
+                 const formatted: BudgetProduct[] = rawData.map(row => ({
+                  ProductGroup: groupName, 
+                  SubProductGroup: row['Sub-product Group'], 
+                  Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
+                  Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
+                  Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
+                })).filter(r => r.SubProductGroup);
+                
+                setBudgetProduct(prev => [...prev.filter(r => r.ProductGroup !== groupName), ...formatted]);
+              }
+            };
+            reader.readAsText(file);
+          };
+
+          const availableSubProducts = useMemo(() => {
+            const base = selectedGroup === 'ALL' ? salesData : salesData.filter(d => d.ProductGroup === selectedGroup);
+            return Array.from(new Set(base.map(d => d.SubProductGroup || '').filter(Boolean))).sort();
+          }, [salesData, selectedGroup]);
+
+          const availableChannels = useMemo(() => {
+            const base = selectedGroup === 'ALL' ? salesData : salesData.filter(d => d.ProductGroup === selectedGroup);
+            return Array.from(new Set(base.map(d => d.Channel || '').filter(Boolean))).sort();
+          }, [salesData, selectedGroup]);
+
+          const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+          const filteredData = useMemo(() => {
+            return salesData.filter(d => {
+              const matchGroup = selectedGroup === 'ALL' || d.ProductGroup === selectedGroup;
+              const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
+              const matchChannel = filterChannel === 'All' || d.Channel === filterChannel;
+              const matchMonth = filterMonth === 'All' || (d.Month && d.Month.startsWith(filterMonth));
+              return matchGroup && matchSub && matchChannel && matchMonth;
+            });
+          }, [salesData, selectedGroup, filterSubProduct, filterChannel, filterMonth]);
+
+          const kpi = useMemo(() => {
+            const filterFn = (d: SalesRecord) => {
+              const matchGroup = selectedGroup === 'ALL' || d.ProductGroup === selectedGroup;
+              const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
+              const matchChannel = filterChannel === 'All' || d.Channel === filterChannel;
+              const matchMonth = filterMonth === 'All' || (d.Month && d.Month.startsWith(filterMonth));
+              return matchGroup && matchSub && matchChannel && matchMonth;
+            };
+
+            const data2026 = salesData.filter(d => d.Year === '2026' && filterFn(d));
+            const s26 = data2026.reduce((a, b) => a + b.NetPrice, 0);
+
+            const monthsPresentIn2026 = new Set(data2026.map(d => d.Month.split('-')[0])); 
+
+            const s25_YTD = salesData
+              .filter(d => d.Year === '2025' && filterFn(d) && monthsPresentIn2026.has(d.Month.split('-')[0]))
+              .reduce((a, b) => a + b.NetPrice, 0);
+
+            const growthYoY = s25_YTD > 0 ? ((s26 - s25_YTD) / s25_YTD) * 100 : 0;
+
+            let target26: number | null = 0;
+            let forecast26: number | null = 0;
+            let plan27: number | null = 0;
+
+            const isSubFiltered = filterSubProduct !== 'All';
+            const isChannelFiltered = filterChannel !== 'All';
+
+            if (isSubFiltered && isChannelFiltered) {
+              target26 = null; forecast26 = null; plan27 = null;
+            } else if (isSubFiltered) {
+               const relevant = budgetProduct.filter(b => (selectedGroup === 'ALL' || b.ProductGroup === selectedGroup) && b.SubProductGroup === filterSubProduct);
+               if (relevant.length === 0) { target26 = null; forecast26 = null; plan27 = null; }
+               else { 
+                 target26 = relevant.reduce((a,b) => a + b.Target2026, 0); 
+                 forecast26 = relevant.reduce((a,b) => a + b.Forecast2026, 0); 
+                 plan27 = relevant.reduce((a,b) => a + b.Plan2027, 0); 
+               }
+            } else if (isChannelFiltered) {
+               const relevant = budgetChannel.filter(b => (selectedGroup === 'ALL' || b.ProductGroup === selectedGroup) && b.Channel === filterChannel);
+               if (relevant.length === 0) { target26 = null; forecast26 = null; plan27 = null; }
+               else { 
+                 target26 = relevant.reduce((a,b) => a + b.Target2026, 0); 
+                 forecast26 = relevant.reduce((a,b) => a + b.Forecast2026, 0); 
+                 plan27 = relevant.reduce((a,b) => a + b.Plan2027, 0); 
+               }
+            } else {
+               const relevant = budgetChannel.filter(b => (selectedGroup === 'ALL' || b.ProductGroup === selectedGroup));
+               target26 = relevant.reduce((a,b) => a + b.Target2026, 0); 
+               forecast26 = relevant.reduce((a,b) => a + b.Forecast2026, 0); 
+               plan27 = relevant.reduce((a,b) => a + b.Plan2027, 0);
+            }
+            const progress = (target26 && target26 > 0) ? (s26 / target26) * 100 : 0;
+            const growthPlan = (target26 && plan27 && target26 > 0) ? ((plan27 - target26) / target26) * 100 : 0;
+            
+            return { s26, s25_YTD, growthYoY, target26, forecast26, plan27, progress, growthPlan };
+          }, [salesData, budgetChannel, budgetProduct, selectedGroup, filterSubProduct, filterChannel, filterMonth]);
+
+          const trendChartData = useMemo(() => {
+            const base2026 = filteredData.filter(d => d.Year === '2026');
+            if (selectedGroup === 'ALL') {
+              return monthsList.map(m => {
+                const monthData = base2026.filter(d => d.Month.startsWith(m));
+                const dacare = monthData.filter(d => d.ProductGroup === 'DACARE').reduce((s, r) => s + r.NetPrice, 0);
+                const daos = monthData.filter(d => d.ProductGroup === 'DAOS').reduce((s, r) => s + r.NetPrice, 0);
+                const dasp = monthData.filter(d => d.ProductGroup === 'DASP&Q').reduce((s, r) => s + r.NetPrice, 0);
+                const dalife = monthData.filter(d => d.ProductGroup === 'DALIFESTYLE').reduce((s, r) => s + r.NetPrice, 0);
+                const total = dacare + daos + dasp + dalife;
+                return { name: m, 'DACARE': dacare, 'DAOS': daos, 'DASP&Q': dasp, 'DALIFESTYLE': dalife, total: total === 0 ? null : total };
+              });
+            } else {
+              const base2025 = salesData.filter(d => d.ProductGroup === selectedGroup && d.Year === '2025' && (filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct) && (filterChannel === 'All' || d.Channel === filterChannel));
+              return monthsList.map(m => {
+                const val2025 = base2025.filter(d => d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
+                const val2026 = base2026.filter(d => d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
+                return { name: m, '2025': val2025, '2026': val2026 === 0 ? null : val2026 };
+              });
+            }
+          }, [salesData, filteredData, selectedGroup, filterSubProduct, filterChannel]);
+
+          const channelMix = useMemo(() => {
+            const data: any = {};
+            filteredData.filter(d => d.Year === '2026').forEach(d => { data[d.Channel] = (data[d.Channel] || 0) + d.NetPrice; });
+            return Object.keys(data).map(k => ({ name: k, value: data[k] })).sort((a, b) => b.value - a.value);
+          }, [filteredData]);
+
+          const topPerformers = useMemo(() => {
+            const skuMap: Record<string, { totalSales: number, products: Record<string, number> }> = {};
+            filteredData.filter(d => d.Year === '2026').forEach(d => {
+                const key = d.GroupSKU || 'Unknown';
+                if (!skuMap[key]) skuMap[key] = { totalSales: 0, products: {} };
+                skuMap[key].totalSales += d.NetPrice;
+                const pName = d.ProductName || 'Unknown';
+                skuMap[key].products[pName] = (skuMap[key].products[pName] || 0) + d.NetPrice;
+            });
+            let list = Object.entries(skuMap).map(([sku, data]) => {
+                let bestProd = sku;
+                let maxS = -1;
+                Object.entries(data.products).forEach(([pName, s]) => { if (s > maxS) { maxS = s; bestProd = pName; } });
+                return { sku: sku, name: bestProd, value: data.totalSales };
+            });
+            if (debouncedTopPerfSearch.length >= 2) {
+              const term = debouncedTopPerfSearch.toLowerCase();
+              list = list.filter(item => item.sku.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
+            }
+            return list.sort((a, b) => b.value - a.value).slice(0, 10);
+          }, [filteredData, debouncedTopPerfSearch]);
+
+          const coverageGrid = useMemo(() => {
+            const base2026 = salesData.filter(d => d.Year === '2026' && (selectedGroup === 'ALL' || d.ProductGroup === selectedGroup));
+            const rowsBase = filterSubProduct !== 'All' ? base2026.filter(d => d.SubProductGroup === filterSubProduct) : base2026;
+
+            const skuStats: Record<string, number> = {};
+            rowsBase.forEach(d => { if (d.GroupSKU) skuStats[d.GroupSKU] = (skuStats[d.GroupSKU] || 0) + d.NetPrice; });
+            let sortedRows = Object.keys(skuStats).sort((a, b) => skuStats[b] - skuStats[a]);
+
+            if (debouncedCoverageSearch.length >= 2) {
+              const term = debouncedCoverageSearch.toLowerCase();
+              const skuChannels: Record<string, Set<string>> = {};
+              base2026.forEach(d => {
+                 const k = d.GroupSKU;
+                 if(!skuChannels[k]) skuChannels[k] = new Set();
+                 skuChannels[k].add(d.Channel?.toLowerCase() || '');
+                 skuChannels[k].add(d.SubChannel?.toLowerCase() || '');
+              });
+              sortedRows = sortedRows.filter(sku => {
+                 if (sku.toLowerCase().includes(term)) return true;
+                 const chans = skuChannels[sku];
+                 if (!chans) return false;
+                 for (let c of chans) if (c.includes(term)) return true;
+                 return false;
+              });
+            }
+
+            const colStats: Record<string, number> = {};
+            if (coverageDrillChannel) {
+              const drillBase = base2026.filter(d => d.Channel === coverageDrillChannel);
+              drillBase.forEach(d => { if (d.SubChannel) colStats[d.SubChannel] = (colStats[d.SubChannel] || 0) + d.NetPrice; });
+            } else {
+              base2026.forEach(d => { if (d.Channel) colStats[d.Channel] = (colStats[d.Channel] || 0) + d.NetPrice; });
+            }
+            const columns = Object.keys(colStats).sort((a, b) => colStats[b] - colStats[a]);
+
+            const matrix: Record<string, Record<string, { sales: number, count: number }>> = {};
+            const columnTotals: Record<string, { sales: number, count: number }> = {};
+            const rowTotals: Record<string, number> = {};
+            
+            sortedRows.forEach(r => { matrix[r] = {}; rowTotals[r] = 0; });
+            columns.forEach(c => { columnTotals[c] = { sales: 0, count: 0 }; });
+
+            const colSet = new Set(columns);
+            const rowSet = new Set(sortedRows);
+            
+            const colUniqueItemsForHeader: Record<string, Set<string>> = {};
+            const colSalesForHeader: Record<string, number> = {};
+            columns.forEach(c => { 
+                colUniqueItemsForHeader[c] = new Set(); 
+                colSalesForHeader[c] = 0;
+            });
+
+            const allowedSKUs = new Set(sortedRows);
+            const cellUniqueItems: Record<string, Record<string, Set<string>>> = {};
+
+            base2026.forEach(d => {
+               const sku = d.GroupSKU;
+               let col = '';
+               if (coverageDrillChannel) { col = d.Channel === coverageDrillChannel ? d.SubChannel : ''; } 
+               else { col = d.Channel; }
+               if (!col || !colSet.has(col)) return;
+
+               if (allowedSKUs.has(sku)) {
+                   colSalesForHeader[col] += d.NetPrice;
+                   if (!coverageDrillChannel) {
+                       if (isChainBasedChannel(col)) colUniqueItemsForHeader[col].add(d.SubChannel);
+                       else colUniqueItemsForHeader[col].add(d.SoldToParty);
+                   }
+               }
+
+               if (!sku || !rowSet.has(sku)) return;
+
+               if (!cellUniqueItems[sku]) cellUniqueItems[sku] = {};
+               if (!cellUniqueItems[sku][col]) {
+                  cellUniqueItems[sku][col] = new Set();
+                  matrix[sku][col] = { sales: 0, count: 0 };
+               }
+               matrix[sku][col].sales += d.NetPrice;
+
+               const uniqueKey = (coverageDrillChannel || isChainBasedChannel(coverageDrillChannel ? d.Channel : col)) 
+                  ? (coverageDrillChannel ? d.SoldToParty : d.SubChannel) : d.SoldToParty;
+
+               if (uniqueKey) { cellUniqueItems[sku][col].add(uniqueKey); }
+            });
+
+            sortedRows.forEach(sku => {
+               columns.forEach(col => {
+                  if (cellUniqueItems[sku]?.[col]) {
+                     const count = coverageDrillChannel ? (matrix[sku][col].sales > 0 ? 1 : 0) : cellUniqueItems[sku][col].size;
+                     matrix[sku][col].count = count;
+                     rowTotals[sku] += count;
+                  } else { matrix[sku][col] = { sales: 0, count: 0 }; }
+               });
+            });
+
+            columns.forEach(col => {
+               let totalCount = 0;
+               if (coverageDrillChannel) {
+                  sortedRows.forEach(sku => { if (matrix[sku][col] && matrix[sku][col].sales > 0) totalCount++; });
+               } else { totalCount = colUniqueItemsForHeader[col].size; }
+               columnTotals[col] = { sales: colSalesForHeader[col], count: totalCount };
+            });
+
+            return { rows: sortedRows, columns, matrix, columnTotals, rowTotals };
+          }, [salesData, selectedGroup, filterSubProduct, coverageDrillChannel, debouncedCoverageSearch]);
+
+          const searchResults = useMemo(() => {
+            if (!debouncedSearchTerm || debouncedSearchTerm.length < 2) return [];
+            const term = debouncedSearchTerm.toLowerCase();
+            const agg: Record<string, { sales: number, channels: Set<string>, subSales: Record<string, number> }> = {};
+            salesData.forEach(d => {
+              if (d.Year !== '2026') return;
+              const match = (d.GroupSKU && d.GroupSKU.toLowerCase().includes(term)) || 
+                            (d.ProductName && d.ProductName.toLowerCase().includes(term)) ||
+                            (d.SoldToParty && d.SoldToParty.toLowerCase().includes(term)) ||
+                            (d.Channel && d.Channel.toLowerCase().includes(term));
+              if (match) {
+                 const pName = d.ProductName;
+                 if (!agg[pName]) agg[pName] = { sales: 0, channels: new Set(), subSales: {} };
+                 agg[pName].sales += d.NetPrice;
+                 agg[pName].channels.add(d.Channel);
+                 if (isChainBasedChannel(d.Channel) && d.SubChannel) {
+                    if (!agg[pName].subSales[d.SubChannel]) agg[pName].subSales[d.SubChannel] = 0;
+                    agg[pName].subSales[d.SubChannel] += d.NetPrice;
+                 }
+              }
+            });
+            return Object.entries(agg).map(([name, data]) => {
+                const channelList = Array.from(data.channels);
+                const chainChannels = channelList.filter(c => isChainBasedChannel(c));
+                const otherChannels = channelList.filter(c => !isChainBasedChannel(c));
+                let locText = "";
+                if (chainChannels.length > 0) {
+                   const topSubs = Object.entries(data.subSales).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]).join(', ');
+                   const chainText = `${chainChannels.join('/')} (${topSubs}${Object.keys(data.subSales).length > 3 ? '...' : ''})`;
+                   locText = otherChannels.length > 0 ? `${otherChannels.join(', ')}, ${chainText}` : chainText;
+                } else { locText = channelList.join(', '); }
+                return { name, val: data.sales, location: locText };
+              }).sort((a, b) => b.val - a.val);
+          }, [salesData, debouncedSearchTerm]);
+
+          const dynamicRecommendations = useMemo(() => {
+            const isGrowthPositive = kpi.growthYoY >= 0;
+            const topCh = channelMix.length > 0 ? channelMix[0].name : 'N/A';
+            const growthVal = Math.abs(kpi.growthYoY).toFixed(1);
+            let contextTitle = `Overview`;
+            if (filterSubProduct !== 'All') contextTitle = filterSubProduct;
+            else if (selectedGroup !== 'ALL') contextTitle = selectedGroup;
+
+            const subProductRecs: Record<string, { head: string, desc: string }[]> = {
+                'Tissue': [
+                    { head: "Premium Softness War", desc: "ตลาดทิชชู่แข่งกันที่ 'ความนุ่ม'. ควรออกรุ่น Premium Soft Pack ที่เน้นสัมผัสผิวหน้าโดยเฉพาะ เจาะกลุ่มผู้หญิงวัยทำงาน" },
+                    { head: "On-the-Go Hygiene", desc: "ขยายไลน์ Pocket Tissue หรือ Mini Handkerchief ที่พกพาสะดวก ลายลิขสิทธิ์น่ารัก เพื่อวางขายหน้า Counter ใน CVS" },
+                    { head: "Kitchen Towel Value", desc: "ดันยอด Kitchen Towel แบบแผ่นใหญ่หนาพิเศษในช่องทาง MT เพื่อจับกลุ่มแม่บ้านที่เน้นความคุ้มค่าและดูดซับมันดีเยี่ยม" }
+                ],
+                'Mask': [
+                    { head: "PM2.5 Seasonal Push", desc: "เตรียมสต็อกและสื่อโฆษณา Mask ป้องกัน PM2.5 ล่วงหน้าก่อนเข้าฤดูฝุ่น (ธ.ค.-มี.ค.) เพื่อชิงส่วนแบ่งการตลาดช่วง High Season" },
+                    { head: "Fashion & Function", desc: "Mask ไม่ใช่แค่ป้องกันแต่เป็นแฟชั่น. ออกสีใหม่ Earth Tone หรือ Pastel และรูปทรง 3D ที่ใส่แล้วหน้าเรียว เจาะกลุ่ม Gen Z" },
+                    { head: "Kids Medical Grade", desc: "ตลาดหน้ากากเด็กยังต้องการ Medical Grade ที่ลายน่ารักและใส่สบาย พ่อแม่ยินดีจ่ายแพงเพื่อความปลอดภัยของลูก" }
+                ],
+                'Wipes': [
+                    { head: "Sanitizing vs Baby", desc: "แยกเซกเมนต์ให้ชัด: Wipes แอลกอฮอล์สำหรับวัยทำงาน (เน้นฆ่าเชื้อ) และ Water Wipes สำหรับแม่และเด็ก (เน้นอ่อนโยน 99% น้ำเปล่า)" },
+                    { head: "Adult Care Boom", desc: "ออก Wipes แผ่นใหญ่หนานุ่มสำหรับผู้สูงอายุ รองรับ Aging Society ขายคู่กับผ้าอ้อมผู้ใหญ่ในช่องทาง Pharmacy/MT" },
+                    { head: "Flushable Innovation", desc: "นวัตกรรมทิชชู่เปียกที่ทิ้งลงชักโครกได้ (Flushable) เป็น Gap ใหม่ในตลาดคอนโดและออฟฟิศเกรด A" }
+                ],
+                'Stapler': [
+                    { head: "Ergonomic & Force Reduction", desc: "เน้นจุดขาย 'เย็บเบาแรง' (Effortless) และดีไซน์ที่จับถนัดมือ ลดอาการปวดนิ้วสำหรับพนักงานออฟฟิศที่ใช้งานหนัก" },
+                    { head: "Color Series Collection", desc: "ออกคอลเลกชันสีตามเทรนด์ (เช่น Pantone ประจำปี) เพื่อกระตุ้นให้ลูกค้าซื้อใหม่แม้ของเดิมยังไม่พัง" },
+                    { head: "Bundle Strategy", desc: "ขายคู่ลูกแม็กคุณภาพสูงใน Pack เดียว (Starter Kit) เพื่อแก้ปัญหาลูกแม็กติดขัดและสร้าง Brand Loyalty" }
+                ],
+                'Glue': [
+                    { head: "Non-Toxic for Kids", desc: "ชูจุดขาย 'ไร้สารพิษ & ล้างออกง่าย' สำหรับกาวแท่งเจาะกลุ่มโรงเรียนและผู้ปกครอง สร้างความมั่นใจเรื่องความปลอดภัย" },
+                    { head: "Precision Application", desc: "พัฒนากาวหัวปากกาหรือกาวเทป (Glue Tape) สำหรับงานประดิษฐ์และ Planner ที่ต้องการความเนี้ยบ ไม่เลอะเทอะ" },
+                    { head: "Office Bulk Pack", desc: "ทำ Pack ประหยัดสุดคุ้มสำหรับสำนักงาน (B2B) เพื่อแย่งส่วนแบ่งจาก House Brand ในแคตตาล็อกจัดซื้อ" }
+                ]
+            };
+
+            const getGenericProductRecs = (prodName: string) => [
+                { head: `Expand ${prodName} Distribution`, desc: `สินค้า ${prodName} มีศักยภาพในการขยายไปยังช่องทาง ${topCh} เพิ่มเติม ตรวจสอบ Gap Analysis เพื่อดูสาขาที่ยังไม่วางจำหน่าย` },
+                { head: `${prodName} Value Pack`, desc: `กระตุ้นยอดขายต่อบิลด้วยการทำ Bundle Pack หรือ Family Pack สำหรับ ${prodName} ในช่องทาง Online และ Hypermarket` },
+                { head: "Cross-Category Promo", desc: `จัดโปรโมชั่นซื้อ ${prodName} คู่กับสินค้าขายดีตัวอื่นในพอร์ต (เช่น กระดาษ A4) เพื่อแนะนำสินค้าให้ลูกค้าเดิมทดลองใช้` }
+            ];
+
+            let items = [];
+            if (filterSubProduct !== 'All') {
+                items = subProductRecs[filterSubProduct] || getGenericProductRecs(filterSubProduct);
+            } else {
+                const getGeneralRecs = () => [
+                    { head: isGrowthPositive ? "2026 Growth Momentum" : "2026 Turnaround", desc: isGrowthPositive ? `ปี 2026 เริ่มต้นดีโต ${growthVal}% YoY. รักษา Momentum ในช่องทาง ${topCh} แล้วขยายสินค้า Hero ไปยังช่องทางรอง` : `ปี 2026 ยอดขายชะลอตัว ${growthVal}%. ต้องเร่งทบทวนแผนช่องทางหลักและอัดโปรโมชั่นดึงยอดคืนในไตรมาสถัดไป` },
+                    { head: "Channel Optimization", desc: `ช่องทาง ${topCh} ยังคงเป็นเส้นเลือดใหญ่ (${kpi.s26 ? (channelMix[0]?.value/kpi.s26*100).toFixed(0) : 0}%). ควรกระจายความเสี่ยงไป Online หรือ MT อื่นๆ` },
+                    { head: "Profit Focus", desc: "เน้นสินค้า High Margin ในกลุ่ม DAOS เพื่อชดเชยการแข่งขันราคาในตลาด Mass ของ DACARE" }
+                ];
+
+                const groupRecs: any = {
+                    'DACARE': [
+                        { head: "Premium Hygiene 2026", desc: "เทรนด์ปีนี้คือ Premium Hygiene ผู้บริโภคยอมจ่ายแพงเพื่อสินค้าที่ดูดีและอ่อนโยนกว่าเดิม" },
+                        { head: "Aging Society", desc: "ตลาดผู้สูงอายุโตต่อเนื่อง ดันสินค้า Wipes สำหรับผู้ใหญ่เข้า MT/Pharmacy ให้มากขึ้น" },
+                        { head: "Travel Recovery", desc: "ท่องเที่ยวฟื้นตัว 100% จัดเซ็ต Travel Kit วางขาย CVS ดักนักท่องเที่ยว" }
+                    ],
+                    'DAOS': [
+                        { head: "Smart Hybrid Work", desc: "สินค้าออฟฟิศต้องเบาและพกพาได้ ตอบโจทย์การทำงานแบบ Hybrid Work ที่ยังคงอยู่" },
+                        { head: "Green Office", desc: "B2B มองหา Green Supply Chain. ชูจุดขายสินค้ารักษ์โลกเพื่อปิดดีล Corporate ใหญ่" },
+                        { head: "Gen Z Aesthetic", desc: "ดีไซน์ Minimal/Pastel ยังครองใจ Gen Z. ออกคอลเลกชันใหม่กระตุ้นการซื้อซ้ำ" }
+                    ],
+                    'DASP&Q': [
+                        { head: "Channel Pack Size", desc: "CVS = Pack เล็ก, Online = Bulk Pack. แยก SKU ให้ชัดเพื่อไม่ให้แย่งยอดกันเอง" },
+                        { head: "Collab Marketing", desc: "Collab กับ Artist หรือ Character ดังเพื่อสร้างสีสันให้สินค้ากระดาษธรรมดาดูน่าสะสม" },
+                        { head: "Planner Niche", desc: "เจาะตลาดสมุด Planner/Journal ที่ยังมี Loyalty สูงและ Margin ดี" }
+                    ],
+                    'DALIFESTYLE': [
+                        { head: "Eco-Lifestyle", desc: "ชูจุดขาย Eco-friendly สำหรับสินค้าไลฟ์สไตล์ (ถุงผ้า/แก้วน้ำ) ตอบโจทย์เทรนด์รักษ์โลก 2026" },
+                        { head: "Corporate Gift", desc: "บุกตลาดของพรีเมียมองค์กร (Corporate Gift) ใช้จุดแข็ง Brand Double A สร้างความน่าเชื่อถือ" },
+                        { head: "Online Driven", desc: "ใช้ Social Commerce (TikTok/Shopee Live) เป็นช่องทางหลักในการขายสินค้ากลุ่มนี้เพื่อเข้าถึงคนรุ่นใหม่" }
+                    ]
+                };
+                items = selectedGroup === 'ALL' ? getGeneralRecs() : (groupRecs[selectedGroup] || getGeneralRecs());
+            }
+
+            return { title: `AI Strategic Insights: ${contextTitle} (BETA)`, items: items };
+          }, [selectedGroup, filterSubProduct, kpi, channelMix]);
+
+          const COLORS = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+          const BLUE_PALETTE = ['#1e3a8a', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
+
+          const renderCustomLabel = (props: any) => {
+            const { x, y, width, value } = props;
+            if (value === 0 || value === undefined || value === null) return null;
+            const cx = (width && !isNaN(width)) ? x + width / 2 : x;
+            const cy = !isNaN(y) ? y - 10 : y;
+            if (isNaN(cx) || isNaN(cy)) return null;
+            const valInM = Number(value) / 1000000;
+            const formatted = valInM < 1 ? `${valInM.toFixed(2)}M` : `${valInM.toFixed(1)}M`;
+            return <text x={cx} y={cy} fill="#64748b" textAnchor="middle" fontSize={10}>{formatted}</text>;
+          };
+
+          return (
+            <div ref={dashboardRef} className="bg-slate-50 min-h-screen font-sans text-slate-800 pb-10 w-full">
+              {/* Header */}
+              <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+                <div className="w-full px-6 h-16 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <LayoutDashboard className="w-6 h-6 text-blue-400" />
+                    <div><h1 className="text-lg font-semibold tracking-wide">Non-paper Performance Dashboard <span className="text-blue-400">2026</span> <span className="text-blue-400 text-sm">(BETA)</span></h1></div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex bg-slate-800 rounded-md p-1">
+                      {['ALL', 'DACARE', 'DAOS', 'DASP&Q', 'DALIFESTYLE'].map(group => (
+                        <button key={group} onClick={() => { setSelectedGroup(group); setFilterSubProduct('All'); }} className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${selectedGroup === group ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-white'}`}>{group}</button>
+                      ))}
+                    </div>
+                    <button onClick={() => setShowUpload(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors">
+                      <Upload className="w-4 h-4" /> <span className="hidden md:inline">Import Data</span>
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Filter Bar */}
+                <div className="bg-white border-b border-slate-200 py-3 relative z-40">
+                  <div className="w-full px-6 flex flex-wrap gap-4 items-center">
+                    <span className="text-sm font-bold text-slate-500 uppercase flex items-center gap-2"><Layers className="w-4 h-4" /> Filters:</span>
+                    <FilterDropdown label="Product" value={filterSubProduct} options={['All', ...availableSubProducts]} onChange={setFilterSubProduct} icon={<ShoppingBag className="w-4 h-4" />} />
+                    <FilterDropdown label="Channel" value={filterChannel} options={['All', ...availableChannels]} onChange={setFilterChannel} icon={<Users className="w-4 h-4" />} />
+                    <FilterDropdown label="Month" value={filterMonth} options={['All', ...monthsList]} onChange={setFilterMonth} icon={<Calendar className="w-4 h-4" />} />
+                    {(filterSubProduct !== 'All' || filterChannel !== 'All' || filterMonth !== 'All') && (
+                      <button onClick={() => { setFilterSubProduct('All'); setFilterChannel('All'); setFilterMonth('All'); }} className="text-sm text-red-500 hover:text-red-700 font-medium ml-auto flex items-center gap-1 px-3 py-1.5 border border-red-100 rounded bg-red-50 hover:bg-red-100 transition-colors">
+                        <X className="w-4 h-4" /> Reset Filters
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </header>
+
+              {/* Main Content */}
+              <main className="w-full px-6 py-6 space-y-6">
+                
+                {/* KPI Row */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full">
+                    <div>
+                      <div className="flex justify-between items-start mb-2"><span className="text-sm font-bold text-slate-500 uppercase">YTD Actual 2026</span><DollarSign className="w-5 h-5 text-blue-600" /></div>
+                    </div>
+                    <div>
+                      <h3 className="text-3xl font-bold text-slate-900">฿{kpi.s26.toLocaleString()}</h3>
+                      <div className={`text-sm mt-2 font-bold flex items-center gap-1 ${kpi.growthYoY >= 0 ? 'text-green-600' : 'text-red-600'}`}>{kpi.growthYoY >= 0 ? '▲' : '▼'} {Math.abs(kpi.growthYoY).toFixed(1)}% vs 2025 YTD</div>
+                    </div>
+                  </div>
+
+                  <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.target26 === null ? 'opacity-70 grayscale' : ''}`}>
+                     <div className="flex justify-between items-start mb-1"><span className="text-sm font-bold text-slate-500 uppercase">Target 2026</span><Target className="w-5 h-5 text-purple-600" /></div>
+                     <div>
+                       {kpi.target26 !== null ? (
+                         <>
+                           <div className="flex justify-between items-end mb-1">
+                             <h3 className="text-3xl font-bold text-slate-900">{kpi.target26 === 0 ? 'TBC' : `฿${kpi.target26.toLocaleString()}`}</h3>
+                             {kpi.target26 > 0 && <span className={`text-sm font-bold ${kpi.progress >= 100 ? 'text-green-600' : 'text-blue-600'}`}>{kpi.progress.toFixed(1)}%</span>}
                            </div>
-                           <div className="text-xs font-normal text-slate-500">
-                             ฿{(total.sales/1000000).toFixed(1)}M
-                           </div>
-                           <div className="flex items-center gap-1 text-[10px] font-normal text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded mt-1">
-                             {coverageDrillChannel ? <Package className="w-3 h-3" /> : <Users className="w-3 h-3" />}
-                             {total.count} {coverageDrillChannel ? 'Selling SKUs' : (isChain ? 'Chains' : 'Outlets')}
-                           </div>
-                         </div>
-                       </th>
-                     );
-                   })}
-                 </tr>
-               </thead>
-               <tbody>
-                 {coverageGrid.rows.length > 0 ? (
-                    coverageGrid.rows.map((sku, idx) => (
-                      <tr key={sku} className={`border-b border-slate-50 hover:bg-slate-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
-                        <td className="py-3 px-4 font-medium text-slate-700 truncate max-w-[250px]" title={sku}>
-                          <div className="text-sm">{sku}</div>
-                          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-normal mt-1">
-                            Total Avail: {coverageDrillChannel ? <Check className="w-3 h-3 text-green-500" /> : <Users className="w-3 h-3" />} <span className="font-medium text-slate-600">{coverageGrid.rowTotals[sku] || 0}</span>
-                          </div>
-                        </td>
-                        {coverageGrid.columns.map(col => {
-                          const data = coverageGrid.matrix[sku][col] || { sales: 0, count: 0 };
-                          const isGap = data.count === 0;
-                          return (
-                            <td key={col} className="py-3 px-3 text-center">
-                              {coverageDrillChannel ? (
-                                isGap ? <span className="inline-block text-slate-300 font-light text-lg">-</span> : <Check className="w-5 h-5 text-green-500 mx-auto" />
-                              ) : (
-                                isGap ? (
-                                  <span className="inline-block text-slate-300 font-light text-lg">-</span>
-                                ) : (
-                                  <div className="flex flex-col items-center gap-1">
-                                    <span className="font-light text-slate-600 text-xs">
-                                      ฿{(data.sales/1000000).toFixed(2)}M
-                                    </span>
-                                    <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 shadow-sm border border-blue-100">
-                                      <Users className="w-2.5 h-2.5" />
-                                      {data.count}
-                                    </span>
-                                  </div>
-                                )
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))
-                 ) : (
-                   <tr>
-                     <td colSpan={coverageGrid.columns.length + 1} className="py-16 text-center text-slate-400">
-                       No products found matching "{coverageSearch}"
-                     </td>
-                   </tr>
-                 )}
-               </tbody>
-             </table>
-           </div>
-           
-           <div className="mt-4 flex items-center gap-2 text-xs text-slate-400 px-1 bg-slate-50 p-2 rounded-lg border border-slate-100 inline-block">
-              <AlertCircle className="w-4 h-4 text-orange-400" />
-              <span>Tip: Sorted by Sales. '-' is Gap. MT/Online/Inter/BJC counts Chains (Sub-channels), others count Outlets (Sold-to).</span>
-           </div>
-        </div>
+                           {kpi.target26 > 0 && <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden"><div className={`h-full rounded-full transition-all duration-500 ${kpi.progress >= 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(kpi.progress, 100)}%` }}></div></div>}
+                         </>
+                       ) : <div className="h-full flex items-center justify-center text-slate-400 text-sm italic py-2">N/A (Filtered)</div>}
+                     </div>
+                  </div>
 
-        {/* AI Strategic Insights */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 rounded-xl shadow-lg text-white mt-8 border border-slate-700">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 border-b border-slate-700/50 pb-6 gap-4">
-            <div className="flex items-center gap-4">
-              <div className="bg-blue-500/20 p-3 rounded-xl border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-                <Sparkles className="w-8 h-8 text-blue-400" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold flex items-center gap-3">
-                  {dynamicRecommendations.title} <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30">BETA</span>
-                </h2>
-                <p className="text-sm text-slate-400 mt-1">
-                  Generated based on real-time sales performance: <span className="text-blue-300 font-medium">Growth {kpi.growthYoY >= 0 ? '+' : ''}{kpi.growthYoY.toFixed(1)}%</span> • Top Channel: <span className="text-blue-300 font-medium">{channelMix[0]?.name || 'N/A'}</span>
-                </p>
-              </div>
-            </div>
-          </div>
+                  <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.forecast26 === null ? 'opacity-70 grayscale' : ''}`}>
+                     <div className="flex justify-between items-start mb-2"><span className="text-sm font-bold text-slate-500 uppercase">Forecast 2026 (L.E.)</span><TrendingUp className="w-5 h-5 text-orange-600" /></div>
+                     <div>
+                        {kpi.forecast26 !== null ? <h3 className="text-3xl font-bold text-slate-900">{kpi.forecast26 === 0 ? 'TBC' : `฿${kpi.forecast26.toLocaleString()}`}</h3> : <div className="text-3xl font-bold text-slate-300">N/A</div>}
+                        <p className="text-sm text-slate-400 mt-2">Latest Estimate</p>
+                     </div>
+                  </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {dynamicRecommendations.items.map((item: any, idx: number) => (
-              <div key={idx} className="bg-slate-800/40 p-5 rounded-xl border border-slate-700 hover:border-blue-500/40 hover:bg-slate-800/60 transition-all duration-300 group">
-                <h3 className="text-base font-bold text-blue-400 mb-3 flex items-center gap-2 group-hover:text-blue-300">
-                  <Lightbulb className="w-5 h-5" /> {item.head}
-                </h3>
-                <p className="text-sm text-slate-300 leading-relaxed font-light">
-                  {item.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
+                  <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.plan27 === null ? 'opacity-70 grayscale' : ''}`}>
+                     <div className="flex justify-between items-start mb-2"><span className="text-sm font-bold text-slate-500 uppercase">Plan 2027</span><Target className="w-5 h-5 text-emerald-600" /></div>
+                     <div>
+                        {kpi.plan27 !== null ? (
+                            <>
+                              <h3 className="text-3xl font-bold text-slate-900">{kpi.plan27 === 0 ? 'TBC' : `฿${kpi.plan27.toLocaleString()}`}</h3>
+                              {kpi.plan27 > 0 && <div className={`text-sm mt-2 font-bold flex items-center gap-1 ${kpi.growthPlan >= 0 ? 'text-green-600' : 'text-red-600'}`}>{kpi.growthPlan >= 0 ? '▲' : '▼'} {Math.abs(kpi.growthPlan).toFixed(1)}% vs Target 26</div>}
+                            </>
+                        ) : (<><div className="text-3xl font-bold text-slate-300">N/A</div><p className="text-sm text-slate-400 mt-2">Next Year Goal</p></>)}
+                     </div>
+                  </div>
+                </div>
 
-      </main>
+                {/* Charts Row 1: Trend & Channel Mix */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
+                    <div className="flex justify-between items-center mb-6"><h3 className="text-base font-bold text-slate-700 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600" /> {selectedGroup === 'ALL' ? '2026 Monthly Trend (Stacked)' : 'Sales Trend 2025 vs 2026'}</h3></div>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        {selectedGroup === 'ALL' ? (
+                          <ComposedChart data={trendChartData} barSize={24}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                            <XAxis dataKey="name" tick={{fontSize: 12}} axisLine={false} tickLine={false} />
+                            <YAxis tick={{fontSize: 12}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
+                            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}} formatter={(v: any) => `฿${(v/1000000).toFixed(2)}M`} />
+                            <Legend wrapperStyle={{fontSize: '12px'}} />
+                            <Bar dataKey="DACARE" stackId="a" fill="#3b82f6" />
+                            <Bar dataKey="DAOS" stackId="a" fill="#f59e0b" />
+                            <Bar dataKey="DASP&Q" stackId="a" fill="#10b981" />
+                            <Bar dataKey="DALIFESTYLE" stackId="a" fill="#8b5cf6" />
+                            <Line type="monotone" dataKey="total" stroke="none" dot={false} activeDot={false}><LabelList dataKey="total" position="top" content={renderCustomLabel} /></Line>
+                          </ComposedChart>
+                        ) : (
+                          <LineChart data={trendChartData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                            <XAxis dataKey="name" tick={{fontSize: 12}} axisLine={false} tickLine={false} />
+                            <YAxis tick={{fontSize: 12}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
+                            <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}} formatter={(v: any) => `฿${(v/1000000).toFixed(2)}M`} />
+                            <Legend wrapperStyle={{fontSize: '12px'}} />
+                            <Line type="monotone" dataKey="2026" stroke="#2563eb" strokeWidth={3} dot={{r:4}}><LabelList dataKey="2026" position="top" content={renderCustomLabel} /></Line>
+                            <Line type="monotone" dataKey="2025" stroke="#94a3b8" strokeDasharray="5 5" strokeWidth={2} dot={{r:4}} />
+                          </LineChart>
+                        )}
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
 
-      {/* Upload Modal */}
-      {showUpload && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-0 animate-in fade-in zoom-in duration-200 overflow-hidden border border-slate-200">
-            <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50/50">
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Upload className="w-5 h-5 text-blue-600" /> Data Import Center
-              </h2>
-              <button onClick={() => setShowUpload(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="flex border-b border-slate-200">
-              {['DACARE', 'DAOS', 'DASP&Q', 'DALIFESTYLE'].map(tab => (
-                 <button key={tab} onClick={() => setUploadTab(tab)} className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${uploadTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>{tab}</button>
-              ))}
-            </div>
-            <div className="p-6 space-y-4">
-              <UploadSlot label="Sales 2025 (.csv)" status={filesStatus[uploadTab as keyof typeof filesStatus].s25} onChange={(e: any) => handleFileUpload(e, uploadTab, 's25')} />
-              <UploadSlot label="Sales 2026 (.csv)" status={filesStatus[uploadTab as keyof typeof filesStatus].s26} onChange={(e: any) => handleFileUpload(e, uploadTab, 's26')} />
-              <UploadSlot label="Budget Channel (.csv)" status={filesStatus[uploadTab as keyof typeof filesStatus].bCh} onChange={(e: any) => handleFileUpload(e, uploadTab, 'bCh')} />
-              <UploadSlot label="Budget Product (.csv)" status={filesStatus[uploadTab as keyof typeof filesStatus].bPr} onChange={(e: any) => handleFileUpload(e, uploadTab, 'bPr')} />
-            </div>
-            <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-end">
-              <button onClick={() => setShowUpload(false)} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">Done</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                    <h3 className="text-base font-bold text-slate-700 mb-4 flex items-center gap-2"><PieIcon className="w-5 h-5 text-blue-600" /> Channel Mix 2026</h3>
+                    <div className="h-48 relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={channelMix} innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value">{channelMix.map((entry, index) => <Cell key={`cell-${index}`} fill={BLUE_PALETTE[index % BLUE_PALETTE.length]} />)}</Pie>
+                          <Tooltip formatter={(v: any) => `฿${(v/1000000).toFixed(2)}M`} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="text-center"><div className="text-xs text-slate-400">Total</div><div className="text-sm font-bold text-slate-700">{(kpi.s26/1000000).toFixed(1)}M</div></div></div>
+                    </div>
+                    <div className="mt-4 space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                      {channelMix.map((item, idx) => (
+                        <div key={item.name} className="flex justify-between items-center text-sm border-b border-slate-50 pb-2 last:border-0">
+                           <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: BLUE_PALETTE[idx % BLUE_PALETTE.length]}}></div><span className="text-slate-600 font-medium">{item.name}</span></div>
+                           <div className="text-right"><span className="font-bold text-slate-800 block">฿{(item.value/1000000).toFixed(1)}M</span><span className="text-xs text-slate-400 font-medium">({kpi.s26 > 0 ? (item.value / kpi.s26 * 100).toFixed(1) : 0}%)</span></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
-// Sub-components
-const UploadSlot = ({ label, status, onChange }: any) => (
-  <div className={`flex items-center justify-between p-3 rounded-lg border border-slate-200 transition-all ${status ? 'bg-blue-50 border-blue-200' : 'bg-white hover:border-blue-300'}`}>
-    <div className="flex items-center gap-3">
-      <div className={`w-2.5 h-2.5 rounded-full ${status ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-slate-300'}`}></div>
-      <span className="text-sm font-medium text-slate-700">{label}</span>
-    </div>
-    <label className="cursor-pointer text-xs bg-white border border-slate-200 hover:border-blue-400 text-slate-600 hover:text-blue-600 font-medium px-3 py-1.5 rounded transition-colors">
-      {status ? 'Replace' : 'Upload'}
-      <input type="file" accept=".csv" className="hidden" onChange={onChange} />
-    </label>
-  </div>
-);
+                {/* Charts Row 2: Top Performers & Universal Search */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2 flex flex-col">
+                     <div className="flex justify-between items-center mb-6">
+                       <div className="flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" /><h3 className="text-base font-bold text-slate-700">Top Performers 2026 (Group SKU)</h3></div>
+                       <div className="relative w-56"><input type="text" placeholder="Filter list..." className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:outline-none focus:border-blue-400" value={topPerfSearch} onChange={(e) => setTopPerfSearch(e.target.value)} /><Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" /></div>
+                     </div>
+                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 max-h-72">
+                        <table className="w-full text-sm text-left">
+                          <thead className="text-slate-400 border-b border-slate-100 font-medium"><tr><th className="py-3 pl-3">Rank</th><th className="py-3">Group SKU / Top Product Name</th><th className="py-3 text-right">Sales (YTD 2026)</th></tr></thead>
+                          <tbody>
+                            {topPerformers.map((item, idx) => {
+                              let rankIcon = <span className="text-slate-400 w-6 text-center inline-block">#{idx + 1}</span>;
+                              let rowClass = "border-b border-slate-50 hover:bg-slate-50 transition-colors";
+                              if (idx === 0) { rankIcon = <Trophy className="w-5 h-5 text-yellow-500 inline-block" />; rowClass = "bg-yellow-50/50 border-b border-yellow-100"; }
+                              else if (idx === 1) { rankIcon = <Medal className="w-5 h-5 text-slate-400 inline-block" />; }
+                              else if (idx === 2) { rankIcon = <Medal className="w-5 h-5 text-orange-400 inline-block" />; }
+                              return (
+                                <tr key={idx} className={rowClass}>
+                                  <td className="py-3.5 pl-3 font-bold">{rankIcon}</td>
+                                  <td className="py-3.5"><div className="font-semibold text-slate-700">{item.sku}</div><div className="text-xs text-slate-500 truncate max-w-[300px] mt-0.5" title={item.name}><span className="text-slate-400 mr-1">Top Item:</span> {item.name}</div></td>
+                                  <td className="py-3.5 text-right font-bold text-blue-700">฿{(item.value/1000000).toFixed(2)}M</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                     </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                    <h3 className="text-base font-bold text-slate-700 mb-4 flex items-center gap-2"><Search className="w-5 h-5 text-blue-600" /> Universal Search</h3>
+                    <div className="relative mb-4"><input type="text" placeholder="Search Product, Store, Channel..." className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 transition-colors" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /><Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" /></div>
+                    <div className="flex-1 overflow-y-auto pr-2 max-h-60 custom-scrollbar">
+                      {debouncedSearchTerm.length < 2 ? <div className="text-center text-slate-400 text-sm py-12">Type to search...</div> : searchResults.length === 0 ? <div className="text-center text-slate-400 text-sm py-12">No results found</div> : (
+                        <div className="space-y-3">
+                          <div className="text-xs text-slate-400 uppercase font-bold px-1 mb-2">Found Products & Locations (2026)</div>
+                          {searchResults.map((item, idx) => (
+                            <div key={idx} className="flex flex-col text-sm border-b border-slate-50 pb-3 last:border-0 hover:bg-slate-50 p-2 rounded transition-colors">
+                              <div className="flex justify-between items-start mb-1"><span className="text-slate-800 font-semibold truncate w-2/3" title={item.name}>{item.name}</span><span className="text-blue-700 font-bold">฿{(item.val/1000000).toFixed(2)}M</span></div>
+                              <div className="flex items-start gap-1.5 text-slate-500"><MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" /><span className="text-xs leading-snug line-clamp-2" title={item.location}>{item.location}</span></div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Charts Row 3: Channel Coverage Grid */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                   <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                     <div className="flex items-center gap-3">
+                       <Grid3X3 className="w-6 h-6 text-orange-600" />
+                       <div><h3 className="text-base font-bold text-slate-700">Channel Coverage Gap Analysis (2026)</h3><p className="text-xs text-slate-400 mt-0.5">{coverageDrillChannel ? `Drilled down: ${coverageDrillChannel}` : 'Overview by Main Channel'} {' • '}Click column header to drill down</p></div>
+                     </div>
+                     <div className="flex items-center gap-3">
+                       {coverageDrillChannel && <button onClick={() => setCoverageDrillChannel(null)} className="flex items-center gap-1.5 text-sm text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors font-medium border border-blue-100"><ArrowLeft className="w-4 h-4" /> Back</button>}
+                       <div className="relative"><input type="text" placeholder="Search SKU or Channel..." className="w-56 pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 transition-colors" value={coverageSearch} onChange={(e) => setCoverageSearch(e.target.value)} /><Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" /></div>
+                     </div>
+                   </div>
+
+                   <div className="overflow-x-auto custom-scrollbar max-h-[600px]">
+                     <table className="w-full text-sm text-left border-collapse min-w-[800px]">
+                       <thead className="sticky top-0 bg-slate-50 z-10 shadow-sm">
+                         <tr className="border-b border-slate-200">
+                           <th className="py-4 px-4 font-semibold text-slate-600 w-1/3 min-w-[250px]">Group SKU<div className="text-[10px] font-normal text-slate-400">Sorted by Sales (High-Low)</div></th>
+                           {coverageGrid.columns.map(col => {
+                             const total = coverageGrid.columnTotals[col];
+                             const isChain = !coverageDrillChannel && isChainBasedChannel(col);
+                             return (
+                               <th key={col} className={`py-4 px-3 font-semibold text-center min-w-[120px] ${!coverageDrillChannel ? 'cursor-pointer hover:bg-blue-50 text-blue-600' : 'text-slate-600'}`} onClick={() => !coverageDrillChannel && setCoverageDrillChannel(col)} title={!coverageDrillChannel ? "Click to drill down" : ""}>
+                                 <div className="flex flex-col items-center">
+                                   <div className="flex items-center gap-1.5 mb-1">{col}{!coverageDrillChannel && <ChevronDown className="w-3.5 h-3.5 opacity-50" />}</div>
+                                   <div className="text-xs font-normal text-slate-500">฿{(total.sales/1000000).toFixed(1)}M</div>
+                                   <div className="flex items-center gap-1 text-[10px] font-normal text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded mt-1">{coverageDrillChannel ? <Package className="w-3 h-3" /> : <Users className="w-3 h-3" />}{total.count} {coverageDrillChannel ? 'Selling SKUs' : (isChain ? 'Chains' : 'Outlets')}</div>
+                                 </div>
+                               </th>
+                             );
+                           })}
+                         </tr>
+                       </thead>
+                       <tbody>
+                         {coverageGrid.rows.length > 0 ? (
+                            coverageGrid.rows.map((sku, idx) => (
+                              <tr key={sku} className={`border-b border-slate-50 hover:bg-slate-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
+                                <td className="py-3 px-4 font-medium text-slate-700 truncate max-w-[250px]" title={sku}>
+                                  <div className="text-sm">{sku}</div>
+                                  <div className="flex items-center gap-1.5 text-xs text-slate-400 font-normal mt-1">Total Avail: {coverageDrillChannel ? <Check className="w-3 h-3 text-green-500" /> : <Users className="w-3 h-3" />} <span className="font-medium text-slate-600">{coverageGrid.rowTotals[sku] || 0}</span></div>
+                                </td>
+                                {coverageGrid.columns.map(col => {
+                                  const data = coverageGrid.matrix[sku][col] || { sales: 0, count: 0 };
+                                  const isGap = data.count === 0;
+                                  return (
+                                    <td key={col} className="py-3 px-3 text-center">
+                                      {coverageDrillChannel ? (isGap ? <span className="inline-block text-slate-300 font-light text-lg">-</span> : <Check className="w-5 h-5 text-green-500 mx-auto" />) : (isGap ? <span className="inline-block text-slate-300 font-light text-lg">-</span> : <div className="flex flex-col items-center gap-1"><span className="font-light text-slate-600 text-xs">฿{(data.sales/1000000).toFixed(2)}M</span><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 shadow-sm border border-blue-100"><Users className="w-2.5 h-2.5" />{data.count}</span></div>)}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))
+                         ) : <tr><td colSpan={coverageGrid.columns.length + 1} className="py-16 text-center text-slate-400">No products found matching "{coverageSearch}"</td></tr>}
+                       </tbody>
+                     </table>
+                   </div>
+                   <div className="mt-4 flex items-center gap-2 text-xs text-slate-400 px-1 bg-slate-50 p-2 rounded-lg border border-slate-100 inline-block"><AlertCircle className="w-4 h-4 text-orange-400" /><span>Tip: Sorted by Sales. '-' is Gap. MT/Online/Inter/BJC counts Chains (Sub-channels), others count Outlets (Sold-to).</span></div>
+                </div>
+
+                {/* AI Strategic Insights */}
+                <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 rounded-xl shadow-lg text-white mt-8 border border-slate-700">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 border-b border-slate-700/50 pb-6 gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-blue-500/20 p-3 rounded-xl border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]"><Sparkles className="w-8 h-8 text-blue-400" /></div>
+                      <div>
+                        <h2 className="text-xl font-bold flex items-center gap-3">{dynamicRecommendations.title} <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30">BETA</span></h2>
+                        <p className="text-sm text-slate-400 mt-1">Generated based on real-time sales performance: <span className="text-blue-300 font-medium">Growth {kpi.growthYoY >= 0 ? '+' : ''}{kpi.growthYoY.toFixed(1)}%</span> • Top Channel: <span className="text-blue-300 font-medium">{channelMix[0]?.name || 'N/A'}</span></p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {dynamicRecommendations.items.map((item: any, idx: number) => (
+                      <div key={idx} className="bg-slate-800/40 p-5 rounded-xl border border-slate-700 hover:border-blue-500/40 hover:bg-slate-800/60 transition-all duration-300 group">
+                        <h3 className="text-base font-bold text-blue-400 mb-3 flex items-center gap-2 group-hover:text-blue-300"><Lightbulb className="w-5 h-5" /> {item.head}</h3>
+                        <p className="text-sm text-slate-300 leading-relaxed font-light">{item.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </main>
+
+              {/* Upload Modal */}
+              {showUpload && (
+                <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-md">
+                  <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-0 animate-in fade-in zoom-in duration-200 overflow-hidden border border-slate-200">
+                    <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50/50">
+                      <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Upload className="w-5 h-5 text-blue-600" /> Data Import Center</h2>
+                      <button onClick={() => setShowUpload(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X className="w-5 h-5" /></button>
+                    </div>
+                    <div className="flex border-b border-slate-200">
+                      {['DACARE', 'DAOS', 'DASP&Q', 'DALIFESTYLE'].map(tab => (
+                         <button key={tab} onClick={() => setUploadTab(tab)} className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${uploadTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>{tab}</button>
+                      ))}
+                    </div>
+                    <div className="p-6 space-y-4">
+                      <UploadSlot label="Sales 2025 (.csv)" status={filesStatus[uploadTab as keyof typeof filesStatus].s25} onChange={(e: any) => handleFileUpload(e, uploadTab, 's25')} />
+                      <UploadSlot label="Sales 2026 (.csv)" status={filesStatus[uploadTab as keyof typeof filesStatus].s26} onChange={(e: any) => handleFileUpload(e, uploadTab, 's26')} />
+                      <UploadSlot label="Budget Channel (.csv)" status={filesStatus[uploadTab as keyof typeof filesStatus].bCh} onChange={(e: any) => handleFileUpload(e, uploadTab, 'bCh')} />
+                      <UploadSlot label="Budget Product (.csv)" status={filesStatus[uploadTab as keyof typeof filesStatus].bPr} onChange={(e: any) => handleFileUpload(e, uploadTab, 'bPr')} />
+                    </div>
+                    <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-end">
+                      <button onClick={() => setShowUpload(false)} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">Done</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<Dashboard />);
+    </script>
+</body>
+</html>
