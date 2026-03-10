@@ -12,13 +12,14 @@
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
     
-    <!-- Dependencies -->
+    <!-- Dependencies for Recharts (Crucial for UMD build) -->
     <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <script src="https://unpkg.com/react-is@18.2.0/umd/react-is.production.min.js"></script>
     
-    <!-- Recharts (Pinned to 2.1.12 for UMD stability to fix ForwardRef issue) -->
-    <script src="https://unpkg.com/recharts@2.1.12/umd/Recharts.min.js"></script>
+    <!-- Recharts (Pinned to 2.1.9, which is rock-solid for standalone HTML files) -->
+    <script src="https://unpkg.com/recharts@2.1.9/umd/Recharts.min.js"></script>
 
-    <!-- Babel for JSX compilation in browser (Must be loaded AFTER all dependencies) -->
+    <!-- Babel for JSX compilation in browser -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
@@ -45,10 +46,13 @@
 
     <script type="text/babel">
         const { useState, useMemo, useEffect, useRef } = React;
+        
+        // Safety Check for Recharts loading
+        const Recharts = window.Recharts;
         const { 
             BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
-            PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, ComposedChart, LabelList 
-        } = window.Recharts;
+            PieChart, Pie, Cell, LineChart, Line, ComposedChart, LabelList 
+        } = Recharts || {};
 
         // --- SVG Icons (Replacement for lucide-react to work standalone) ---
         const IconBase = ({ children, className = "w-5 h-5" }) => (
@@ -175,6 +179,17 @@
 
         // --- Main Component ---
         function Dashboard() {
+            // Guard clause if Recharts failed to load
+            if (!Recharts) {
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 text-slate-800">
+                        <Icons.AlertCircle className="w-16 h-16 text-red-500 mb-4" />
+                        <h2 className="text-xl font-bold mb-2">Failed to load Recharts library</h2>
+                        <p className="text-slate-500">Please check your internet connection or try refreshing the page.</p>
+                    </div>
+                );
+            }
+
             // Clean Start Mode (Empty data initially)
             const [salesData, setSalesData] = useState([]);
             const [budgetChannel, setBudgetChannel] = useState([]);
@@ -209,11 +224,6 @@
             const [uploadTab, setUploadTab] = useState('DACARE');
 
             const dashboardRef = useRef(null);
-
-            // No Mock Data
-            useEffect(() => {
-                // Start Clean
-            }, []);
 
             const handleFileUpload = (event, groupName, type) => {
                 const file = event.target.files?.[0];
@@ -594,7 +604,7 @@
                     ],
                     'Glue': [
                         { head: "Non-Toxic for Kids", desc: "ชูจุดขาย 'ไร้สารพิษ & ล้างออกง่าย' สำหรับกาวแท่งเจาะกลุ่มโรงเรียนและผู้ปกครอง สร้างความมั่นใจเรื่องความปลอดภัย" },
-                        { head: "Precision Application", desc: "พัฒนากาวหัวปากกาหรือกาวเทป (Glue Tape) สำหรับงานประดิษฐ์และ Planner ที่ต้องการความเนี้ยบ ไม่เลอะเทอะ" },
+                        { head: "Precision Application", desc: "พัฒกาวหัวปากกาหรือกาวเทป (Glue Tape) สำหรับงานประดิษฐ์และ Planner ที่ต้องการความเนี้ยบ ไม่เลอะเทอะ" },
                         { head: "Office Bulk Pack", desc: "ทำ Pack ประหยัดสุดคุ้มสำหรับสำนักงาน (B2B) เพื่อแย่งส่วนแบ่งจาก House Brand ในแคตตาล็อกจัดซื้อ" }
                     ]
                 };
