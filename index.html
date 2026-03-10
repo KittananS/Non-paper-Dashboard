@@ -62,6 +62,9 @@
     <!-- Recharts -->
     <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
     
+    <!-- PapaParse for CSV fetching -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
     <!-- Lucide React Icons -->
     <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.min.js"></script>
 
@@ -105,7 +108,8 @@
         const { 
             Upload, TrendingUp, Target, Users, DollarSign, LayoutDashboard, 
             PieChart: PieIcon, X, Search, ChevronDown, Calendar, Layers, ShoppingBag, 
-            Trophy, Medal, Store, ArrowLeft, Grid3X3, AlertCircle, MapPin, Lightbulb, Sparkles, ArrowRightCircle, Package, Check 
+            Trophy, Medal, Store, ArrowLeft, Grid3X3, AlertCircle, MapPin, Lightbulb, Sparkles, ArrowRightCircle, Package, Check,
+            RefreshCw, Database, CheckCircle2, XCircle
         } = LucideProxy;
 
         // --- Hooks ---
@@ -125,31 +129,48 @@
             return parseFloat(val.toString().replace(/[฿",]/g, '').trim()) || 0;
         };
 
-        const parseCSV = (text) => {
-            const lines = text.split('\n').filter(l => l.trim() !== '');
-            const headers = lines[0].split(',').map(h => h.trim());
-            return lines.slice(1).map(line => {
-                let row = [];
-                let inQuote = false;
-                let current = '';
-                for (let i = 0; i < line.length; i++) {
-                    const char = line[i];
-                    if (char === '"') { inQuote = !inQuote; } 
-                    else if (char === ',' && !inQuote) { row.push(current); current = ''; } 
-                    else { current += char; }
-                }
-                row.push(current);
-                const obj = {};
-                headers.forEach((h, i) => {
-                    obj[h] = row[i]?.replace(/^"|"$/g, '').trim();
-                });
-                return obj;
-            });
-        };
-
         const isChainBasedChannel = (channel) => {
             const upper = channel?.toUpperCase() || '';
             return ['MT', 'INTER COMPANY', 'ONLINE', 'BJC'].includes(upper);
+        };
+
+        const DATA_SOURCES = {
+            'DACARE': {
+                s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=0&single=true&output=csv',
+                s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=840326660&single=true&output=csv',
+                bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=676992950&single=true&output=csv',
+                bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=676992950&single=true&output=csv'
+            },
+            'DAOS': {
+                s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTqXyVL3DuTVqQnP8o7oZ-fQIU7wIeeRtRkcSbUkRHn4XTKHM-0-Xf43YqSsSUMX-7l3UHTro3XxRgu/pub?gid=0&single=true&output=csv',
+                s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTqXyVL3DuTVqQnP8o7oZ-fQIU7wIeeRtRkcSbUkRHn4XTKHM-0-Xf43YqSsSUMX-7l3UHTro3XxRgu/pub?gid=1788634359&single=true&output=csv',
+                bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTqXyVL3DuTVqQnP8o7oZ-fQIU7wIeeRtRkcSbUkRHn4XTKHM-0-Xf43YqSsSUMX-7l3UHTro3XxRgu/pub?gid=1758041911&single=true&output=csv',
+                bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTqXyVL3DuTVqQnP8o7oZ-fQIU7wIeeRtRkcSbUkRHn4XTKHM-0-Xf43YqSsSUMX-7l3UHTro3XxRgu/pub?gid=323060654&single=true&output=csv'
+            },
+            'DASP&Q': {
+                s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=1670436585&single=true&output=csv',
+                s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=632732784&single=true&output=csv',
+                bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=632732784&single=true&output=csv',
+                bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=503774950&single=true&output=csv'
+            },
+            'DALIFESTYLE': {
+                s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQWNuYqkCH8Z7pIvXMwJOnK0iwEb3kyTrJj_nF2A2WwluWOtrvFKRxiiSCLX81AgB4PJf3sZYD7lkwO/pub?gid=1241849681&single=true&output=csv',
+                s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQWNuYqkCH8Z7pIvXMwJOnK0iwEb3kyTrJj_nF2A2WwluWOtrvFKRxiiSCLX81AgB4PJf3sZYD7lkwO/pub?gid=1151038683&single=true&output=csv',
+                bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQWNuYqkCH8Z7pIvXMwJOnK0iwEb3kyTrJj_nF2A2WwluWOtrvFKRxiiSCLX81AgB4PJf3sZYD7lkwO/pub?gid=228153519&single=true&output=csv',
+                bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQWNuYqkCH8Z7pIvXMwJOnK0iwEb3kyTrJj_nF2A2WwluWOtrvFKRxiiSCLX81AgB4PJf3sZYD7lkwO/pub?gid=1341247115&single=true&output=csv'
+            }
+        };
+
+        const fetchCSV = (url) => {
+            return new Promise((resolve, reject) => {
+                window.Papa.parse(url, {
+                    download: true,
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => resolve(results.data),
+                    error: (error) => reject(error)
+                });
+            });
         };
 
         // --- Sub-components ---
@@ -185,18 +206,40 @@
             );
         };
 
-        const UploadSlot = ({ label, status, onChange }) => (
-            <div className={`flex items-center justify-between p-3 rounded-lg border border-slate-200 transition-all ${status ? 'bg-blue-50 border-blue-200' : 'bg-white hover:border-blue-300'}`}>
-                <div className="flex items-center gap-3">
-                    <div className={`w-2.5 h-2.5 rounded-full ${status ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-slate-300'}`}></div>
-                    <span className="text-sm font-medium text-slate-700">{label}</span>
+        const SyncStatusSlot = ({ label, status }) => {
+            let statusColor = 'bg-slate-300';
+            let statusText = 'Pending';
+            let icon = null;
+            
+            if (status === 'loading') {
+                statusColor = 'bg-blue-400 animate-pulse';
+                statusText = 'Syncing...';
+                icon = <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />;
+            } else if (status === 'success') {
+                statusColor = 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]';
+                statusText = 'Synced';
+                icon = <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />;
+            } else if (status === 'error') {
+                statusColor = 'bg-red-500';
+                statusText = 'Failed';
+                icon = <XCircle className="w-3.5 h-3.5 text-red-600" />;
+            }
+
+            return (
+                <div className={`flex items-center justify-between p-3 rounded-lg border border-slate-200 transition-all ${status === 'success' ? 'bg-green-50/50 border-green-200' : (status === 'error' ? 'bg-red-50/50 border-red-200' : 'bg-white')}`}>
+                    <div className="flex items-center gap-3">
+                        <div className={`w-2.5 h-2.5 rounded-full ${statusColor}`}></div>
+                        <span className="text-sm font-medium text-slate-700">{label}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        {icon}
+                        <span className={`text-xs font-bold ${status === 'success' ? 'text-green-700' : (status === 'error' ? 'text-red-700' : 'text-slate-500')}`}>
+                            {statusText}
+                        </span>
+                    </div>
                 </div>
-                <label className="cursor-pointer text-xs bg-white border border-slate-200 hover:border-blue-400 text-slate-600 hover:text-blue-600 font-medium px-3 py-1.5 rounded transition-colors">
-                    {status ? 'Replace' : 'Upload'}
-                    <input type="file" accept=".csv" className="hidden" onChange={onChange} />
-                </label>
-            </div>
-        );
+            );
+        };
 
         // --- Main Component ---
         function Dashboard() {
@@ -206,6 +249,7 @@
             
             const [selectedGroup, setSelectedGroup] = useState('ALL'); 
             const [showUpload, setShowUpload] = useState(false);
+            const [isSyncing, setIsSyncing] = useState(false);
             
             // Search States
             const [searchTerm, setSearchTerm] = useState('');
@@ -225,69 +269,97 @@
             
             // Status for 4 groups x 4 files = 16 files
             const [filesStatus, setFilesStatus] = useState({
-                DACARE: { s25: false, s26: false, bCh: false, bPr: false },
-                DAOS: { s25: false, s26: false, bCh: false, bPr: false },
-                'DASP&Q': { s25: false, s26: false, bCh: false, bPr: false },
-                DALIFESTYLE: { s25: false, s26: false, bCh: false, bPr: false },
+                DACARE: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
+                DAOS: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
+                'DASP&Q': { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
+                DALIFESTYLE: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
             });
             const [uploadTab, setUploadTab] = useState('DACARE');
 
             const dashboardRef = useRef(null);
 
-            // Initialize with empty data (No Mock Data)
-            useEffect(() => {
-                // Clean start
-            }, []);
+            const syncAllData = async () => {
+                if (isSyncing) return;
+                setIsSyncing(true);
+                setShowUpload(true); // Open monitor
 
-            const handleFileUpload = (event, groupName, type) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const text = e.target?.result;
-                    const rawData = parseCSV(text);
-                    setFilesStatus(prev => ({...prev, [groupName]: { ...prev[groupName], [type]: true }}));
-                    
-                    // Data Processing Logic for 2025/2026
-                    if (type === 's25' || type === 's26') {
-                        const year = type === 's25' ? '2025' : '2026';
-                        const formatted = rawData.map(row => ({
-                            Month: row['Month'], 
-                            ProductGroup: groupName, 
-                            Channel: row['Channel'], SubChannel: row['Sub-channel'],
-                            SoldToParty: row['Sold-to party'], MaterialNumber: row['Material Number'], ProductName: row['Product Name'],
-                            SubProductGroup: row['Sub-product group'], GroupSKU: row['Group SKU'] || row['Sub-product group'],
-                            NetPrice: cleanCurrency(row['Net Price']), Year: year
-                        })).filter(r => r.ProductGroup);
-                        
-                        setSalesData(prev => {
-                            const others = prev.filter(r => !(r.ProductGroup === groupName && r.Year === year));
-                            return [...others, ...formatted];
-                        });
-                    } else if (type === 'bCh') {
-                        const formatted = rawData.map(row => ({
-                            ProductGroup: groupName, 
-                            Channel: row['Channel'], 
-                            Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
-                            Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
-                            Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
-                        })).filter(r => r.Channel !== 'TOTAL' && r.Channel);
-                        
-                        setBudgetChannel(prev => [...prev.filter(r => r.ProductGroup !== groupName), ...formatted]);
-                    } else if (type === 'bPr') {
-                        const formatted = rawData.map(row => ({
-                            ProductGroup: groupName, 
-                            SubProductGroup: row['Sub-product Group'], 
-                            Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
-                            Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
-                            Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
-                        })).filter(r => r.SubProductGroup);
-                        
-                        setBudgetProduct(prev => [...prev.filter(r => r.ProductGroup !== groupName), ...formatted]);
+                let allSales = [];
+                let allBudgetChannel = [];
+                let allBudgetProduct = [];
+                let currentStatus = { ...filesStatus };
+
+                for (const groupName of Object.keys(DATA_SOURCES)) {
+                    currentStatus[groupName] = { s25: 'loading', s26: 'loading', bCh: 'loading', bPr: 'loading' };
+                }
+                setFilesStatus({...currentStatus});
+
+                for (const [groupName, sources] of Object.entries(DATA_SOURCES)) {
+                    try {
+                        // Parallel fetch to optimize load time
+                        const [s25Raw, s26Raw, bChRaw, bPrRaw] = await Promise.all([
+                            fetchCSV(sources.s25).catch(() => null),
+                            fetchCSV(sources.s26).catch(() => null),
+                            fetchCSV(sources.bCh).catch(() => null),
+                            fetchCSV(sources.bPr).catch(() => null)
+                        ]);
+
+                        if (s25Raw) {
+                            allSales.push(...s25Raw.map(row => ({
+                                Month: row['Month'], ProductGroup: groupName, Channel: row['Channel'], SubChannel: row['Sub-channel'] || row['Sub-Channel'],
+                                SoldToParty: row['Sold-to party'] || row['Sold-To Party'], MaterialNumber: row['Material Number'], ProductName: row['Product Name'],
+                                SubProductGroup: row['Sub-product group'] || row['Sub-Product Group'], GroupSKU: row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'],
+                                NetPrice: cleanCurrency(row['Net Price']), Year: '2025'
+                            })).filter(r => r.ProductGroup && r.Month));
+                            currentStatus[groupName].s25 = 'success';
+                        } else currentStatus[groupName].s25 = 'error';
+
+                        if (s26Raw) {
+                            allSales.push(...s26Raw.map(row => ({
+                                Month: row['Month'], ProductGroup: groupName, Channel: row['Channel'], SubChannel: row['Sub-channel'] || row['Sub-Channel'],
+                                SoldToParty: row['Sold-to party'] || row['Sold-To Party'], MaterialNumber: row['Material Number'], ProductName: row['Product Name'],
+                                SubProductGroup: row['Sub-product group'] || row['Sub-Product Group'], GroupSKU: row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'],
+                                NetPrice: cleanCurrency(row['Net Price']), Year: '2026'
+                            })).filter(r => r.ProductGroup && r.Month));
+                            currentStatus[groupName].s26 = 'success';
+                        } else currentStatus[groupName].s26 = 'error';
+
+                        if (bChRaw) {
+                            allBudgetChannel.push(...bChRaw.map(row => ({
+                                ProductGroup: groupName, Channel: row['Channel'], 
+                                Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
+                                Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
+                                Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
+                            })).filter(r => r.Channel && r.Channel !== 'TOTAL'));
+                            currentStatus[groupName].bCh = 'success';
+                        } else currentStatus[groupName].bCh = 'error';
+
+                        if (bPrRaw) {
+                            allBudgetProduct.push(...bPrRaw.map(row => ({
+                                ProductGroup: groupName, SubProductGroup: row['Sub-product Group'] || row['Sub-Product Group'], 
+                                Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
+                                Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
+                                Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
+                            })).filter(r => r.SubProductGroup && r.SubProductGroup !== 'TOTAL'));
+                            currentStatus[groupName].bPr = 'success';
+                        } else currentStatus[groupName].bPr = 'error';
+
+                        setFilesStatus({...currentStatus});
+                    } catch (error) {
+                        console.error(`Unexpected error syncing ${groupName}:`, error);
                     }
-                };
-                reader.readAsText(file);
+                }
+
+                setSalesData(allSales);
+                setBudgetChannel(allBudgetChannel);
+                setBudgetProduct(allBudgetProduct);
+                setIsSyncing(false);
+                setTimeout(() => setShowUpload(false), 1500); // Auto close cleanly
             };
+
+            // Auto-fetch on mount
+            useEffect(() => {
+                syncAllData();
+            }, []);
 
             const availableSubProducts = useMemo(() => {
                 const base = selectedGroup === 'ALL' ? salesData : salesData.filter(d => d.ProductGroup === selectedGroup);
@@ -707,8 +779,8 @@
                                         </button>
                                     ))}
                                 </div>
-                                <button onClick={() => setShowUpload(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors">
-                                    <Upload className="w-4 h-4" /> <span className="hidden md:inline">Import Data</span>
+                                <button onClick={() => showUpload ? setShowUpload(false) : syncAllData()} disabled={isSyncing} className={`flex items-center gap-2 text-white px-4 py-2 rounded text-sm font-medium transition-colors ${isSyncing ? 'bg-blue-800 opacity-80 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                                    <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} /> <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
                                 </button>
                             </div>
                         </div>
@@ -1194,7 +1266,7 @@
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-0 animate-in fade-in zoom-in duration-200 overflow-hidden border border-slate-200">
                                 <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50/50">
                                     <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                        <Upload className="w-5 h-5 text-blue-600" /> Data Import Center
+                                        <Database className="w-5 h-5 text-blue-600" /> Data Synchronization Status
                                     </h2>
                                     <button onClick={() => setShowUpload(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X className="w-5 h-5" /></button>
                                 </div>
@@ -1203,14 +1275,19 @@
                                         <button key={tab} onClick={() => setUploadTab(tab)} className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${uploadTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>{tab}</button>
                                     ))}
                                 </div>
-                                <div className="p-6 space-y-4">
-                                    <UploadSlot label="Sales 2025 (.csv)" status={filesStatus[uploadTab].s25} onChange={(e) => handleFileUpload(e, uploadTab, 's25')} />
-                                    <UploadSlot label="Sales 2026 (.csv)" status={filesStatus[uploadTab].s26} onChange={(e) => handleFileUpload(e, uploadTab, 's26')} />
-                                    <UploadSlot label="Budget Channel (.csv)" status={filesStatus[uploadTab].bCh} onChange={(e) => handleFileUpload(e, uploadTab, 'bCh')} />
-                                    <UploadSlot label="Budget Product (.csv)" status={filesStatus[uploadTab].bPr} onChange={(e) => handleFileUpload(e, uploadTab, 'bPr')} />
+                                <div className="p-6 space-y-4 bg-slate-50/30">
+                                    <SyncStatusSlot label="Sales 2025" status={filesStatus[uploadTab].s25} />
+                                    <SyncStatusSlot label="Sales 2026" status={filesStatus[uploadTab].s26} />
+                                    <SyncStatusSlot label="Budget Channel 2026" status={filesStatus[uploadTab].bCh} />
+                                    <SyncStatusSlot label="Budget Product 2026" status={filesStatus[uploadTab].bPr} />
                                 </div>
-                                <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-end">
-                                    <button onClick={() => setShowUpload(false)} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">Done</button>
+                                <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                                    <div className="text-xs text-slate-500 flex items-center gap-2 font-medium">
+                                        <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-orange-500 animate-pulse' : 'bg-green-500'}`}></div> Live from Google Sheets
+                                    </div>
+                                    <button onClick={() => setShowUpload(false)} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                                        {isSyncing ? 'Running in background...' : 'Close'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
