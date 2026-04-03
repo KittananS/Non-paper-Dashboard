@@ -517,10 +517,19 @@
 
             // --- Coverage Analysis Grid ---
             const coverageGrid = useMemo(() => {
+                const selectedMonthIndex = filterMonth === 'All' ? 11 : monthsList.indexOf(filterMonth);
+
                 const base2026 = salesData.filter(d => {
                     const matchYear = d.Year === '2026';
                     const matchGroup = selectedGroup === 'ALL' || d.ProductGroup === selectedGroup;
-                    const matchMonth = filterMonth === 'All' || (d.Month && d.Month.startsWith(filterMonth));
+                    
+                    // Accumulative Month Logic (YTD up to selected month)
+                    let matchMonth = true;
+                    if (filterMonth !== 'All' && d.Month) {
+                        const recordMonthIndex = monthsList.findIndex(m => d.Month.startsWith(m));
+                        matchMonth = recordMonthIndex !== -1 && recordMonthIndex <= selectedMonthIndex;
+                    }
+
                     return matchYear && matchGroup && matchMonth;
                 });
                 const rowsBase = filterSubProduct !== 'All' ? base2026.filter(d => d.SubProductGroup === filterSubProduct) : base2026;
