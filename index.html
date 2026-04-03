@@ -517,7 +517,12 @@
 
             // --- Coverage Analysis Grid ---
             const coverageGrid = useMemo(() => {
-                const base2026 = salesData.filter(d => d.Year === '2026' && (selectedGroup === 'ALL' || d.ProductGroup === selectedGroup));
+                const base2026 = salesData.filter(d => {
+                    const matchYear = d.Year === '2026';
+                    const matchGroup = selectedGroup === 'ALL' || d.ProductGroup === selectedGroup;
+                    const matchMonth = filterMonth === 'All' || (d.Month && d.Month.startsWith(filterMonth));
+                    return matchYear && matchGroup && matchMonth;
+                });
                 const rowsBase = filterSubProduct !== 'All' ? base2026.filter(d => d.SubProductGroup === filterSubProduct) : base2026;
 
                 const skuStats = {};
@@ -630,7 +635,7 @@
                 });
 
                 return { rows: sortedRows, columns, matrix, columnTotals, rowTotals };
-            }, [salesData, selectedGroup, filterSubProduct, coverageDrillChannel, debouncedCoverageSearch]);
+            }, [salesData, selectedGroup, filterSubProduct, filterMonth, coverageDrillChannel, debouncedCoverageSearch]);
 
             // --- Universal Search Logic ---
             const searchResults = useMemo(() => {
