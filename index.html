@@ -266,6 +266,7 @@
             const [filterMonth, setFilterMonth] = useState('All');
             
             const [coverageDrillChannel, setCoverageDrillChannel] = useState(null);
+            const [topPerfDrillDown, setTopPerfDrillDown] = useState(null);
             
             // Status for 4 groups x 4 files = 16 files
             const [filesStatus, setFilesStatus] = useState({
@@ -503,10 +504,12 @@
                     skuMap[key].products[pName] = (skuMap[key].products[pName] || 0) + d.NetPrice;
                 });
                 let list = Object.entries(skuMap).map(([sku, data]) => {
-                    let bestProd = sku;
-                    let maxS = -1;
-                    Object.entries(data.products).forEach(([pName, s]) => { if (s > maxS) { maxS = s; bestProd = pName; } });
-                    return { sku: sku, name: bestProd, value: data.totalSales };
+                    const sortedProducts = Object.entries(data.products)
+                        .map(([pName, s]) => ({ name: pName, value: s }))
+                        .sort((a, b) => b.value - a.value);
+
+                    const bestProd = sortedProducts.length > 0 ? sortedProducts[0].name : sku;
+                    return { sku: sku, name: bestProd, value: data.totalSales, allProducts: sortedProducts };
                 });
                 if (debouncedTopPerfSearch.length >= 2) {
                     const term = debouncedTopPerfSearch.toLowerCase();
@@ -1046,18 +1049,31 @@
                                 <div className="flex justify-between items-center mb-6">
                                     <div className="flex items-center gap-2">
                                         <Trophy className="w-5 h-5 text-yellow-500" />
-                                        <h3 className="text-base font-bold text-slate-700">Top Performers 2026 (Group SKU)</h3>
+                                        <h3 className="text-base font-extrabold text-slate-800">
+                                            {topPerfDrillDown ? `Top Products: ${topPerfDrillDown.sku}` : 'Top Performers 2026 (Group SKU)'}
+                                        </h3>
                                     </div>
                                     
-                                    <div className="relative w-56">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Filter list..." 
-                                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded text-sm font-medium focus:outline-none focus:border-blue-500"
-                                            value={topPerfSearch}
-                                            onChange={(e) => setTopPerfSearch(e.target.value)}
-                                        />
-                                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                                    <div className="flex items-center gap-3">
+                                        {topPerfDrillDown ? (
+                                            <button 
+                                                onClick={() => setTopPerfDrillDown(null)}
+                                                className="flex items-center gap-1.5 text-sm text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors font-bold border border-blue-200"
+                                            >
+                                                <ArrowLeft className="w-4 h-4" /> Back
+                                            </button>
+                                        ) : (
+                                            <div className="relative w-56">
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Filter list..." 
+                                                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded text-sm font-medium focus:outline-none focus:border-blue-500"
+                                                    value={topPerfSearch}
+                                                    onChange={(e) => setTopPerfSearch(e.target.value)}
+                                                />
+                                                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1066,39 +1082,49 @@
                                         <thead className="text-slate-500 border-b border-slate-200 font-semibold">
                                             <tr>
                                                 <th className="py-3 pl-3">Rank</th>
-                                                <th className="py-3">Group SKU / Top Product Name</th>
+                                                <th className="py-3">{topPerfDrillDown ? 'Product Name' : 'Group SKU / Top Product Name'}</th>
                                                 <th className="py-3 text-right">Sales (YTD 2026)</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {topPerformers.map((item, idx) => {
-                                                let rankIcon = <span className="text-slate-400 font-semibold w-6 text-center inline-block">#{idx + 1}</span>;
-                                                let rowClass = "border-b border-slate-100 hover:bg-slate-50 transition-colors";
-                                                
-                                                if (idx === 0) {
-                                                    rankIcon = <Trophy className="w-5 h-5 text-yellow-500 inline-block" />;
-                                                    rowClass = "bg-yellow-50/50 border-b border-yellow-200";
-                                                } else if (idx === 1) {
-                                                    rankIcon = <Medal className="w-5 h-5 text-slate-400 inline-block" />;
-                                                } else if (idx === 2) {
-                                                    rankIcon = <Medal className="w-5 h-5 text-orange-400 inline-block" />;
-                                                }
-
-                                                return (
-                                                    <tr key={idx} className={rowClass}>
-                                                        <td className="py-3.5 pl-3 font-semibold">{rankIcon}</td>
-                                                        <td className="py-3.5">
-                                                            <div className="font-semibold text-slate-800">{item.sku}</div>
-                                                            <div className="text-xs text-slate-500 font-medium truncate max-w-[300px] mt-0.5" title={item.name}>
-                                                                <span className="text-slate-400 mr-1">Top Item:</span> {item.name}
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-3.5 text-right font-bold text-blue-700">
-                                                            ฿{(item.value/1000000).toFixed(2)}M
-                                                        </td>
+                                            {topPerfDrillDown ? (
+                                                topPerfDrillDown.allProducts.map((prod, idx) => (
+                                                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                                        <td className="py-3.5 pl-3 font-semibold text-slate-400">#{idx + 1}</td>
+                                                        <td className="py-3.5 font-semibold text-slate-800">{prod.name}</td>
+                                                        <td className="py-3.5 text-right font-bold text-blue-700">฿{(prod.value/1000000).toFixed(2)}M</td>
                                                     </tr>
-                                                );
-                                            })}
+                                                ))
+                                            ) : (
+                                                topPerformers.map((item, idx) => {
+                                                    let rankIcon = <span className="text-slate-400 font-semibold w-6 text-center inline-block">#{idx + 1}</span>;
+                                                    let rowClass = "border-b border-slate-100 hover:bg-blue-50/50 transition-colors cursor-pointer group";
+                                                    
+                                                    if (idx === 0) {
+                                                        rankIcon = <Trophy className="w-5 h-5 text-yellow-500 inline-block" />;
+                                                        rowClass = "bg-yellow-50/30 border-b border-yellow-200 hover:bg-yellow-100/50 transition-colors cursor-pointer group";
+                                                    } else if (idx === 1) {
+                                                        rankIcon = <Medal className="w-5 h-5 text-slate-400 inline-block" />;
+                                                    } else if (idx === 2) {
+                                                        rankIcon = <Medal className="w-5 h-5 text-orange-400 inline-block" />;
+                                                    }
+
+                                                    return (
+                                                        <tr key={idx} className={rowClass} onClick={() => setTopPerfDrillDown(item)} title="Click to view all products in this SKU">
+                                                            <td className="py-3.5 pl-3 font-semibold">{rankIcon}</td>
+                                                            <td className="py-3.5">
+                                                                <div className="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">{item.sku}</div>
+                                                                <div className="text-xs text-slate-500 font-medium truncate max-w-[300px] mt-0.5">
+                                                                    <span className="text-slate-400 mr-1">Top Item:</span> {item.name}
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-3.5 text-right font-bold text-blue-700">
+                                                                ฿{(item.value/1000000).toFixed(2)}M
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
