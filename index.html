@@ -1010,13 +1010,13 @@
                                             <Pie data={channelMix} innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value">
                                                 {channelMix.map((entry, index) => <Cell key={`cell-${index}`} fill={BLUE_PALETTE[index % BLUE_PALETTE.length]} />)}
                                             </Pie>
-                                            <Tooltip formatter={(v) => `฿${(v/1000000).toFixed(2)}M`} contentStyle={{fontWeight: '500', borderRadius: '8px'}} />
+                                            <Tooltip formatter={(v) => `฿${v.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`} contentStyle={{fontWeight: '500', borderRadius: '8px'}} />
                                         </PieChart>
                                     </ResponsiveContainer>
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                         <div className="text-center">
                                             <div className="text-xs font-semibold text-slate-500">Total</div>
-                                            <div className="text-sm font-bold text-slate-800">{(kpi.s26/1000000).toFixed(1)}M</div>
+                                            <div className="text-sm font-bold text-slate-800">{kpi.s26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -1031,7 +1031,7 @@
                                                 <span className="text-slate-700 font-semibold">{item.name}</span>
                                             </div>
                                             <div className="text-right">
-                                                <span className="font-bold text-slate-800 block">฿{(item.value/1000000).toFixed(1)}M</span>
+                                                <span className="font-bold text-slate-800 block">฿{item.value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
                                                 <span className="text-xs text-slate-500 font-semibold">({percent}%)</span>
                                             </div>
                                         </div>
@@ -1092,7 +1092,7 @@
                                                     <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                                                         <td className="py-3.5 pl-3 font-semibold text-slate-400">#{idx + 1}</td>
                                                         <td className="py-3.5 font-semibold text-slate-800">{prod.name}</td>
-                                                        <td className="py-3.5 text-right font-bold text-blue-700">฿{(prod.value/1000000).toFixed(2)}M</td>
+                                                        <td className="py-3.5 text-right font-bold text-blue-700">฿{prod.value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</td>
                                                     </tr>
                                                 ))
                                             ) : (
@@ -1119,7 +1119,7 @@
                                                                 </div>
                                                             </td>
                                                             <td className="py-3.5 text-right font-bold text-blue-700">
-                                                                ฿{(item.value/1000000).toFixed(2)}M
+                                                                ฿{item.value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                                             </td>
                                                         </tr>
                                                     );
