@@ -109,7 +109,7 @@
             Upload, TrendingUp, Target, Users, DollarSign, LayoutDashboard, Activity,
             PieChart: PieIcon, X, Search, ChevronDown, Calendar, Layers, ShoppingBag, 
             Trophy, Medal, Store, ArrowLeft, Grid3X3, AlertCircle, MapPin, Lightbulb, Sparkles, ArrowRightCircle, Package, Check,
-            RefreshCw, Database, CheckCircle2, XCircle
+            RefreshCw, Database, CheckCircle2, XCircle, Info
         } = LucideProxy;
 
         // --- Hooks ---
@@ -1049,8 +1049,17 @@
                                 <div className="flex justify-between items-center mb-6">
                                     <div className="flex items-center gap-2">
                                         <Trophy className="w-5 h-5 text-yellow-500" />
-                                        <h3 className="text-base font-extrabold text-slate-800">
+                                        <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-1.5">
                                             {topPerfDrillDown ? `Top Products: ${topPerfDrillDown.sku}` : 'Top Performers 2026 (Group SKU)'}
+                                            {!topPerfDrillDown && (
+                                                <div className="relative group flex items-center">
+                                                    <Info className="w-4 h-4 text-slate-400 hover:text-blue-500 cursor-help transition-colors" />
+                                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-slate-800 text-white text-xs font-medium rounded shadow-lg text-center z-50">
+                                                        Click on any row below to drill down into SKU details.
+                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </h3>
                                     </div>
                                     
