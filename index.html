@@ -125,13 +125,15 @@
             return `image/${groupName.toLowerCase().replace(/&/g, '')}.png`;
         };
 
-        const GROUP_ORDER = ['DACARE', 'DATISSUE', 'DAOS', 'DABATTERY', 'DASP&Q', 'DALIFESTYLE'];
+        const GROUP_ORDER = ['DACARE', 'DATISSUE', 'DAOS', 'DABATTERY', 'DASP', 'DANB', 'QUALITY', 'DALIFESTYLE'];
         const GROUP_COLORS = {
             'DACARE': 'text-blue-700 bg-blue-100/60',
             'DATISSUE': 'text-sky-700 bg-sky-100/60',
             'DAOS': 'text-amber-700 bg-amber-100/60',
             'DABATTERY': 'text-red-700 bg-red-100/60',
-            'DASP&Q': 'text-emerald-700 bg-emerald-100/60',
+            'DASP': 'text-emerald-700 bg-emerald-100/60',
+            'DANB': 'text-teal-700 bg-teal-100/60',
+            'QUALITY': 'text-cyan-700 bg-cyan-100/60',
             'DALIFESTYLE': 'text-purple-700 bg-purple-100/60',
         };
 
@@ -160,7 +162,19 @@
                 bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS29e0vG5YtTyMMPjUDyn23E6RtjI2c5dHJ4o_bfRu0qQutiuIZ_ifgh6gwnRVb2_sxImgOCsgyRLRg/pub?gid=1758041911&single=true&output=csv',
                 bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS29e0vG5YtTyMMPjUDyn23E6RtjI2c5dHJ4o_bfRu0qQutiuIZ_ifgh6gwnRVb2_sxImgOCsgyRLRg/pub?gid=323060654&single=true&output=csv'
             },
-            'DASP&Q': {
+            'DASP': {
+                s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=1670436585&single=true&output=csv',
+                s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=632732784&single=true&output=csv',
+                bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=2001882698&single=true&output=csv',
+                bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=503774950&single=true&output=csv'
+            },
+            'DANB': {
+                s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=1670436585&single=true&output=csv',
+                s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=632732784&single=true&output=csv',
+                bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=2001882698&single=true&output=csv',
+                bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=503774950&single=true&output=csv'
+            },
+            'QUALITY': {
                 s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=1670436585&single=true&output=csv',
                 s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=632732784&single=true&output=csv',
                 bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=2001882698&single=true&output=csv',
@@ -315,7 +329,9 @@
                 DATISSUE: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
                 DAOS: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
                 DABATTERY: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
-                'DASP&Q': { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
+                DASP: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
+                DANB: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
+                QUALITY: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
                 DALIFESTYLE: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
             });
             const [uploadTab, setUploadTab] = useState('DACARE');
@@ -349,6 +365,9 @@
                         if (s25Raw) {
                             for (let i=0; i<s25Raw.length; i++) {
                                 const row = s25Raw[i];
+                                const rawGrp = row['Product Group'] || row['ProductGroup'];
+                                if (rawGrp && rawGrp.toUpperCase().trim() !== groupName) continue; // Skip rows meant for other groups
+                                
                                 if (row['Product Name'] && row['Month']) {
                                     groupSales.push({
                                         Month: row['Month'], ProductGroup: groupName, Channel: row['Channel'], SubChannel: row['Sub-channel'] || row['Sub-Channel'],
@@ -364,6 +383,9 @@
                         if (s26Raw) {
                             for (let i=0; i<s26Raw.length; i++) {
                                 const row = s26Raw[i];
+                                const rawGrp = row['Product Group'] || row['ProductGroup'];
+                                if (rawGrp && rawGrp.toUpperCase().trim() !== groupName) continue;
+                                
                                 if (row['Product Name'] && row['Month']) {
                                     groupSales.push({
                                         Month: row['Month'], ProductGroup: groupName, Channel: row['Channel'], SubChannel: row['Sub-channel'] || row['Sub-Channel'],
@@ -379,6 +401,9 @@
                         if (bChRaw) {
                             for (let i=0; i<bChRaw.length; i++) {
                                 const row = bChRaw[i];
+                                const rawGrp = row['Product Group'] || row['ProductGroup'];
+                                if (rawGrp && rawGrp.toUpperCase().trim() !== groupName) continue;
+                                
                                 if (row['Channel'] && row['Channel'] !== 'TOTAL') {
                                     groupBudgetChannel.push({
                                         ProductGroup: groupName, Channel: row['Channel'], 
@@ -394,6 +419,9 @@
                         if (bPrRaw) {
                             for (let i=0; i<bPrRaw.length; i++) {
                                 const row = bPrRaw[i];
+                                const rawGrp = row['Product Group'] || row['ProductGroup'];
+                                if (rawGrp && rawGrp.toUpperCase().trim() !== groupName) continue;
+                                
                                 const subGroup = row['Sub-product Group'] || row['Sub-Product Group'];
                                 if (subGroup && subGroup !== 'TOTAL') {
                                     groupBudgetProduct.push({
@@ -534,9 +562,9 @@
                     plan27 = relevant.reduce((a,b) => a + b.Plan2027, 0);
                 }
                 const progress = (target26 && target26 > 0) ? (s26 / target26) * 100 : 0;
-                const growthPlan = (target26 && plan27 && target26 > 0) ? ((plan27 - target26) / target26) * 100 : 0;
-                return { s26, s25_YTD, growthYoY, target26, forecast26, plan27, progress, growthPlan };
-            }, [salesData, budgetChannel, budgetProduct, selectedGroup, filterSubProduct, filterChannel, filterMonth]);
+            const growthPlan = (target26 && plan27 && target26 > 0) ? ((plan27 - target26) / target26) * 100 : 0;
+            return { s26, s25_YTD, growthYoY, target26, forecast26, plan27, progress, growthPlan };
+        }, [salesData, budgetChannel, budgetProduct, selectedGroup, filterSubProduct, filterChannel, filterMonth]);
 
             const trendChartData = useMemo(() => {
                 const base2026 = filteredData.filter(d => d.Year === '2026');
@@ -547,11 +575,13 @@
                         const datissue = monthData.filter(d => d.ProductGroup === 'DATISSUE').reduce((s, r) => s + r.NetPrice, 0);
                         const daos = monthData.filter(d => d.ProductGroup === 'DAOS').reduce((s, r) => s + r.NetPrice, 0);
                         const dabattery = monthData.filter(d => d.ProductGroup === 'DABATTERY').reduce((s, r) => s + r.NetPrice, 0);
-                        const dasp = monthData.filter(d => d.ProductGroup === 'DASP&Q').reduce((s, r) => s + r.NetPrice, 0);
+                        const dasp = monthData.filter(d => d.ProductGroup === 'DASP').reduce((s, r) => s + r.NetPrice, 0);
+                        const danb = monthData.filter(d => d.ProductGroup === 'DANB').reduce((s, r) => s + r.NetPrice, 0);
+                        const quality = monthData.filter(d => d.ProductGroup === 'QUALITY').reduce((s, r) => s + r.NetPrice, 0);
                         const dalife = monthData.filter(d => d.ProductGroup === 'DALIFESTYLE').reduce((s, r) => s + r.NetPrice, 0);
-                        const total = dacare + datissue + daos + dabattery + dasp + dalife;
+                        const total = dacare + datissue + daos + dabattery + dasp + danb + quality + dalife;
                         return {
-                            name: m, 'DACARE': dacare, 'DATISSUE': datissue, 'DAOS': daos, 'DABATTERY': dabattery, 'DASP&Q': dasp, 'DALIFESTYLE': dalife, total: total === 0 ? null : total
+                            name: m, 'DACARE': dacare, 'DATISSUE': datissue, 'DAOS': daos, 'DABATTERY': dabattery, 'DASP': dasp, 'DANB': danb, 'QUALITY': quality, 'DALIFESTYLE': dalife, total: total === 0 ? null : total
                         };
                     });
                 } else {
@@ -729,7 +759,43 @@
                 });
                 const getTopGrowth = (dataObj, threshold) => { let top = { name: 'N/A', growth: -Infinity }; Object.entries(dataObj).forEach(([name, data]) => { if (data.s25 > threshold) { const growth = ((data.s26 - data.s25) / data.s25) * 100; if (growth > top.growth) top = { name, growth }; } }); return top; };
                 const topTrendingProduct = getTopGrowth(subProdYTD, 50000); const topTrendingChannel = getTopGrowth(channelYTD, 100000);
-                const items = [{ head: "Peak Season & Momentum", desc: `ภาพรวม ${isGrowthPositive ? `โต +${growthVal}%` : `ติดลบ ${growthVal}%`} (Top Ch: ${topCh}). ข้อมูลปีที่แล้วชี้ว่าเดือน ${peakMonth25 || 'N/A'} คือช่วง High Season ของพอร์ตนี้ เตรียมแผน Supply Chain และ Marketing ให้พร้อมกอบโกยยอด` }, { head: topTrendingProduct.growth > 0 ? `Hero Product: ${topTrendingProduct.name}` : "Margin Protection", desc: topTrendingProduct.growth > 0 ? `สินค้ากลุ่ม ${topTrendingProduct.name} โตกระโดด +${topTrendingProduct.growth.toFixed(1)}% YoY ดันขึ้นแท่นหัวหอกหลัก จัด Bundle Pack หรือเพิ่ม Visibility หน้าเชลฟ์เพื่อขยาย Basket Size ด่วน` : `ตลาดยังซึม แนะนำลด Focus การทำราคา แล้วหันมา Push สินค้า High Margin เพื่อรักษากำไรบรรทัดสุดท้าย (Bottom Line)` }, { head: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `Rising Channel: ${topTrendingChannel.name}` : "Core Channel Defense", desc: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `ช่องทาง ${topTrendingChannel.name} โตทะลุเป้า +${topTrendingChannel.growth.toFixed(1)}% YoY เป็น Blue Ocean ที่ควรโยก Trade Budget บางส่วนมาอัดโปรโมชั่นดึงยอดเพิ่มทันที` : `รักษาส่วนแบ่งในช่องทางหลักอย่าง ${topCh} ให้แน่น ป้องกันคู่แข่งแย่งพื้นที่ Shelf และ Share of Voice` }];
+                
+                const groupRecs = {
+                    'DACARE': [
+                        { head: "Premium Hygiene 2026", desc: "เทรนด์ปีนี้คือ Premium Hygiene ผู้บริโภคยอมจ่ายแพงเพื่อสินค้าที่ดูดีและอ่อนโยนกว่าเดิม" },
+                        { head: "Aging Society", desc: "ตลาดผู้สูงอายุโตต่อเนื่อง ดันสินค้า Wipes สำหรับผู้ใหญ่เข้า MT/Pharmacy ให้มากขึ้น" }
+                    ],
+                    'DAOS': [
+                        { head: "Smart Hybrid Work", desc: "สินค้าออฟฟิศต้องเบาและพกพาได้ ตอบโจทย์การทำงานแบบ Hybrid Work ที่ยังคงอยู่" },
+                        { head: "Green Office", desc: "B2B มองหา Green Supply Chain. ชูจุดขายสินค้ารักษ์โลกเพื่อปิดดีล Corporate ใหญ่" }
+                    ],
+                    'DABATTERY': [
+                        { head: "Channel Expansion", desc: "วิเคราะห์ช่องว่างการจัดจำหน่ายในช่องทาง MT และ Online เพื่อเพิ่ม Coverage ของสินค้ากลุ่มแบตเตอรี่" },
+                        { head: "Promotion Strategy", desc: "วางแผนทำ Bundle Pack หรือ Cross-promotion ร่วมกับสินค้ากลุ่มออฟฟิศ (DAOS) เพื่อเพิ่ม Basket Size" }
+                    ],
+                    'DASP': [
+                        { head: "Ergonomic Focus", desc: "ดันสินค้ากลุ่มที่ช่วยลดแรง (Force Reduction) ตอบโจทย์เทรนด์ออฟฟิศยุคใหม่" },
+                        { head: "Cross-Selling", desc: "จัดเซ็ตคู่กับกลุ่มกระดาษ (DAOS) หรือทำโปรโมชั่นระดับ Corporate เพื่อขยายพอร์ต" }
+                    ],
+                    'DANB': [
+                        { head: "Design Aesthetic", desc: "สมุดบันทึกและ Planner ยังมี Loyalty สูง เน้นดีไซน์ปกที่สะท้อน Lifestyle ของ Gen Z" },
+                        { head: "Seasonal Launch", desc: "เตรียมออกคอลเลกชันช่วง Back-to-School และ New Year Gifting" }
+                    ],
+                    'QUALITY': [
+                        { head: "Premium Segment", desc: "เจาะตลาดกระดาษ Premium สำหรับงานพิมพ์ระดับสูง ที่ผู้บริโภคเน้นคุณภาพมากกว่าราคา" },
+                        { head: "B2B Expansion", desc: "ขยายฐานลูกค้า Corporate ที่ต้องการงานนำเสนอหรือเอกสารที่ดูเป็นมืออาชีพ" }
+                    ],
+                    'DALIFESTYLE': [
+                        { head: "Eco-Lifestyle", desc: "ชูจุดขาย Eco-friendly สำหรับสินค้าไลฟ์สไตล์ (ถุงผ้า/แก้วน้ำ) ตอบโจทย์เทรนด์รักษ์โลก 2026" },
+                        { head: "Online Driven", desc: "ใช้ Social Commerce เป็นช่องทางหลักในการขายสินค้ากลุ่มนี้เพื่อเข้าถึงคนรุ่นใหม่" }
+                    ]
+                };
+
+                const items = selectedGroup !== 'ALL' && groupRecs[selectedGroup] ? groupRecs[selectedGroup] : [
+                    { head: "Peak Season & Momentum", desc: `ภาพรวม ${isGrowthPositive ? `โต +${growthVal}%` : `ติดลบ ${growthVal}%`} (Top Ch: ${topCh}). ข้อมูลปีที่แล้วชี้ว่าเดือน ${peakMonth25 || 'N/A'} คือช่วง High Season ของพอร์ตนี้ เตรียมแผน Supply Chain และ Marketing ให้พร้อมกอบโกยยอด` }, 
+                    { head: topTrendingProduct.growth > 0 ? `Hero Product: ${topTrendingProduct.name}` : "Margin Protection", desc: topTrendingProduct.growth > 0 ? `สินค้ากลุ่ม ${topTrendingProduct.name} โตกระโดด +${topTrendingProduct.growth.toFixed(1)}% YoY ดันขึ้นแท่นหัวหอกหลัก จัด Bundle Pack หรือเพิ่ม Visibility หน้าเชลฟ์เพื่อขยาย Basket Size ด่วน` : `ตลาดยังซึม แนะนำลด Focus การทำราคา แล้วหันมา Push สินค้า High Margin เพื่อรักษากำไรบรรทัดสุดท้าย (Bottom Line)` }, 
+                    { head: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `Rising Channel: ${topTrendingChannel.name}` : "Core Channel Defense", desc: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `ช่องทาง ${topTrendingChannel.name} โตทะลุเป้า +${topTrendingChannel.growth.toFixed(1)}% YoY เป็น Blue Ocean ที่ควรโยก Trade Budget บางส่วนมาอัดโปรโมชั่นดึงยอดเพิ่มทันที` : `รักษาส่วนแบ่งในช่องทางหลักอย่าง ${topCh} ให้แน่น ป้องกันคู่แข่งแย่งพื้นที่ Shelf และ Share of Voice` }
+                ];
                 return { title: `AI Strategic Insights: ${contextTitle}`, items };
             }, [selectedGroup, filterSubProduct, kpi, channelMix, salesData, filteredData]);
 
@@ -836,7 +902,9 @@
                                                 <Bar dataKey="DATISSUE" stackId="a" fill="#0ea5e9" />
                                                 <Bar dataKey="DAOS" stackId="a" fill="#f59e0b" />
                                                 <Bar dataKey="DABATTERY" stackId="a" fill="#ef4444" />
-                                                <Bar dataKey="DASP&Q" stackId="a" fill="#10b981" />
+                                                <Bar dataKey="DASP" stackId="a" fill="#10b981" />
+                                                <Bar dataKey="DANB" stackId="a" fill="#14b8a6" />
+                                                <Bar dataKey="QUALITY" stackId="a" fill="#06b6d4" />
                                                 <Bar dataKey="DALIFESTYLE" stackId="a" fill="#8b5cf6" />
                                                 <Line type="monotone" dataKey="total" stroke="none" dot={false} activeDot={false}><LabelList dataKey="total" position="top" content={renderCustomLabel} /></Line>
                                             </ComposedChart>
@@ -964,7 +1032,7 @@
                         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-md">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200">
                                 <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50/50"><h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Database className="w-5 h-5 text-blue-600" /> Data Sync Status</h2><button onClick={() => setShowUpload(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button></div>
-                                <div className="flex border-b border-slate-200 overflow-x-auto custom-scrollbar">{['DACARE', 'DATISSUE', 'DAOS', 'DABATTERY', 'DASP&Q', 'DALIFESTYLE'].map(tab => (<button key={tab} onClick={() => setUploadTab(tab)} className={`flex-1 py-3 px-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${uploadTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>{tab}</button>))}</div>
+                                <div className="flex border-b border-slate-200 overflow-x-auto custom-scrollbar">{GROUP_ORDER.map(tab => (<button key={tab} onClick={() => setUploadTab(tab)} className={`flex-1 py-3 px-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${uploadTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>{tab}</button>))}</div>
                                 <div className="p-6 space-y-4 bg-slate-50/30">
                                     <SyncStatusSlot label="Sales 2025" status={filesStatus[uploadTab].s25} />
                                     <SyncStatusSlot label="Sales 2026" status={filesStatus[uploadTab].s26} />
