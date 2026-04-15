@@ -147,6 +147,12 @@
                 bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTqXyVL3DuTVqQnP8o7oZ-fQIU7wIeeRtRkcSbUkRHn4XTKHM-0-Xf43YqSsSUMX-7l3UHTro3XxRgu/pub?gid=1758041911&single=true&output=csv',
                 bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTqXyVL3DuTVqQnP8o7oZ-fQIU7wIeeRtRkcSbUkRHn4XTKHM-0-Xf43YqSsSUMX-7l3UHTro3XxRgu/pub?gid=323060654&single=true&output=csv'
             },
+            'DABATTERY': {
+                s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS29e0vG5YtTyMMPjUDyn23E6RtjI2c5dHJ4o_bfRu0qQutiuIZ_ifgh6gwnRVb2_sxImgOCsgyRLRg/pub?gid=0&single=true&output=csv',
+                s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS29e0vG5YtTyMMPjUDyn23E6RtjI2c5dHJ4o_bfRu0qQutiuIZ_ifgh6gwnRVb2_sxImgOCsgyRLRg/pub?gid=1788634359&single=true&output=csv',
+                bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS29e0vG5YtTyMMPjUDyn23E6RtjI2c5dHJ4o_bfRu0qQutiuIZ_ifgh6gwnRVb2_sxImgOCsgyRLRg/pub?gid=1758041911&single=true&output=csv',
+                bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS29e0vG5YtTyMMPjUDyn23E6RtjI2c5dHJ4o_bfRu0qQutiuIZ_ifgh6gwnRVb2_sxImgOCsgyRLRg/pub?gid=323060654&single=true&output=csv'
+            },
             'DASP&Q': {
                 s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=1670436585&single=true&output=csv',
                 s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSc4GaqFG4Fn7_bkeKyEbmBRPW810BBiWz9AaBu5ufMRBigl9_EP0yrD6hRdtD80KO0dii9pEMPAUEa/pub?gid=632732784&single=true&output=csv',
@@ -161,12 +167,15 @@
             }
         };
 
+        // --- Optimized Fetching with Web Worker ---
         const fetchCSV = (url) => {
+            if (!url) return Promise.reject(new Error('No URL provided'));
             return new Promise((resolve, reject) => {
                 window.Papa.parse(url, {
                     download: true,
                     header: true,
                     skipEmptyLines: true,
+                    worker: true, // Optimize: Use background thread to unblock UI
                     complete: (results) => resolve(results.data),
                     error: (error) => reject(error)
                 });
@@ -286,19 +295,19 @@
                 setIsSyncing(true);
                 setShowUpload(true); // Open monitor
 
-                let allSales = [];
-                let allBudgetChannel = [];
-                let allBudgetProduct = [];
-                let currentStatus = { ...filesStatus };
-
+                let initialStatus = { ...filesStatus };
                 for (const groupName of Object.keys(DATA_SOURCES)) {
-                    currentStatus[groupName] = { s25: 'loading', s26: 'loading', bCh: 'loading', bPr: 'loading' };
+                    initialStatus[groupName] = { s25: 'loading', s26: 'loading', bCh: 'loading', bPr: 'loading' };
                 }
-                setFilesStatus({...currentStatus});
+                setFilesStatus(initialStatus);
 
-                for (const [groupName, sources] of Object.entries(DATA_SOURCES)) {
+                // Optimize: Fetch ALL groups concurrently instead of sequential loop
+                const groupPromises = Object.entries(DATA_SOURCES).map(async ([groupName, sources]) => {
+                    let groupSales = [];
+                    let groupBudgetChannel = [];
+                    let groupBudgetProduct = [];
+
                     try {
-                        // Parallel fetch to optimize load time
                         const [s25Raw, s26Raw, bChRaw, bPrRaw] = await Promise.all([
                             fetchCSV(sources.s25).catch(() => null),
                             fetchCSV(sources.s26).catch(() => null),
@@ -306,8 +315,6 @@
                             fetchCSV(sources.bPr).catch(() => null)
                         ]);
 
-                        // FIX: Use .concat() instead of spread operator (...array) to avoid "Maximum call stack size exceeded"
-                        // Spread operators turn array elements into arguments, which has a stack limit in JS engines.
                         if (s25Raw) {
                             const mapped = s25Raw.map(row => ({
                                 Month: row['Month'], ProductGroup: groupName, Channel: row['Channel'], SubChannel: row['Sub-channel'] || row['Sub-Channel'],
@@ -315,9 +322,9 @@
                                 SubProductGroup: row['Sub-product group'] || row['Sub-Product Group'], GroupSKU: row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'],
                                 NetPrice: cleanCurrency(row['Net Price']), Year: '2025'
                             })).filter(r => r.ProductGroup && r.Month);
-                            allSales = allSales.concat(mapped);
-                            currentStatus[groupName].s25 = 'success';
-                        } else currentStatus[groupName].s25 = 'error';
+                            groupSales = groupSales.concat(mapped);
+                            setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s25: 'success' } }));
+                        } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s25: 'error' } }));
 
                         if (s26Raw) {
                             const mapped = s26Raw.map(row => ({
@@ -326,9 +333,9 @@
                                 SubProductGroup: row['Sub-product group'] || row['Sub-Product Group'], GroupSKU: row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'],
                                 NetPrice: cleanCurrency(row['Net Price']), Year: '2026'
                             })).filter(r => r.ProductGroup && r.Month);
-                            allSales = allSales.concat(mapped);
-                            currentStatus[groupName].s26 = 'success';
-                        } else currentStatus[groupName].s26 = 'error';
+                            groupSales = groupSales.concat(mapped);
+                            setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s26: 'success' } }));
+                        } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s26: 'error' } }));
 
                         if (bChRaw) {
                             const mapped = bChRaw.map(row => ({
@@ -337,9 +344,9 @@
                                 Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
                                 Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
                             })).filter(r => r.Channel && r.Channel !== 'TOTAL');
-                            allBudgetChannel = allBudgetChannel.concat(mapped);
-                            currentStatus[groupName].bCh = 'success';
-                        } else currentStatus[groupName].bCh = 'error';
+                            groupBudgetChannel = groupBudgetChannel.concat(mapped);
+                            setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bCh: 'success' } }));
+                        } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bCh: 'error' } }));
 
                         if (bPrRaw) {
                             const mapped = bPrRaw.map(row => ({
@@ -348,21 +355,35 @@
                                 Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
                                 Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
                             })).filter(r => r.SubProductGroup && r.SubProductGroup !== 'TOTAL');
-                            allBudgetProduct = allBudgetProduct.concat(mapped);
-                            currentStatus[groupName].bPr = 'success';
-                        } else currentStatus[groupName].bPr = 'error';
+                            groupBudgetProduct = groupBudgetProduct.concat(mapped);
+                            setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bPr: 'success' } }));
+                        } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bPr: 'error' } }));
 
-                        setFilesStatus({...currentStatus});
+                        return { groupSales, groupBudgetChannel, groupBudgetProduct };
+
                     } catch (error) {
                         console.error(`Unexpected error syncing ${groupName}:`, error);
-                        currentStatus[groupName] = { s25: 'error', s26: 'error', bCh: 'error', bPr: 'error' };
-                        setFilesStatus({...currentStatus});
+                        setFilesStatus(prev => ({ ...prev, [groupName]: { s25: 'error', s26: 'error', bCh: 'error', bPr: 'error' } }));
+                        return { groupSales: [], groupBudgetChannel: [], groupBudgetProduct: [] };
                     }
-                }
+                });
 
-                setSalesData(allSales);
-                setBudgetChannel(allBudgetChannel);
-                setBudgetProduct(allBudgetProduct);
+                // Wait for all groups to process simultaneously
+                const results = await Promise.all(groupPromises);
+
+                let finalSales = [];
+                let finalBudgetChannel = [];
+                let finalBudgetProduct = [];
+
+                results.forEach(res => {
+                    finalSales = finalSales.concat(res.groupSales);
+                    finalBudgetChannel = finalBudgetChannel.concat(res.groupBudgetChannel);
+                    finalBudgetProduct = finalBudgetProduct.concat(res.groupBudgetProduct);
+                });
+
+                setSalesData(finalSales);
+                setBudgetChannel(finalBudgetChannel);
+                setBudgetProduct(finalBudgetProduct);
                 setIsSyncing(false);
                 setTimeout(() => setShowUpload(false), 1500); // Auto close cleanly
             };
@@ -463,13 +484,15 @@
                         const monthData = base2026.filter(d => d.Month.startsWith(m));
                         const dacare = monthData.filter(d => d.ProductGroup === 'DACARE').reduce((s, r) => s + r.NetPrice, 0);
                         const daos = monthData.filter(d => d.ProductGroup === 'DAOS').reduce((s, r) => s + r.NetPrice, 0);
+                        const dabattery = monthData.filter(d => d.ProductGroup === 'DABATTERY').reduce((s, r) => s + r.NetPrice, 0);
                         const dasp = monthData.filter(d => d.ProductGroup === 'DASP&Q').reduce((s, r) => s + r.NetPrice, 0);
                         const dalife = monthData.filter(d => d.ProductGroup === 'DALIFESTYLE').reduce((s, r) => s + r.NetPrice, 0);
-                        const total = dacare + daos + dasp + dalife;
+                        const total = dacare + daos + dabattery + dasp + dalife;
                         return {
                             name: m,
                             'DACARE': dacare,
                             'DAOS': daos,
+                            'DABATTERY': dabattery,
                             'DASP&Q': dasp,
                             'DALIFESTYLE': dalife,
                             total: total === 0 ? null : total
@@ -498,51 +521,81 @@
             // --- Top Performers ---
             const topPerformers = useMemo(() => {
                 const skuMap = {};
-                filteredData.filter(d => d.Year === '2026').forEach(d => {
+                const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
+                
+                filteredData.forEach(d => {
                     const key = d.GroupSKU || 'Unknown';
-                    if (!skuMap[key]) skuMap[key] = { totalSales: 0, products: {} };
-                    skuMap[key].totalSales += d.NetPrice;
-                    const pName = d.ProductName || 'Unknown';
-                    skuMap[key].products[pName] = (skuMap[key].products[pName] || 0) + d.NetPrice;
+                    if (!skuMap[key]) skuMap[key] = { totalSales26: 0, totalSales25: 0, products: {} };
+                    
+                    if (d.Year === '2026') {
+                        skuMap[key].totalSales26 += d.NetPrice;
+                        const pName = d.ProductName || 'Unknown';
+                        if (!skuMap[key].products[pName]) skuMap[key].products[pName] = { val26: 0, val25: 0 };
+                        skuMap[key].products[pName].val26 += d.NetPrice;
+                    } else if (d.Year === '2025') {
+                        const monthPrefix = d.Month ? d.Month.split('-')[0] : '';
+                        if (filterMonth !== 'All' || valid2026Months.has(monthPrefix)) {
+                            skuMap[key].totalSales25 += d.NetPrice;
+                            const pName = d.ProductName || 'Unknown';
+                            if (!skuMap[key].products[pName]) skuMap[key].products[pName] = { val26: 0, val25: 0 };
+                            skuMap[key].products[pName].val25 += d.NetPrice;
+                        }
+                    }
                 });
+                
                 let list = Object.entries(skuMap).map(([sku, data]) => {
                     const sortedProducts = Object.entries(data.products)
-                        .map(([pName, s]) => ({ name: pName, value: s }))
+                        .map(([pName, pData]) => ({ name: pName, value: pData.val26, sales25: pData.val25 }))
+                        .filter(p => p.value > 0)
                         .sort((a, b) => b.value - a.value);
 
                     const bestProd = sortedProducts.length > 0 ? sortedProducts[0].name : sku;
-                    return { sku: sku, name: bestProd, value: data.totalSales, allProducts: sortedProducts };
+                    return { sku: sku, name: bestProd, value: data.totalSales26, sales25: data.totalSales25, allProducts: sortedProducts };
                 });
+                
+                list = list.filter(item => item.value > 0);
+
                 if (debouncedTopPerfSearch.length >= 2) {
                     const term = debouncedTopPerfSearch.toLowerCase();
                     list = list.filter(item => item.sku.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
                 }
                 return list.sort((a, b) => b.value - a.value).slice(0, 10);
-            }, [filteredData, debouncedTopPerfSearch]);
+            }, [filteredData, debouncedTopPerfSearch, salesData, filterMonth]);
 
             // --- Top Customers (Sold-To Party / Chain) ---
             const topCustomers = useMemo(() => {
                 const customerMap = {};
-                filteredData.filter(d => d.Year === '2026').forEach(d => {
+                const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
+                
+                filteredData.forEach(d => {
                     // Logic: If MT, group by SubChannel (Chain) instead of individual Sold-To
                     const isMT = d.Channel?.toUpperCase() === 'MT';
                     const customerName = isMT ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
                     const key = `${customerName}|${d.Channel || 'Unknown'}`;
                     
                     if (!customerMap[key]) {
-                        customerMap[key] = { name: customerName, channel: d.Channel || 'Unknown', totalSales: 0 };
+                        customerMap[key] = { name: customerName, channel: d.Channel || 'Unknown', totalSales26: 0, totalSales25: 0 };
                     }
-                    customerMap[key].totalSales += d.NetPrice;
+                    
+                    if (d.Year === '2026') {
+                        customerMap[key].totalSales26 += d.NetPrice;
+                    } else if (d.Year === '2025') {
+                        const monthPrefix = d.Month ? d.Month.split('-')[0] : '';
+                        if (filterMonth !== 'All' || valid2026Months.has(monthPrefix)) {
+                            customerMap[key].totalSales25 += d.NetPrice;
+                        }
+                    }
                 });
                 
                 let list = Object.values(customerMap);
+                list = list.filter(item => item.totalSales26 > 0);
                 
                 if (debouncedCustomerSearch.length >= 2) {
                     const term = debouncedCustomerSearch.toLowerCase();
                     list = list.filter(item => item.name.toLowerCase().includes(term) || item.channel.toLowerCase().includes(term));
                 }
-                return list.sort((a, b) => b.totalSales - a.totalSales).slice(0, 50); // แสดง Top 50 
-            }, [filteredData, debouncedCustomerSearch]);
+                return list.sort((a, b) => b.totalSales26 - a.totalSales26).slice(0, 50); // แสดง Top 50 
+            }, [filteredData, debouncedCustomerSearch, salesData, filterMonth]);
 
             const uniqueCustomersCount = useMemo(() => {
                 const unique = new Set();
@@ -834,7 +887,7 @@
                             </div>
                             <div className="flex items-center gap-4">
                                 <div className="flex bg-slate-800 rounded-md p-1">
-                                    {['ALL', 'DACARE', 'DAOS', 'DASP&Q', 'DALIFESTYLE'].map(group => (
+                                    {['ALL', 'DACARE', 'DAOS', 'DABATTERY', 'DASP&Q', 'DALIFESTYLE'].map(group => (
                                         <button key={group} onClick={() => { setSelectedGroup(group); setFilterSubProduct('All'); }} className={`px-4 py-1.5 text-sm font-semibold rounded transition-all ${selectedGroup === group ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-white'}`}>
                                             {group}
                                         </button>
@@ -873,18 +926,20 @@
                             {/* Category Image Card */}
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center h-full relative overflow-hidden group">
                                 <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none"></div>
-                                <div className="relative z-10 w-full flex flex-col h-full">
+                                <div className="relative z-10 w-full flex flex-col h-full justify-center">
                                     {selectedGroup === 'DACARE' && <img src="image/dacare.png" alt="DACARE" className="w-full h-32 object-contain mb-4" />}
                                     {selectedGroup === 'DAOS' && <img src="image/daos.png" alt="DAOS" className="w-full h-32 object-contain mb-4" />}
+                                    {selectedGroup === 'DABATTERY' && <img src="image/dabattery.png" alt="DABATTERY" className="w-full h-32 object-contain mb-4" />}
                                     {selectedGroup === 'DASP&Q' && <img src="image/daspq.png" alt="DASP&Q" className="w-full h-32 object-contain mb-4" />}
                                     {selectedGroup === 'DALIFESTYLE' && <img src="image/dalifestyle.png" alt="DALIFESTYLE" className="w-full h-32 object-contain mb-4" />}
                                     
                                     {selectedGroup === 'ALL' && (
-                                        <div className="grid grid-cols-2 gap-2 w-full h-32 mb-4">
-                                            <img src="image/dacare.png" alt="DACARE" className="w-full h-14 object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DACARE')} title="DACARE" />
-                                            <img src="image/daos.png" alt="DAOS" className="w-full h-14 object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DAOS')} title="DAOS" />
-                                            <img src="image/daspq.png" alt="DASP&Q" className="w-full h-14 object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DASP&Q')} title="DASP&Q" />
-                                            <img src="image/dalifestyle.png" alt="DALIFESTYLE" className="w-full h-14 object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DALIFESTYLE')} title="DALIFESTYLE" />
+                                        <div className="grid grid-cols-3 gap-2 w-full h-auto max-h-32 mb-4 overflow-y-auto custom-scrollbar place-items-center">
+                                            <img src="image/dacare.png" alt="DACARE" className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DACARE')} title="DACARE" />
+                                            <img src="image/daos.png" alt="DAOS" className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DAOS')} title="DAOS" />
+                                            <img src="image/dabattery.png" alt="DABATTERY" className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DABATTERY')} title="DABATTERY" />
+                                            <img src="image/daspq.png" alt="DASP&Q" className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DASP&Q')} title="DASP&Q" />
+                                            <img src="image/dalifestyle.png" alt="DALIFESTYLE" className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DALIFESTYLE')} title="DALIFESTYLE" />
                                         </div>
                                     )}
                                     
@@ -1009,6 +1064,7 @@
                                                 <Legend wrapperStyle={{fontSize: '12px', fontWeight: '500'}} />
                                                 <Bar dataKey="DACARE" stackId="a" fill="#3b82f6" />
                                                 <Bar dataKey="DAOS" stackId="a" fill="#f59e0b" />
+                                                <Bar dataKey="DABATTERY" stackId="a" fill="#ef4444" />
                                                 <Bar dataKey="DASP&Q" stackId="a" fill="#10b981" />
                                                 <Bar dataKey="DALIFESTYLE" stackId="a" fill="#8b5cf6" />
                                                 <Line type="monotone" dataKey="total" stroke="none" dot={false} activeDot={false}>
@@ -1129,17 +1185,30 @@
                                                 <th className="py-3 pl-3">Rank</th>
                                                 <th className="py-3">{topPerfDrillDown ? 'Product Name' : 'Group SKU / Top Product Name'}</th>
                                                 <th className="py-3 text-right">Sales (YTD 2026)</th>
+                                                <th className="py-3 pr-3 text-right">%Growth YoY</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {topPerfDrillDown ? (
-                                                topPerfDrillDown.allProducts.map((prod, idx) => (
-                                                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                                        <td className="py-3.5 pl-3 font-semibold text-slate-400">#{idx + 1}</td>
-                                                        <td className="py-3.5 font-semibold text-slate-800">{prod.name}</td>
-                                                        <td className="py-3.5 text-right font-bold text-blue-700">฿{prod.value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</td>
-                                                    </tr>
-                                                ))
+                                                topPerfDrillDown.allProducts.map((prod, idx) => {
+                                                    const yoy = prod.sales25 > 0 ? ((prod.value - prod.sales25) / prod.sales25) * 100 : null;
+                                                    return (
+                                                        <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                                            <td className="py-3.5 pl-3 font-semibold text-slate-400">#{idx + 1}</td>
+                                                            <td className="py-3.5 font-semibold text-slate-800">{prod.name}</td>
+                                                            <td className="py-3.5 text-right font-bold text-blue-700">฿{prod.value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</td>
+                                                            <td className="py-3.5 pr-3 text-right font-bold">
+                                                                {yoy !== null ? (
+                                                                    <span className={yoy >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                        {yoy >= 0 ? '▲' : '▼'} {Math.abs(yoy).toFixed(1)}%
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-slate-400 text-xs">N/A</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
                                             ) : (
                                                 topPerformers.map((item, idx) => {
                                                     let rankIcon = <span className="text-slate-400 font-semibold w-6 text-center inline-block">#{idx + 1}</span>;
@@ -1154,6 +1223,8 @@
                                                         rankIcon = <Medal className="w-5 h-5 text-orange-400 inline-block" />;
                                                     }
 
+                                                    const yoy = item.sales25 > 0 ? ((item.value - item.sales25) / item.sales25) * 100 : null;
+
                                                     return (
                                                         <tr key={idx} className={rowClass} onClick={() => setTopPerfDrillDown(item)} title="Click to view all products in this SKU">
                                                             <td className="py-3.5 pl-3 font-semibold">{rankIcon}</td>
@@ -1165,6 +1236,15 @@
                                                             </td>
                                                             <td className="py-3.5 text-right font-bold text-blue-700">
                                                                 ฿{item.value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                                            </td>
+                                                            <td className="py-3.5 pr-3 text-right font-bold">
+                                                                {yoy !== null ? (
+                                                                    <span className={yoy >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                        {yoy >= 0 ? '▲' : '▼'} {Math.abs(yoy).toFixed(1)}%
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-slate-400 text-xs">N/A</span>
+                                                                )}
                                                             </td>
                                                         </tr>
                                                     );
@@ -1246,14 +1326,15 @@
                             </div>
 
                             <div className="overflow-x-auto custom-scrollbar max-h-80">
-                                <table className="w-full text-sm text-left border-collapse min-w-[600px]">
+                                <table className="w-full text-sm text-left border-collapse min-w-[700px]">
                                     <thead className="sticky top-0 bg-slate-100 z-10 shadow-sm border-b border-slate-200">
                                         <tr>
                                             <th className="py-3 px-4 font-bold text-slate-700 w-16 text-center">Rank</th>
                                             <th className="py-3 px-4 font-bold text-slate-700">Sold-To Party / Chain</th>
-                                            <th className="py-3 px-4 font-bold text-slate-700 w-48">Channel</th>
-                                            <th className="py-3 px-4 font-bold text-slate-700 text-right w-48">Sales (YTD 2026)</th>
-                                            <th className="py-3 px-4 font-bold text-slate-700 text-right w-40">% Proportion</th>
+                                            <th className="py-3 px-4 font-bold text-slate-700 w-40">Channel</th>
+                                            <th className="py-3 px-4 font-bold text-slate-700 text-right w-40">Sales (YTD 2026)</th>
+                                            <th className="py-3 px-4 font-bold text-slate-700 text-right w-32">%Growth YoY</th>
+                                            <th className="py-3 px-4 font-bold text-slate-700 text-right w-32">% Proportion</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1264,7 +1345,8 @@
                                                 else if (idx === 1) rankColor = "text-slate-400 font-bold text-base";
                                                 else if (idx === 2) rankColor = "text-orange-500 font-bold text-base";
 
-                                                const proportion = kpi.s26 > 0 ? ((item.totalSales / kpi.s26) * 100).toFixed(1) : "0.0";
+                                                const proportion = kpi.s26 > 0 ? ((item.totalSales26 / kpi.s26) * 100).toFixed(1) : "0.0";
+                                                const yoy = item.totalSales25 > 0 ? ((item.totalSales26 - item.totalSales25) / item.totalSales25) * 100 : null;
 
                                                 return (
                                                     <tr key={`${item.name}-${item.channel}`} className={`border-b border-slate-100 hover:bg-blue-50/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
@@ -1280,7 +1362,16 @@
                                                             </span>
                                                         </td>
                                                         <td className="py-3 px-4 text-right font-extrabold text-blue-700">
-                                                            ฿{item.totalSales.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                                            ฿{item.totalSales26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                                        </td>
+                                                        <td className="py-3 px-4 text-right font-bold">
+                                                            {yoy !== null ? (
+                                                                <span className={yoy >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                    {yoy >= 0 ? '▲' : '▼'} {Math.abs(yoy).toFixed(1)}%
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-slate-400 text-xs">N/A</span>
+                                                            )}
                                                         </td>
                                                         <td className="py-3 px-4">
                                                             <div className="flex items-center justify-end gap-2">
@@ -1295,7 +1386,7 @@
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan="5" className="py-12 text-center text-slate-400 font-medium">
+                                                <td colSpan="6" className="py-12 text-center text-slate-400 font-medium">
                                                     No customers found matching your criteria.
                                                 </td>
                                             </tr>
@@ -1480,9 +1571,9 @@
                                     </h2>
                                     <button onClick={() => setShowUpload(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X className="w-5 h-5" /></button>
                                 </div>
-                                <div className="flex border-b border-slate-200">
-                                    {['DACARE', 'DAOS', 'DASP&Q', 'DALIFESTYLE'].map(tab => (
-                                        <button key={tab} onClick={() => setUploadTab(tab)} className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${uploadTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>{tab}</button>
+                                <div className="flex border-b border-slate-200 overflow-x-auto custom-scrollbar">
+                                    {['DACARE', 'DAOS', 'DABATTERY', 'DASP&Q', 'DALIFESTYLE'].map(tab => (
+                                        <button key={tab} onClick={() => setUploadTab(tab)} className={`flex-1 py-3 px-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${uploadTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>{tab}</button>
                                     ))}
                                 </div>
                                 <div className="p-6 space-y-4 bg-slate-50/30">
