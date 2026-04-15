@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Non-paper Performance Dashboard 2026</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Custom Scrollbar Style to match component classes -->
     <style>
         .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
@@ -30,7 +28,6 @@
         }
     </style>
 
-    <!-- FIX: Disable AMD and CommonJS loaders to force UMD scripts to expose global variables natively -->
     <script>
         window.__define = window.define;
         window.__require = window.require;
@@ -43,32 +40,24 @@
         window.exports = undefined;
     </script>
 
-    <!-- React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     
-    <!-- FIX: Ensure lowercase "react" is available globally for Recharts/Lucide dependencies -->
     <script>
         window.react = window.React;
         window['react-dom'] = window.ReactDOM;
     </script>
 
-    <!-- Babel for in-browser JSX/TS transpilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- Prop Types (Required by Recharts) -->
     <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
     
-    <!-- Recharts -->
     <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
     
-    <!-- PapaParse for CSV fetching -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
-    <!-- Lucide React Icons -->
     <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.min.js"></script>
 
-    <!-- FIX: Restore loaders for the environment -->
     <script>
         if (window.__define !== undefined) window.define = window.__define;
         if (window.__require !== undefined) window.require = window.__require;
@@ -91,9 +80,7 @@
         const LucideProxy = new Proxy(lucideGlobal, {
             get: function(target, prop) {
                 if (prop in target) return target[prop];
-                if (typeof prop !== 'string') return undefined; // Ignore symbols like React devtools hooks
-                
-                // Return a graceful fallback icon if the requested icon is missing or library failed to load
+                if (typeof prop !== 'string') return undefined;
                 return (props) => React.createElement('svg', {
                     width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none',
                     stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
@@ -134,9 +121,10 @@
             return ['MT', 'INTER COMPANY', 'ONLINE', 'BJC'].includes(upper);
         };
 
-        const GROUP_ORDER = ['DACARE', 'DAOS', 'DABATTERY', 'DASP&Q', 'DALIFESTYLE'];
+        const GROUP_ORDER = ['DACARE', 'DATISSUE', 'DAOS', 'DABATTERY', 'DASP&Q', 'DALIFESTYLE'];
         const GROUP_COLORS = {
             'DACARE': 'text-blue-700 bg-blue-100/60',
+            'DATISSUE': 'text-sky-700 bg-sky-100/60',
             'DAOS': 'text-amber-700 bg-amber-100/60',
             'DABATTERY': 'text-red-700 bg-red-100/60',
             'DASP&Q': 'text-emerald-700 bg-emerald-100/60',
@@ -149,6 +137,12 @@
                 s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=840326660&single=true&output=csv',
                 bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=676992950&single=true&output=csv',
                 bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=1671676832&single=true&output=csv'
+            },
+            'DATISSUE': {
+                s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQfrmCo5_WZAKiozHewHJ9tgiWKI8PxxPIOz26HfRswQucsrWdCN97iWzcXVZGqsG1KR_oP5l9xsHmk/pub?gid=0&single=true&output=csv',
+                s26: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQfrmCo5_WZAKiozHewHJ9tgiWKI8PxxPIOz26HfRswQucsrWdCN97iWzcXVZGqsG1KR_oP5l9xsHmk/pub?gid=840326660&single=true&output=csv',
+                bCh: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQfrmCo5_WZAKiozHewHJ9tgiWKI8PxxPIOz26HfRswQucsrWdCN97iWzcXVZGqsG1KR_oP5l9xsHmk/pub?gid=676992950&single=true&output=csv',
+                bPr: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQfrmCo5_WZAKiozHewHJ9tgiWKI8PxxPIOz26HfRswQucsrWdCN97iWzcXVZGqsG1KR_oP5l9xsHmk/pub?gid=1671676832&single=true&output=csv'
             },
             'DAOS': {
                 s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTqXyVL3DuTVqQnP8o7oZ-fQIU7wIeeRtRkcSbUkRHn4XTKHM-0-Xf43YqSsSUMX-7l3UHTro3XxRgu/pub?gid=0&single=true&output=csv',
@@ -176,7 +170,6 @@
             }
         };
 
-        // --- Optimized Fetching with Web Worker ---
         const fetchCSV = (url) => {
             if (!url) return Promise.reject(new Error('No URL provided'));
             return new Promise((resolve, reject) => {
@@ -184,7 +177,7 @@
                     download: true,
                     header: true,
                     skipEmptyLines: true,
-                    worker: true, // Optimize: Use background thread to unblock UI
+                    worker: true,
                     complete: (results) => resolve(results.data),
                     error: (error) => reject(error)
                 });
@@ -312,9 +305,10 @@
             const [coverageDrillChannel, setCoverageDrillChannel] = useState(null);
             const [topPerfDrillDown, setTopPerfDrillDown] = useState(null);
             
-            // Status for 5 groups x 4 files = 20 files
+            // Status for all groups
             const [filesStatus, setFilesStatus] = useState({
                 DACARE: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
+                DATISSUE: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
                 DAOS: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
                 DABATTERY: { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
                 'DASP&Q': { s25: 'pending', s26: 'pending', bCh: 'pending', bPr: 'pending' },
@@ -327,7 +321,7 @@
             const syncAllData = async () => {
                 if (isSyncing) return;
                 setIsSyncing(true);
-                setShowUpload(true); // Open monitor
+                setShowUpload(true);
 
                 let initialStatus = { ...filesStatus };
                 for (const groupName of Object.keys(DATA_SOURCES)) {
@@ -335,7 +329,6 @@
                 }
                 setFilesStatus(initialStatus);
 
-                // Optimize: Fetch ALL groups concurrently instead of sequential loop
                 const groupPromises = Object.entries(DATA_SOURCES).map(async ([groupName, sources]) => {
                     let groupSales = [];
                     let groupBudgetChannel = [];
@@ -402,7 +395,6 @@
                     }
                 });
 
-                // Wait for all groups to process simultaneously
                 const results = await Promise.all(groupPromises);
 
                 let finalSales = [];
@@ -419,52 +411,41 @@
                 setBudgetChannel(finalBudgetChannel);
                 setBudgetProduct(finalBudgetProduct);
                 setIsSyncing(false);
-                setTimeout(() => setShowUpload(false), 1500); // Auto close cleanly
+                setTimeout(() => setShowUpload(false), 1500);
             };
 
-            // Auto-fetch on mount
             useEffect(() => {
                 syncAllData();
             }, []);
 
             const availableSubProducts = useMemo(() => {
                 const base = selectedGroup === 'ALL' ? salesData : salesData.filter(d => d.ProductGroup === selectedGroup);
-                
                 const subProdMap = new Map();
                 base.forEach(d => {
                     if (d.SubProductGroup && !subProdMap.has(d.SubProductGroup)) {
                         subProdMap.set(d.SubProductGroup, d.ProductGroup);
                     }
                 });
-
                 const list = Array.from(subProdMap.entries()).map(([name, group]) => ({ val: name, group }));
-                
                 list.sort((a, b) => {
                     const gA = GROUP_ORDER.indexOf(a.group);
                     const gB = GROUP_ORDER.indexOf(b.group);
                     if (gA !== gB) return gA - gB;
                     return a.val.localeCompare(b.val);
                 });
-                
                 return list;
             }, [salesData, selectedGroup]);
 
             const availableChannels = useMemo(() => {
                 const base = selectedGroup === 'ALL' ? salesData : salesData.filter(d => d.ProductGroup === selectedGroup);
-                
-                // Aggregate sales by channel for the current year (2026) to determine sorting order
                 const channelSalesMap = {};
                 base.forEach(d => {
                     const ch = d.Channel;
                     if (ch) {
                         if (!channelSalesMap[ch]) channelSalesMap[ch] = 0;
-                        if (d.Year === '2026') {
-                            channelSalesMap[ch] += d.NetPrice;
-                        }
+                        if (d.Year === '2026') channelSalesMap[ch] += d.NetPrice;
                     }
                 });
-
-                // Convert to array, sort by sales (descending), and extract channel names
                 return Object.entries(channelSalesMap)
                     .map(([name, sales]) => ({ name, sales }))
                     .sort((a, b) => b.sales - a.sales)
@@ -483,7 +464,6 @@
                 });
             }, [salesData, selectedGroup, filterSubProduct, filterChannel, filterMonth]);
 
-            // --- KPI Calculation (Apple-to-Apple YTD) ---
             const kpi = useMemo(() => {
                 const filterFn = (d) => {
                     const matchGroup = selectedGroup === 'ALL' || d.ProductGroup === selectedGroup;
@@ -492,31 +472,20 @@
                     const matchMonth = filterMonth === 'All' || (d.Month && d.Month.startsWith(filterMonth));
                     return matchGroup && matchSub && matchChannel && matchMonth;
                 };
-
-                // 1. Current Year (2026)
                 const data2026 = salesData.filter(d => d.Year === '2026' && filterFn(d));
                 const s26 = data2026.reduce((a, b) => a + b.NetPrice, 0);
-
-                // 2. Identify available months in 2026 for accurate comparison
                 const monthsPresentIn2026 = new Set(data2026.map(d => d.Month.split('-')[0])); 
-
-                // 3. Previous Year (2025) - Matching Months Only
                 const s25_YTD = salesData
                     .filter(d => d.Year === '2025' && filterFn(d) && monthsPresentIn2026.has(d.Month.split('-')[0]))
                     .reduce((a, b) => a + b.NetPrice, 0);
-
                 const growthYoY = s25_YTD > 0 ? ((s26 - s25_YTD) / s25_YTD) * 100 : 0;
 
-                let target26 = 0;
-                let forecast26 = 0;
-                let plan27 = 0;
-
+                let target26 = 0; let forecast26 = 0; let plan27 = 0;
                 const isSubFiltered = filterSubProduct !== 'All';
                 const isChannelFiltered = filterChannel !== 'All';
 
-                if (isSubFiltered && isChannelFiltered) {
-                    target26 = null; forecast26 = null; plan27 = null;
-                } else if (isSubFiltered) {
+                if (isSubFiltered && isChannelFiltered) { target26 = null; forecast26 = null; plan27 = null; }
+                else if (isSubFiltered) {
                     const relevant = budgetProduct.filter(b => (selectedGroup === 'ALL' || b.ProductGroup === selectedGroup) && b.SubProductGroup === filterSubProduct);
                     if (relevant.length === 0) { target26 = null; forecast26 = null; plan27 = null; }
                     else { 
@@ -540,30 +509,23 @@
                 }
                 const progress = (target26 && target26 > 0) ? (s26 / target26) * 100 : 0;
                 const growthPlan = (target26 && plan27 && target26 > 0) ? ((plan27 - target26) / target26) * 100 : 0;
-                
                 return { s26, s25_YTD, growthYoY, target26, forecast26, plan27, progress, growthPlan };
             }, [salesData, budgetChannel, budgetProduct, selectedGroup, filterSubProduct, filterChannel, filterMonth]);
 
-            // --- Charts Logic ---
             const trendChartData = useMemo(() => {
                 const base2026 = filteredData.filter(d => d.Year === '2026');
                 if (selectedGroup === 'ALL') {
                     return monthsList.map(m => {
                         const monthData = base2026.filter(d => d.Month.startsWith(m));
                         const dacare = monthData.filter(d => d.ProductGroup === 'DACARE').reduce((s, r) => s + r.NetPrice, 0);
+                        const datissue = monthData.filter(d => d.ProductGroup === 'DATISSUE').reduce((s, r) => s + r.NetPrice, 0);
                         const daos = monthData.filter(d => d.ProductGroup === 'DAOS').reduce((s, r) => s + r.NetPrice, 0);
                         const dabattery = monthData.filter(d => d.ProductGroup === 'DABATTERY').reduce((s, r) => s + r.NetPrice, 0);
                         const dasp = monthData.filter(d => d.ProductGroup === 'DASP&Q').reduce((s, r) => s + r.NetPrice, 0);
                         const dalife = monthData.filter(d => d.ProductGroup === 'DALIFESTYLE').reduce((s, r) => s + r.NetPrice, 0);
-                        const total = dacare + daos + dabattery + dasp + dalife;
+                        const total = dacare + datissue + daos + dabattery + dasp + dalife;
                         return {
-                            name: m,
-                            'DACARE': dacare,
-                            'DAOS': daos,
-                            'DABATTERY': dabattery,
-                            'DASP&Q': dasp,
-                            'DALIFESTYLE': dalife,
-                            total: total === 0 ? null : total
+                            name: m, 'DACARE': dacare, 'DATISSUE': datissue, 'DAOS': daos, 'DABATTERY': dabattery, 'DASP&Q': dasp, 'DALIFESTYLE': dalife, total: total === 0 ? null : total
                         };
                     });
                 } else {
@@ -571,50 +533,27 @@
                     return monthsList.map(m => {
                         const val2025 = base2025.filter(d => d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
                         const val2026 = base2026.filter(d => d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
-                        return {
-                            name: m,
-                            '2025': val2025,
-                            '2026': val2026 === 0 ? null : val2026,
-                        };
+                        return { name: m, '2025': val2025, '2026': val2026 === 0 ? null : val2026 };
                     });
                 }
             }, [salesData, filteredData, selectedGroup, filterSubProduct, filterChannel]);
 
-            // --- Y-Axis Tick Generator (Strict & Clean Nice Scale) ---
             const yAxisTicks = useMemo(() => {
                 const maxVal = trendChartData.reduce((max, d) => {
-                    if (selectedGroup === 'ALL') {
-                        return Math.max(max, d.total || 0);
-                    } else {
-                        return Math.max(max, d['2025'] || 0, d['2026'] || 0);
-                    }
+                    if (selectedGroup === 'ALL') return Math.max(max, d.total || 0);
+                    else return Math.max(max, d['2025'] || 0, d['2026'] || 0);
                 }, 0);
-
-                if (maxVal === 0) return [0, 5000000]; // Default 0-5M if no data
-
-                const targetMax = maxVal * 1.15; // 15% headroom
-                
-                // หาค่า Step กว้างๆ สำหรับแบ่งกราฟประมาณ 4 ช่อง (ไม่ให้ซอยถี่เกินไป)
+                if (maxVal === 0) return [0, 5000000];
+                const targetMax = maxVal * 1.15;
                 const roughStep = targetMax / 4; 
                 const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep || 1)));
                 const normalized = roughStep / magnitude;
-                
-                // ปัดเศษให้เป็นตัวเลขกลมๆ (1, 2, 2.5, 5, 10) เพื่อให้ช่องไฟเท่ากันเป๊ะ
                 let niceNorm;
-                if (normalized <= 1) niceNorm = 1;
-                else if (normalized <= 2) niceNorm = 2;
-                else if (normalized <= 2.5) niceNorm = 2.5;
-                else if (normalized <= 5) niceNorm = 5;
-                else niceNorm = 10;
-                
+                if (normalized <= 1) niceNorm = 1; else if (normalized <= 2) niceNorm = 2; else if (normalized <= 2.5) niceNorm = 2.5; else if (normalized <= 5) niceNorm = 5; else niceNorm = 10;
                 const step = niceNorm * magnitude;
                 const maxTick = Math.ceil(targetMax / step) * step;
-                
                 const ticks = [];
-                for (let current = 0; current <= maxTick + (step * 0.1); current += step) {
-                    ticks.push(current);
-                }
-                
+                for (let current = 0; current <= maxTick + (step * 0.1); current += step) ticks.push(current);
                 return ticks;
             }, [trendChartData, selectedGroup]);
 
@@ -624,15 +563,12 @@
                 return Object.keys(data).map(k => ({ name: k, value: data[k] })).sort((a, b) => b.value - a.value);
             }, [filteredData]);
 
-            // --- Top Performers ---
             const topPerformers = useMemo(() => {
                 const skuMap = {};
                 const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
-                
                 filteredData.forEach(d => {
                     const key = d.GroupSKU || 'Unknown';
                     if (!skuMap[key]) skuMap[key] = { totalSales26: 0, totalSales25: 0, products: {} };
-                    
                     if (d.Year === '2026') {
                         skuMap[key].totalSales26 += d.NetPrice;
                         const pName = d.ProductName || 'Unknown';
@@ -648,76 +584,40 @@
                         }
                     }
                 });
-                
                 let list = Object.entries(skuMap).map(([sku, data]) => {
-                    const sortedProducts = Object.entries(data.products)
-                        .map(([pName, pData]) => ({ name: pName, value: pData.val26, sales25: pData.val25 }))
-                        .filter(p => p.value > 0)
-                        .sort((a, b) => b.value - a.value);
-
+                    const sortedProducts = Object.entries(data.products).map(([pName, pData]) => ({ name: pName, value: pData.val26, sales25: pData.val25 })).filter(p => p.value > 0).sort((a, b) => b.value - a.value);
                     const bestProd = sortedProducts.length > 0 ? sortedProducts[0].name : sku;
-                    return { sku: sku, name: bestProd, value: data.totalSales26, sales25: data.totalSales25, allProducts: sortedProducts };
-                });
-                
-                list = list.filter(item => item.value > 0);
-
+                    return { sku, name: bestProd, value: data.totalSales26, sales25: data.totalSales25, allProducts: sortedProducts };
+                }).filter(item => item.value > 0);
                 if (debouncedTopPerfSearch.length >= 2) {
                     const term = debouncedTopPerfSearch.toLowerCase();
                     list = list.filter(item => item.sku.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
                 }
-
-                if (topPerfSortMode === 'yoy') {
-                    return list.sort((a, b) => {
-                        const yoyA = a.sales25 > 0 ? (a.value - a.sales25) / a.sales25 : -Infinity;
-                        const yoyB = b.sales25 > 0 ? (b.value - b.sales25) / b.sales25 : -Infinity;
-                        return yoyB - yoyA;
-                    }).slice(0, 10);
-                } else {
-                    return list.sort((a, b) => b.value - a.value).slice(0, 10);
-                }
+                if (topPerfSortMode === 'yoy') return list.sort((a, b) => { const yoyA = a.sales25 > 0 ? (a.value - a.sales25) / a.sales25 : -Infinity; const yoyB = b.sales25 > 0 ? (b.value - b.sales25) / b.sales25 : -Infinity; return yoyB - yoyA; }).slice(0, 10);
+                else return list.sort((a, b) => b.value - a.value).slice(0, 10);
             }, [filteredData, debouncedTopPerfSearch, salesData, filterMonth, topPerfSortMode]);
 
-            // --- Top Customers (Sold-To Party / Chain) ---
             const topCustomers = useMemo(() => {
                 const customerMap = {};
                 const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
-                
                 filteredData.forEach(d => {
                     const isMT = d.Channel?.toUpperCase() === 'MT';
                     const customerName = isMT ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
                     const key = `${customerName}|${d.Channel || 'Unknown'}`;
-                    
-                    if (!customerMap[key]) {
-                        customerMap[key] = { name: customerName, channel: d.Channel || 'Unknown', totalSales26: 0, totalSales25: 0 };
-                    }
-                    
-                    if (d.Year === '2026') {
-                        customerMap[key].totalSales26 += d.NetPrice;
-                    } else if (d.Year === '2025') {
+                    if (!customerMap[key]) customerMap[key] = { name: customerName, channel: d.Channel || 'Unknown', totalSales26: 0, totalSales25: 0 };
+                    if (d.Year === '2026') customerMap[key].totalSales26 += d.NetPrice;
+                    else if (d.Year === '2025') {
                         const monthPrefix = d.Month ? d.Month.split('-')[0] : '';
-                        if (filterMonth !== 'All' || valid2026Months.has(monthPrefix)) {
-                            customerMap[key].totalSales25 += d.NetPrice;
-                        }
+                        if (filterMonth !== 'All' || valid2026Months.has(monthPrefix)) customerMap[key].totalSales25 += d.NetPrice;
                     }
                 });
-                
-                let list = Object.values(customerMap);
-                list = list.filter(item => item.totalSales26 > 0);
-                
+                let list = Object.values(customerMap).filter(item => item.totalSales26 > 0);
                 if (debouncedCustomerSearch.length >= 2) {
                     const term = debouncedCustomerSearch.toLowerCase();
                     list = list.filter(item => item.name.toLowerCase().includes(term) || item.channel.toLowerCase().includes(term));
                 }
-
-                if (topCustomerSortMode === 'yoy') {
-                    return list.sort((a, b) => {
-                        const yoyA = a.totalSales25 > 0 ? (a.totalSales26 - a.totalSales25) / a.totalSales25 : -Infinity;
-                        const yoyB = b.totalSales25 > 0 ? (b.totalSales26 - b.totalSales25) / b.totalSales25 : -Infinity;
-                        return yoyB - yoyA;
-                    }).slice(0, 50);
-                } else {
-                    return list.sort((a, b) => b.totalSales26 - a.totalSales26).slice(0, 50);
-                }
+                if (topCustomerSortMode === 'yoy') return list.sort((a, b) => { const yoyA = a.totalSales25 > 0 ? (a.totalSales26 - a.totalSales25) / a.totalSales25 : -Infinity; const yoyB = b.totalSales25 > 0 ? (b.totalSales26 - b.totalSales25) / b.totalSales25 : -Infinity; return yoyB - yoyA; }).slice(0, 50);
+                else return list.sort((a, b) => b.totalSales26 - a.totalSales26).slice(0, 50);
             }, [filteredData, debouncedCustomerSearch, salesData, filterMonth, topCustomerSortMode]);
 
             const uniqueCustomersCount = useMemo(() => {
@@ -730,260 +630,81 @@
                 return unique.size;
             }, [filteredData]);
 
-            // --- Coverage Analysis Grid ---
             const coverageGrid = useMemo(() => {
                 const selectedMonthIndex = filterMonth === 'All' ? 11 : monthsList.indexOf(filterMonth);
-
                 const base2026 = salesData.filter(d => {
                     const matchYear = d.Year === '2026';
                     const matchGroup = selectedGroup === 'ALL' || d.ProductGroup === selectedGroup;
-                    
                     let matchMonth = true;
                     if (filterMonth !== 'All' && d.Month) {
                         const recordMonthIndex = monthsList.findIndex(m => d.Month.startsWith(m));
                         matchMonth = recordMonthIndex !== -1 && recordMonthIndex <= selectedMonthIndex;
                     }
-
                     return matchYear && matchGroup && matchMonth;
                 });
                 const rowsBase = filterSubProduct !== 'All' ? base2026.filter(d => d.SubProductGroup === filterSubProduct) : base2026;
-
                 const skuStats = {};
                 rowsBase.forEach(d => { if (d.GroupSKU) skuStats[d.GroupSKU] = (skuStats[d.GroupSKU] || 0) + d.NetPrice; });
                 let sortedRows = Object.keys(skuStats).sort((a, b) => skuStats[b] - skuStats[a]);
-
                 if (debouncedCoverageSearch.length >= 2) {
                     const term = debouncedCoverageSearch.toLowerCase();
                     const skuChannels = {};
                     base2026.forEach(d => {
-                        const k = d.GroupSKU;
-                        if(!skuChannels[k]) skuChannels[k] = new Set();
-                        skuChannels[k].add(d.Channel?.toLowerCase() || '');
-                        skuChannels[k].add(d.SubChannel?.toLowerCase() || '');
+                        const k = d.GroupSKU; if(!skuChannels[k]) skuChannels[k] = new Set();
+                        skuChannels[k].add(d.Channel?.toLowerCase() || ''); skuChannels[k].add(d.SubChannel?.toLowerCase() || '');
                     });
                     sortedRows = sortedRows.filter(sku => {
                         if (sku.toLowerCase().includes(term)) return true;
-                        const chans = skuChannels[sku];
-                        if (!chans) return false;
-                        for (let c of chans) if (c.includes(term)) return true;
-                        return false;
+                        const chans = skuChannels[sku]; if (!chans) return false;
+                        for (let c of chans) if (c.includes(term)) return true; return false;
                     });
                 }
-
                 const colStats = {};
                 if (coverageDrillChannel) {
                     const drillBase = base2026.filter(d => d.Channel === coverageDrillChannel);
                     drillBase.forEach(d => { if (d.SubChannel) colStats[d.SubChannel] = (colStats[d.SubChannel] || 0) + d.NetPrice; });
-                } else {
-                    base2026.forEach(d => { if (d.Channel) colStats[d.Channel] = (colStats[d.Channel] || 0) + d.NetPrice; });
-                }
+                } else base2026.forEach(d => { if (d.Channel) colStats[d.Channel] = (colStats[d.Channel] || 0) + d.NetPrice; });
                 const columns = Object.keys(colStats).sort((a, b) => colStats[b] - colStats[a]);
-
-                const matrix = {};
-                const columnTotals = {};
-                const rowTotals = {};
-                
+                const matrix = {}; const columnTotals = {}; const rowTotals = {};
                 sortedRows.forEach(r => { matrix[r] = {}; rowTotals[r] = 0; });
                 columns.forEach(c => { columnTotals[c] = { sales: 0, count: 0 }; });
-
-                const colSet = new Set(columns);
-                const rowSet = new Set(sortedRows);
-                
-                const colUniqueItemsForHeader = {};
-                const colSalesForHeader = {};
-                columns.forEach(c => { 
-                    colUniqueItemsForHeader[c] = new Set(); 
-                    colSalesForHeader[c] = 0;
-                });
-
-                const allowedSKUs = new Set(sortedRows);
-                const cellUniqueItems = {};
-
+                const colUniqueItemsForHeader = {}; const colSalesForHeader = {};
+                columns.forEach(c => { colUniqueItemsForHeader[c] = new Set(); colSalesForHeader[c] = 0; });
+                const allowedSKUs = new Set(sortedRows); const cellUniqueItems = {};
                 base2026.forEach(d => {
-                    const sku = d.GroupSKU;
-                    let col = '';
-                    if (coverageDrillChannel) {
-                        col = d.Channel === coverageDrillChannel ? d.SubChannel : '';
-                    } else {
-                        col = d.Channel;
-                    }
-                    if (!col || !colSet.has(col)) return;
-
-                    if (allowedSKUs.has(sku)) {
-                        colSalesForHeader[col] += d.NetPrice;
-                        if (!coverageDrillChannel) {
-                            if (isChainBasedChannel(col)) colUniqueItemsForHeader[col].add(d.SubChannel);
-                            else colUniqueItemsForHeader[col].add(d.SoldToParty);
-                        }
-                    }
-
-                    if (!sku || !rowSet.has(sku)) return;
-
+                    const sku = d.GroupSKU; let col = coverageDrillChannel ? (d.Channel === coverageDrillChannel ? d.SubChannel : '') : d.Channel;
+                    if (!col || !columns.includes(col)) return;
+                    if (allowedSKUs.has(sku)) { colSalesForHeader[col] += d.NetPrice; if (!coverageDrillChannel) { if (isChainBasedChannel(col)) colUniqueItemsForHeader[col].add(d.SubChannel); else colUniqueItemsForHeader[col].add(d.SoldToParty); } }
+                    if (!sku || !allowedSKUs.has(sku)) return;
                     if (!cellUniqueItems[sku]) cellUniqueItems[sku] = {};
-                    if (!cellUniqueItems[sku][col]) {
-                        cellUniqueItems[sku][col] = new Set();
-                        matrix[sku][col] = { sales: 0, count: 0 };
-                    }
+                    if (!cellUniqueItems[sku][col]) { cellUniqueItems[sku][col] = new Set(); matrix[sku][col] = { sales: 0, count: 0 }; }
                     matrix[sku][col].sales += d.NetPrice;
-
-                    const uniqueKey = (coverageDrillChannel || isChainBasedChannel(coverageDrillChannel ? d.Channel : col)) 
-                        ? (coverageDrillChannel ? d.SoldToParty : d.SubChannel)
-                        : d.SoldToParty;
-
-                    if (uniqueKey) {
-                        cellUniqueItems[sku][col].add(uniqueKey);
-                    }
+                    const uniqueKey = (coverageDrillChannel || isChainBasedChannel(col)) ? (coverageDrillChannel ? d.SoldToParty : d.SubChannel) : d.SoldToParty;
+                    if (uniqueKey) cellUniqueItems[sku][col].add(uniqueKey);
                 });
-
-                sortedRows.forEach(sku => {
-                    columns.forEach(col => {
-                        if (cellUniqueItems[sku]?.[col]) {
-                            const count = coverageDrillChannel ? (matrix[sku][col].sales > 0 ? 1 : 0) : cellUniqueItems[sku][col].size;
-                            matrix[sku][col].count = count;
-                            rowTotals[sku] += count;
-                        } else {
-                            matrix[sku][col] = { sales: 0, count: 0 };
-                        }
-                    });
-                });
-
-                columns.forEach(col => {
-                    let totalCount = 0;
-                    if (coverageDrillChannel) {
-                        sortedRows.forEach(sku => { if (matrix[sku][col] && matrix[sku][col].sales > 0) totalCount++; });
-                    } else {
-                        totalCount = colUniqueItemsForHeader[col].size;
-                    }
-                    columnTotals[col] = { sales: colSalesForHeader[col], count: totalCount };
-                });
-
+                sortedRows.forEach(sku => { columns.forEach(col => { if (cellUniqueItems[sku]?.[col]) { const count = coverageDrillChannel ? (matrix[sku][col].sales > 0 ? 1 : 0) : cellUniqueItems[sku][col].size; matrix[sku][col].count = count; rowTotals[sku] += count; } else matrix[sku][col] = { sales: 0, count: 0 }; }); });
+                columns.forEach(col => { columnTotals[col] = { sales: colSalesForHeader[col], count: coverageDrillChannel ? sortedRows.filter(s => matrix[s][col] && matrix[s][col].sales > 0).length : colUniqueItemsForHeader[col].size }; });
                 return { rows: sortedRows, columns, matrix, columnTotals, rowTotals };
             }, [salesData, selectedGroup, filterSubProduct, filterMonth, coverageDrillChannel, debouncedCoverageSearch]);
 
-            // --- Dynamic Recommendations (Data-Driven Insights) ---
             const dynamicRecommendations = useMemo(() => {
-                const isGrowthPositive = kpi.growthYoY >= 0;
-                const topCh = channelMix.length > 0 ? channelMix[0].name : 'N/A';
-                const growthVal = Math.abs(kpi.growthYoY).toFixed(1);
-                
-                let contextTitle = `Overview`;
-                if (filterSubProduct !== 'All') contextTitle = filterSubProduct;
-                else if (selectedGroup !== 'ALL') contextTitle = selectedGroup;
-
-                // --- Data Mining for Dynamic Insights ---
+                const isGrowthPositive = kpi.growthYoY >= 0; const topCh = channelMix.length > 0 ? channelMix[0].name : 'N/A'; const growthVal = Math.abs(kpi.growthYoY).toFixed(1);
+                let contextTitle = filterSubProduct !== 'All' ? filterSubProduct : (selectedGroup !== 'ALL' ? selectedGroup : 'Overview');
                 const valid2026MonthsSet = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
-                
-                // 1. Find Peak Month from Historical Data (2025)
-                const monthlySales25 = {};
-                salesData.filter(d => d.Year === '2025' && (selectedGroup === 'ALL' || d.ProductGroup === selectedGroup)).forEach(d => {
-                    const m = d.Month?.split('-')[0];
-                    if (m) monthlySales25[m] = (monthlySales25[m] || 0) + d.NetPrice;
-                });
-                let peakMonth25 = '';
-                let maxSales25 = 0;
-                Object.entries(monthlySales25).forEach(([m, s]) => {
-                    if (s > maxSales25) { maxSales25 = s; peakMonth25 = m; }
-                });
-
-                // 2. Find Top Trending Product & Rising Channel (from filteredData)
-                const subProdYTD = {};
-                const channelYTD = {};
-                
+                const monthlySales25 = {}; salesData.filter(d => d.Year === '2025' && (selectedGroup === 'ALL' || d.ProductGroup === selectedGroup)).forEach(d => { const m = d.Month?.split('-')[0]; if (m) monthlySales25[m] = (monthlySales25[m] || 0) + d.NetPrice; });
+                let peakMonth25 = ''; let maxSales25 = 0; Object.entries(monthlySales25).forEach(([m, s]) => { if (s > maxSales25) { maxSales25 = s; peakMonth25 = m; } });
+                const subProdYTD = {}; const channelYTD = {};
                 filteredData.forEach(d => {
-                    const monthPrefix = d.Month?.split('-')[0];
-                    const isYTD25 = d.Year === '2025' && valid2026MonthsSet.has(monthPrefix);
-                    
-                    if (d.SubProductGroup) {
-                        if (!subProdYTD[d.SubProductGroup]) subProdYTD[d.SubProductGroup] = { s26: 0, s25: 0 };
-                        if (d.Year === '2026') subProdYTD[d.SubProductGroup].s26 += d.NetPrice;
-                        else if (isYTD25) subProdYTD[d.SubProductGroup].s25 += d.NetPrice;
-                    }
-                    
-                    if (d.Channel) {
-                        if (!channelYTD[d.Channel]) channelYTD[d.Channel] = { s26: 0, s25: 0 };
-                        if (d.Year === '2026') channelYTD[d.Channel].s26 += d.NetPrice;
-                        else if (isYTD25) channelYTD[d.Channel].s25 += d.NetPrice;
-                    }
+                    const monthPrefix = d.Month?.split('-')[0]; const isYTD25 = d.Year === '2025' && valid2026MonthsSet.has(monthPrefix);
+                    if (d.SubProductGroup) { if (!subProdYTD[d.SubProductGroup]) subProdYTD[d.SubProductGroup] = { s26: 0, s25: 0 }; if (d.Year === '2026') subProdYTD[d.SubProductGroup].s26 += d.NetPrice; else if (isYTD25) subProdYTD[d.SubProductGroup].s25 += d.NetPrice; }
+                    if (d.Channel) { if (!channelYTD[d.Channel]) channelYTD[d.Channel] = { s26: 0, s25: 0 }; if (d.Year === '2026') channelYTD[d.Channel].s26 += d.NetPrice; else if (isYTD25) channelYTD[d.Channel].s25 += d.NetPrice; }
                 });
-
-                const getTopGrowth = (dataObj, threshold) => {
-                    let top = { name: 'N/A', growth: -Infinity };
-                    Object.entries(dataObj).forEach(([name, data]) => {
-                        if (data.s25 > threshold) {
-                            const growth = ((data.s26 - data.s25) / data.s25) * 100;
-                            if (growth > top.growth) top = { name, growth };
-                        }
-                    });
-                    return top;
-                };
-
-                const topTrendingProduct = getTopGrowth(subProdYTD, 50000); // 50k base filter
-                const topTrendingChannel = getTopGrowth(channelYTD, 100000); // 100k base filter
-
-                const subProductRecs = {
-                    'Tissue': [
-                        { head: "Premium Softness War", desc: "ตลาดทิชชู่แข่งกันที่ 'ความนุ่ม'. ควรออกรุ่น Premium Soft Pack ที่เน้นสัมผัสผิวหน้าโดยเฉพาะ เจาะกลุ่มผู้หญิงวัยทำงาน" },
-                        { head: "On-the-Go Hygiene", desc: "ขยายไลน์ Pocket Tissue หรือ Mini Handkerchief ที่พกพาสะดวก ลายลิขสิทธิ์น่ารัก เพื่อวางขายหน้า Counter ใน CVS" },
-                        { head: "Kitchen Towel Value", desc: "ดันยอด Kitchen Towel แบบแผ่นใหญ่หนาพิเศษในช่องทาง MT เพื่อจับกลุ่มแม่บ้านที่เน้นความคุ้มค่าและดูดซับมันดีเยี่ยม" }
-                    ],
-                    'Mask': [
-                        { head: "PM2.5 Seasonal Push", desc: "เตรียมสต็อกและสื่อโฆษณา Mask ป้องกัน PM2.5 ล่วงหน้าก่อนเข้าฤดูฝุ่น (ธ.ค.-มี.ค.) เพื่อชิงส่วนแบ่งการตลาดช่วง High Season" },
-                        { head: "Fashion & Function", desc: "Mask ไม่ใช่แค่ป้องกันแต่เป็นแฟชั่น. ออกสีใหม่ Earth Tone หรือ Pastel และรูปทรง 3D ที่ใส่แล้วหน้าเรียว เจาะกลุ่ม Gen Z" },
-                        { head: "Kids Medical Grade", desc: "ตลาดหน้ากากเด็กยังต้องการ Medical Grade ที่ลายน่ารักและใส่สบาย พ่อแม่ยินดีจ่ายแพงเพื่อความปลอดภัยของลูก" }
-                    ],
-                    'Wipes': [
-                        { head: "Sanitizing vs Baby", desc: "แยกเซกเมนต์ให้ชัด: Wipes แอลกอฮอล์สำหรับวัยทำงาน (เน้นฆ่าเชื้อ) และ Water Wipes สำหรับแม่และเด็ก (เน้นอ่อนโยน 99% น้ำเปล่า)" },
-                        { head: "Adult Care Boom", desc: "ออก Wipes แผ่นใหญ่หนานุ่มสำหรับผู้สูงอายุ รองรับ Aging Society ขายคู่กับผ้าอ้อมผู้ใหญ่ในช่องทาง Pharmacy/MT" },
-                        { head: "Flushable Innovation", desc: "นวัตกรรมทิชชู่เปียกที่ทิ้งลงชักโครกได้ (Flushable) เป็น Gap ใหม่ในตลาดคอนโดและออฟฟิศเกรด A" }
-                    ],
-                    'Stapler': [
-                        { head: "Ergonomic & Force Reduction", desc: "เน้นจุดขาย 'เย็บเบาแรง' (Effortless) และดีไซน์ที่จับถนัดมือ ลดอาการปวดนิ้วสำหรับพนักงานออฟฟิศที่ใช้งานหนัก" },
-                        { head: "Color Series Collection", desc: "ออกคอลเลกชันสีตามเทรนด์ (เช่น Pantone ประจำปี) เพื่อกระตุ้นให้ลูกค้าซื้อใหม่แม้ของเดิมยังไม่พัง" },
-                        { head: "Bundle Strategy", desc: "ขายคู่ลูกแม็กคุณภาพสูงใน Pack เดียว (Starter Kit) เพื่อแก้ปัญหาลูกแม็กติดขัดและสร้าง Brand Loyalty" }
-                    ],
-                    'Glue': [
-                        { head: "Non-Toxic for Kids", desc: "ชูจุดขาย 'ไร้สารพิษ & ล้างออกง่าย' สำหรับกาวแท่งเจาะกลุ่มโรงเรียนและผู้ปกครอง สร้างความมั่นใจเรื่องความปลอดภัย" },
-                        { head: "Precision Application", desc: "พัฒนากาวหัวปากกาหรือกาวเทป (Glue Tape) สำหรับงานประดิษฐ์และ Planner ที่ต้องการความเนี้ยบ ไม่เลอะเทอะ" },
-                        { head: "Office Bulk Pack", desc: "ทำ Pack ประหยัดสุดคุ้มสำหรับสำนักงาน (B2B) เพื่อแย่งส่วนแบ่งจาก House Brand ในแคตตาล็อกจัดซื้อ" }
-                    ]
-                };
-
-                const getGenericProductRecs = (prodName) => [
-                    { head: `Expand ${prodName} Distribution`, desc: `สินค้า ${prodName} มีศักยภาพในการขยายไปยังช่องทาง ${topCh} เพิ่มเติม ตรวจสอบ Gap Analysis เพื่อดูสาขาที่ยังไม่วางจำหน่าย` },
-                    { head: `${prodName} Value Pack`, desc: `กระตุ้นยอดขายต่อบิลด้วยการทำ Bundle Pack หรือ Family Pack สำหรับ ${prodName} ในช่องทาง Online และ Hypermarket` },
-                    { head: "Cross-Category Promo", desc: `จัดโปรโมชั่นซื้อ ${prodName} คู่กับสินค้าขายดีตัวอื่นในพอร์ต (เช่น กระดาษ A4) เพื่อแนะนำสินค้าให้ลูกค้าเดิมทดลองใช้` }
-                ];
-
-                let items = [];
-                if (filterSubProduct !== 'All') {
-                    items = subProductRecs[filterSubProduct] || getGenericProductRecs(filterSubProduct);
-                } else {
-                    const getGeneralRecs = () => [
-                        { 
-                            head: "Peak Season & Momentum", 
-                            desc: `ภาพรวม ${isGrowthPositive ? `โต +${growthVal}%` : `ติดลบ ${growthVal}%`} (Top Ch: ${topCh}). ข้อมูลปีที่แล้วชี้ว่าเดือน ${peakMonth25 || 'N/A'} คือช่วง High Season ของพอร์ตนี้ เตรียมแผน Supply Chain และ Marketing ให้พร้อมกอบโกยยอด` 
-                        },
-                        {
-                            head: topTrendingProduct.growth > 0 ? `Hero Product: ${topTrendingProduct.name}` : "Margin Protection",
-                            desc: topTrendingProduct.growth > 0 
-                                ? `สินค้ากลุ่ม ${topTrendingProduct.name} โตกระโดด +${topTrendingProduct.growth.toFixed(1)}% YoY ดันขึ้นแท่นหัวหอกหลัก จัด Bundle Pack หรือเพิ่ม Visibility หน้าเชลฟ์เพื่อขยาย Basket Size ด่วน`
-                                : `ตลาดยังซึม แนะนำลด Focus การทำราคา แล้วหันมา Push สินค้า High Margin เพื่อรักษากำไรบรรทัดสุดท้าย (Bottom Line)`
-                        },
-                        {
-                            head: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `Rising Channel: ${topTrendingChannel.name}` : "Core Channel Defense",
-                            desc: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh
-                                ? `ช่องทาง ${topTrendingChannel.name} โตทะลุเป้า +${topTrendingChannel.growth.toFixed(1)}% YoY เป็น Blue Ocean ที่ควรโยก Trade Budget บางส่วนมาอัดโปรโมชั่นดึงยอดเพิ่มทันที`
-                                : `รักษาส่วนแบ่งในช่องทางหลักอย่าง ${topCh} ให้แน่น ป้องกันคู่แข่งแย่งพื้นที่ Shelf และ Share of Voice`
-                        }
-                    ];
-
-                    items = getGeneralRecs();
-                }
-
-                return { title: `AI Strategic Insights: ${contextTitle}`, items: items };
+                const getTopGrowth = (dataObj, threshold) => { let top = { name: 'N/A', growth: -Infinity }; Object.entries(dataObj).forEach(([name, data]) => { if (data.s25 > threshold) { const growth = ((data.s26 - data.s25) / data.s25) * 100; if (growth > top.growth) top = { name, growth }; } }); return top; };
+                const topTrendingProduct = getTopGrowth(subProdYTD, 50000); const topTrendingChannel = getTopGrowth(channelYTD, 100000);
+                const items = [{ head: "Peak Season & Momentum", desc: `ภาพรวม ${isGrowthPositive ? `โต +${growthVal}%` : `ติดลบ ${growthVal}%`} (Top Ch: ${topCh}). ข้อมูลปีที่แล้วชี้ว่าเดือน ${peakMonth25 || 'N/A'} คือช่วง High Season ของพอร์ตนี้ เตรียมแผน Supply Chain และ Marketing ให้พร้อมกอบโกยยอด` }, { head: topTrendingProduct.growth > 0 ? `Hero Product: ${topTrendingProduct.name}` : "Margin Protection", desc: topTrendingProduct.growth > 0 ? `สินค้ากลุ่ม ${topTrendingProduct.name} โตกระโดด +${topTrendingProduct.growth.toFixed(1)}% YoY ดันขึ้นแท่นหัวหอกหลัก จัด Bundle Pack หรือเพิ่ม Visibility หน้าเชลฟ์เพื่อขยาย Basket Size ด่วน` : `ตลาดยังซึม แนะนำลด Focus การทำราคา แล้วหันมา Push สินค้า High Margin เพื่อรักษากำไรบรรทัดสุดท้าย (Bottom Line)` }, { head: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `Rising Channel: ${topTrendingChannel.name}` : "Core Channel Defense", desc: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `ช่องทาง ${topTrendingChannel.name} โตทะลุเป้า +${topTrendingChannel.growth.toFixed(1)}% YoY เป็น Blue Ocean ที่ควรโยก Trade Budget บางส่วนมาอัดโปรโมชั่นดึงยอดเพิ่มทันที` : `รักษาส่วนแบ่งในช่องทางหลักอย่าง ${topCh} ให้แน่น ป้องกันคู่แข่งแย่งพื้นที่ Shelf และ Share of Voice` }];
+                return { title: `AI Strategic Insights: ${contextTitle}`, items };
             }, [selectedGroup, filterSubProduct, kpi, channelMix, salesData, filteredData]);
 
-            const COLORS = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
             const BLUE_PALETTE = ['#1e3a8a', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
 
             const renderCustomLabel = (props) => {
@@ -998,37 +719,29 @@
             };
 
             return (
-                <div ref={dashboardRef} className={`bg-slate-50 min-h-screen font-sans text-slate-800 pb-10 w-full`}>
-                    
-                    {/* Header */}
+                <div ref={dashboardRef} className="bg-slate-50 min-h-screen font-sans text-slate-800 pb-10 w-full">
                     <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
                         <div className="w-full px-6 h-16 flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <Activity className="w-6 h-6 text-blue-400" />
-                                <div>
-                                    <h1 className="text-lg font-semibold tracking-wide">Non-paper Performance Dashboard <span className="text-blue-400">2026</span></h1>
-                                </div>
+                                <h1 className="text-lg font-semibold tracking-wide">Non-paper Performance Dashboard <span className="text-blue-400">2026</span></h1>
                             </div>
                             <div className="flex items-center gap-4">
-                                <div className="flex bg-slate-800 rounded-md p-1">
-                                    {['ALL', 'DACARE', 'DAOS', 'DABATTERY', 'DASP&Q', 'DALIFESTYLE'].map(group => (
+                                <div className="flex bg-slate-800 rounded-md p-1 overflow-x-auto custom-scrollbar whitespace-nowrap max-w-[500px]">
+                                    {['ALL', ...GROUP_ORDER].map(group => (
                                         <button key={group} onClick={() => { setSelectedGroup(group); setFilterSubProduct('All'); }} className={`px-4 py-1.5 text-sm font-semibold rounded transition-all ${selectedGroup === group ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-white'}`}>
                                             {group}
                                         </button>
                                     ))}
                                 </div>
-                                <button onClick={() => showUpload ? setShowUpload(false) : syncAllData()} disabled={isSyncing} className={`flex items-center gap-2 text-white px-4 py-2 rounded text-sm font-semibold transition-colors ${isSyncing ? 'bg-blue-800 opacity-80 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                                <button onClick={() => syncAllData()} disabled={isSyncing} className={`flex items-center gap-2 text-white px-4 py-2 rounded text-sm font-semibold transition-colors ${isSyncing ? 'bg-blue-800 opacity-80 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>
                                     <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} /> <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
                                 </button>
                             </div>
                         </div>
-                        
-                        {/* Filter Bar */}
                         <div className="bg-white border-b border-slate-300 py-3 relative z-40 shadow-sm">
                             <div className="w-full px-6 flex flex-wrap gap-4 items-center">
-                                <span className="text-sm font-bold text-slate-600 uppercase flex items-center gap-2">
-                                    <Layers className="w-4 h-4" /> Filters:
-                                </span>
+                                <span className="text-sm font-bold text-slate-600 uppercase flex items-center gap-2"><Layers className="w-4 h-4" /> Filters:</span>
                                 <FilterDropdown label="Product" value={filterSubProduct} options={[{val: 'All', group: null}, ...availableSubProducts]} onChange={setFilterSubProduct} icon={<ShoppingBag className="w-4 h-4" />} />
                                 <FilterDropdown label="Channel" value={filterChannel} options={['All', ...availableChannels]} onChange={setFilterChannel} icon={<Users className="w-4 h-4" />} />
                                 <FilterDropdown label="Month" value={filterMonth} options={['All', ...monthsList]} onChange={setFilterMonth} icon={<Calendar className="w-4 h-4" />} />
@@ -1041,32 +754,17 @@
                         </div>
                     </header>
 
-                    {/* Main Content */}
                     <main className="w-full px-6 py-6 space-y-6">
-                        
-                        {/* KPI Row & Category Image */}
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-                            
-                            {/* Category Image Card */}
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center h-full relative overflow-hidden group">
                                 <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none"></div>
                                 <div className="relative z-10 w-full flex flex-col h-full justify-center">
-                                    {selectedGroup === 'DACARE' && <img src="image/dacare.png" alt="DACARE" className="w-full h-32 object-contain mb-4" />}
-                                    {selectedGroup === 'DAOS' && <img src="image/daos.png" alt="DAOS" className="w-full h-32 object-contain mb-4" />}
-                                    {selectedGroup === 'DABATTERY' && <img src="image/dabattery.png" alt="DABATTERY" className="w-full h-32 object-contain mb-4" />}
-                                    {selectedGroup === 'DASP&Q' && <img src="image/daspq.png" alt="DASP&Q" className="w-full h-32 object-contain mb-4" />}
-                                    {selectedGroup === 'DALIFESTYLE' && <img src="image/dalifestyle.png" alt="DALIFESTYLE" className="w-full h-32 object-contain mb-4" />}
-                                    
+                                    {selectedGroup !== 'ALL' && <img src={`image/${selectedGroup.toLowerCase()}.png`} alt={selectedGroup} className="w-full h-32 object-contain mb-4" />}
                                     {selectedGroup === 'ALL' && (
                                         <div className="grid grid-cols-3 gap-2 w-full h-auto max-h-32 mb-4 overflow-y-auto custom-scrollbar place-items-center">
-                                            <img src="image/dacare.png" alt="DACARE" className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DACARE')} title="DACARE" />
-                                            <img src="image/daos.png" alt="DAOS" className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DAOS')} title="DAOS" />
-                                            <img src="image/dabattery.png" alt="DABATTERY" className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DABATTERY')} title="DABATTERY" />
-                                            <img src="image/daspq.png" alt="DASP&Q" className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DASP&Q')} title="DASP&Q" />
-                                            <img src="image/dalifestyle.png" alt="DALIFESTYLE" className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup('DALIFESTYLE')} title="DALIFESTYLE" />
+                                            {GROUP_ORDER.map(g => <img key={g} src={`image/${g.toLowerCase()}.png`} alt={g} className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup(g)} title={g} />)}
                                         </div>
                                     )}
-                                    
                                     <div className="text-sm font-bold text-slate-800 bg-white/80 backdrop-blur border border-slate-200 px-4 py-2 rounded-lg text-center mt-auto w-full truncate shadow-sm">
                                         {selectedGroup === 'ALL' ? 'TOTAL PORTFOLIO' : selectedGroup}
                                     </div>
@@ -1074,648 +772,129 @@
                             </div>
 
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full">
-                                <div>
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="text-sm font-bold text-slate-500 uppercase">YTD Actual 2026</span>
-                                        <DollarSign className="w-5 h-5 text-blue-600" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <h3 className="text-3xl font-bold text-slate-800">฿{kpi.s26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</h3>
-                                    <div className={`text-sm mt-2 font-semibold flex items-center gap-1 ${kpi.growthYoY >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {kpi.growthYoY >= 0 ? '▲' : '▼'} {Math.abs(kpi.growthYoY).toFixed(1)}% vs 2025 YTD
-                                    </div>
-                                </div>
+                                <div className="flex justify-between items-start mb-2"><span className="text-sm font-bold text-slate-500 uppercase">YTD Actual 2026</span><DollarSign className="w-5 h-5 text-blue-600" /></div>
+                                <div><h3 className="text-3xl font-bold text-slate-800">฿{kpi.s26.toLocaleString()}</h3><div className={`text-sm mt-2 font-semibold flex items-center gap-1 ${kpi.growthYoY >= 0 ? 'text-green-600' : 'text-red-600'}`}>{kpi.growthYoY >= 0 ? '▲' : '▼'} {Math.abs(kpi.growthYoY).toFixed(1)}% vs 2025 YTD</div></div>
                             </div>
 
                             <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.target26 === null ? 'opacity-70 grayscale' : ''}`}>
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="text-sm font-bold text-slate-500 uppercase">Target 2026</span>
-                                    <Target className="w-5 h-5 text-purple-600" />
-                                </div>
-                                <div>
-                                    {kpi.target26 !== null ? (
-                                        <>
-                                            <div className="flex justify-between items-end mb-1">
-                                                <h3 className="text-3xl font-bold text-slate-800">
-                                                    {kpi.target26 === 0 ? 'TBC' : `฿${kpi.target26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
-                                                </h3>
-                                                {kpi.target26 > 0 && <span className={`text-sm font-bold ${kpi.progress >= 100 ? 'text-green-600' : 'text-blue-600'}`}>{kpi.progress.toFixed(1)}%</span>}
-                                            </div>
-                                            {kpi.target26 > 0 && (
-                                                <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                                                    <div className={`h-full rounded-full transition-all duration-500 ${kpi.progress >= 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(kpi.progress, 100)}%` }}></div>
-                                                </div>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <div className="h-full flex items-center justify-center text-slate-400 font-medium text-sm italic py-2">
-                                            N/A (Filtered)
-                                        </div>
-                                    )}
-                                </div>
+                                <div className="flex justify-between items-start mb-1"><span className="text-sm font-bold text-slate-500 uppercase">Target 2026</span><Target className="w-5 h-5 text-purple-600" /></div>
+                                <div>{kpi.target26 !== null ? (<><div className="flex justify-between items-end mb-1"><h3 className="text-3xl font-bold text-slate-800">{kpi.target26 === 0 ? 'TBC' : `฿${kpi.target26.toLocaleString()}`}</h3>{kpi.target26 > 0 && <span className={`text-sm font-bold ${kpi.progress >= 100 ? 'text-green-600' : 'text-blue-600'}`}>{kpi.progress.toFixed(1)}%</span>}</div>{kpi.target26 > 0 && <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden"><div className={`h-full rounded-full transition-all duration-500 ${kpi.progress >= 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(kpi.progress, 100)}%` }}></div></div>}</>) : <div className="h-full flex items-center justify-center text-slate-400 font-medium text-sm italic py-2">N/A</div>}</div>
                             </div>
 
                             <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.forecast26 === null ? 'opacity-70 grayscale' : ''}`}>
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className="text-sm font-bold text-slate-500 uppercase">Forecast 2026 (L.E.)</span>
-                                    <TrendingUp className="w-5 h-5 text-orange-600" />
-                                </div>
-                                <div>
-                                    {kpi.forecast26 !== null ? (
-                                        <>
-                                            <h3 className="text-3xl font-bold text-slate-800">
-                                                {kpi.forecast26 === 0 ? 'TBC' : `฿${kpi.forecast26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
-                                            </h3>
-                                            <p className="text-sm text-slate-400 font-medium mt-2">Latest Estimate</p>
-                                        </>
-                                    ) : (
-                                        <div className="text-3xl font-semibold text-slate-300">N/A</div>
-                                    )}
-                                </div>
+                                <div className="flex justify-between items-start mb-2"><span className="text-sm font-bold text-slate-500 uppercase">Forecast 2026</span><TrendingUp className="w-5 h-5 text-orange-600" /></div>
+                                <div>{kpi.forecast26 !== null ? <h3 className="text-3xl font-bold text-slate-800">{kpi.forecast26 === 0 ? 'TBC' : `฿${kpi.forecast26.toLocaleString()}`}</h3> : <div className="text-3xl font-semibold text-slate-300">N/A</div>}<p className="text-sm text-slate-400 font-medium mt-2">Latest Estimate</p></div>
                             </div>
 
                             <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.plan27 === null ? 'opacity-70 grayscale' : ''}`}>
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className="text-sm font-bold text-slate-500 uppercase">Plan 2027</span>
-                                    <Target className="w-5 h-5 text-emerald-600" />
-                                </div>
-                                <div>
-                                    {kpi.plan27 !== null ? (
-                                        <>
-                                            <h3 className="text-3xl font-bold text-slate-800">
-                                                {kpi.plan27 === 0 ? 'TBC' : `฿${kpi.plan27.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
-                                            </h3>
-                                            {kpi.plan27 > 0 && (
-                                                <div className={`text-sm mt-2 font-semibold flex items-center gap-1 ${kpi.growthPlan >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {kpi.growthPlan >= 0 ? '▲' : '▼'} {Math.abs(kpi.growthPlan).toFixed(1)}% vs Target 26
-                                                </div>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="text-3xl font-semibold text-slate-300">N/A</div>
-                                            <p className="text-sm text-slate-400 font-medium mt-2">Next Year Goal</p>
-                                        </>
-                                    )}
-                                </div>
+                                <div className="flex justify-between items-start mb-2"><span className="text-sm font-bold text-slate-500 uppercase">Plan 2027</span><Target className="w-5 h-5 text-emerald-600" /></div>
+                                <div>{kpi.plan27 !== null ? <><h3 className="text-3xl font-bold text-slate-800">{kpi.plan27 === 0 ? 'TBC' : `฿${kpi.plan27.toLocaleString()}`}</h3>{kpi.plan27 > 0 && <div className={`text-sm mt-2 font-semibold flex items-center gap-1 ${kpi.growthPlan >= 0 ? 'text-green-600' : 'text-red-600'}`}>{kpi.growthPlan >= 0 ? '▲' : '▼'} {Math.abs(kpi.growthPlan).toFixed(1)}% vs Target 26</div>}</> : <div className="text-3xl font-semibold text-slate-300">N/A</div>}</div>
                             </div>
                         </div>
 
-                        {/* Charts Row 1: Trend & Channel Mix */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            
-                            {/* Dynamic Sales Trend */}
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-base font-bold text-slate-700 flex items-center gap-2">
-                                        <TrendingUp className="w-5 h-5 text-blue-600" /> 
-                                        {selectedGroup === 'ALL' ? '2026 Monthly Trend (Stacked)' : 'Sales Trend 2025 vs 2026'}
-                                    </h3>
-                                </div>
+                                <div className="flex justify-between items-center mb-6"><h3 className="text-base font-bold text-slate-700 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600" /> {selectedGroup === 'ALL' ? '2026 Monthly Trend (Stacked)' : 'Sales Trend 2025 vs 2026'}</h3></div>
                                 <div className="h-72">
                                     <ResponsiveContainer width="100%" height="100%">
                                         {selectedGroup === 'ALL' ? (
                                             <ComposedChart data={trendChartData} barSize={24}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                                 <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} axisLine={false} tickLine={false} />
-                                                <YAxis 
-                                                    domain={[0, yAxisTicks[yAxisTicks.length - 1]]} 
-                                                    ticks={yAxisTicks}
-                                                    tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} 
-                                                    tickFormatter={(v) => {
-                                                        const valM = v / 1000000;
-                                                        return `${Number.isInteger(valM) ? valM.toFixed(0) : valM.toFixed(1)}M`;
-                                                    }} 
-                                                    axisLine={false} 
-                                                    tickLine={false} 
-                                                />
-                                                <Tooltip 
-                                                    cursor={{fill: '#f8fafc'}}
-                                                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: '500'}}
-                                                    formatter={(v) => `฿${(v/1000000).toFixed(2)}M`}
-                                                />
+                                                <YAxis domain={[0, yAxisTicks[yAxisTicks.length - 1]]} ticks={yAxisTicks} tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
+                                                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: '500'}} formatter={(v) => `฿${(v/1000000).toFixed(2)}M`} />
                                                 <Legend wrapperStyle={{fontSize: '12px', fontWeight: '500'}} />
                                                 <Bar dataKey="DACARE" stackId="a" fill="#3b82f6" />
+                                                <Bar dataKey="DATISSUE" stackId="a" fill="#0ea5e9" />
                                                 <Bar dataKey="DAOS" stackId="a" fill="#f59e0b" />
                                                 <Bar dataKey="DABATTERY" stackId="a" fill="#ef4444" />
                                                 <Bar dataKey="DASP&Q" stackId="a" fill="#10b981" />
                                                 <Bar dataKey="DALIFESTYLE" stackId="a" fill="#8b5cf6" />
-                                                <Line type="monotone" dataKey="total" stroke="none" dot={false} activeDot={false}>
-                                                    <LabelList dataKey="total" position="top" content={renderCustomLabel} />
-                                                </Line>
+                                                <Line type="monotone" dataKey="total" stroke="none" dot={false} activeDot={false}><LabelList dataKey="total" position="top" content={renderCustomLabel} /></Line>
                                             </ComposedChart>
                                         ) : (
                                             <LineChart data={trendChartData}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                                 <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} axisLine={false} tickLine={false} />
-                                                <YAxis 
-                                                    domain={[0, yAxisTicks[yAxisTicks.length - 1]]} 
-                                                    ticks={yAxisTicks}
-                                                    tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} 
-                                                    tickFormatter={(v) => {
-                                                        const valM = v / 1000000;
-                                                        return `${Number.isInteger(valM) ? valM.toFixed(0) : valM.toFixed(1)}M`;
-                                                    }} 
-                                                    axisLine={false} 
-                                                    tickLine={false} 
-                                                />
-                                                <Tooltip 
-                                                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: '500'}}
-                                                    formatter={(v) => `฿${(v/1000000).toFixed(2)}M`}
-                                                />
+                                                <YAxis domain={[0, yAxisTicks[yAxisTicks.length - 1]]} ticks={yAxisTicks} tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
+                                                <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: '500'}} formatter={(v) => `฿${(v/1000000).toFixed(2)}M`} />
                                                 <Legend wrapperStyle={{fontSize: '12px', fontWeight: '500'}} />
-                                                <Line type="monotone" dataKey="2026" stroke="#2563eb" strokeWidth={3} dot={{r:4}}>
-                                                    <LabelList dataKey="2026" position="top" content={renderCustomLabel} />
-                                                </Line>
+                                                <Line type="monotone" dataKey="2026" stroke="#2563eb" strokeWidth={3} dot={{r:4}}><LabelList dataKey="2026" position="top" content={renderCustomLabel} /></Line>
                                                 <Line type="monotone" dataKey="2025" stroke="#94a3b8" strokeDasharray="5 5" strokeWidth={2} dot={{r:4}} />
                                             </LineChart>
                                         )}
                                     </ResponsiveContainer>
                                 </div>
                             </div>
-
-                            {/* Channel Mix 2026 */}
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
-                                <h3 className="text-base font-bold text-slate-700 mb-4 flex items-center gap-2">
-                                    <PieIcon className="w-5 h-5 text-blue-600" /> Channel Mix 2026
-                                </h3>
+                                <h3 className="text-base font-bold text-slate-700 mb-4 flex items-center gap-2"><PieIcon className="w-5 h-5 text-blue-600" /> Channel Mix 2026</h3>
                                 <div className="h-48 relative">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie data={channelMix} innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value">
-                                                {channelMix.map((entry, index) => <Cell key={`cell-${index}`} fill={BLUE_PALETTE[index % BLUE_PALETTE.length]} />)}
-                                            </Pie>
-                                            <Tooltip formatter={(v) => `฿${v.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`} contentStyle={{fontWeight: '500', borderRadius: '8px'}} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <div className="text-center">
-                                            <div className="text-xs font-semibold text-slate-500">Total</div>
-                                            <div className="text-sm font-bold text-slate-800">{kpi.s26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-                                        </div>
-                                    </div>
+                                    <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={channelMix} innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value">{channelMix.map((e, i) => <Cell key={i} fill={BLUE_PALETTE[i % BLUE_PALETTE.length]} />)}</Pie><Tooltip formatter={(v) => `฿${v.toLocaleString()}`} contentStyle={{fontWeight: '500', borderRadius: '8px'}} /></PieChart></ResponsiveContainer>
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div className="text-center"><div className="text-xs font-semibold text-slate-500">Total</div><div className="text-sm font-bold text-slate-800">{kpi.s26.toLocaleString()}</div></div></div>
                                 </div>
-                                
                                 <div className="mt-4 space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
                                     {channelMix.map((item, idx) => {
                                         const percent = kpi.s26 > 0 ? (item.value / kpi.s26 * 100).toFixed(1) : "0";
-                                        return (
-                                        <div key={item.name} className="flex justify-between items-center text-sm border-b border-slate-100 pb-2 last:border-0">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: BLUE_PALETTE[idx % BLUE_PALETTE.length]}}></div>
-                                                <span className="text-slate-700 font-semibold">{item.name}</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="font-bold text-slate-800 block">฿{item.value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
-                                                <span className="text-xs text-slate-500 font-semibold">({percent}%)</span>
-                                            </div>
-                                        </div>
-                                        );
+                                        return (<div key={item.name} className="flex justify-between items-center text-sm border-b border-slate-100 pb-2 last:border-0"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: BLUE_PALETTE[idx % BLUE_PALETTE.length]}}></div><span className="text-slate-700 font-semibold">{item.name}</span></div><div className="text-right"><span className="font-bold text-slate-800 block">฿{item.value.toLocaleString()}</span><span className="text-xs text-slate-500 font-semibold">({percent}%)</span></div></div>);
                                     })}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Charts Row 2: Top Performers (Full Width) */}
-                        <div className="grid grid-cols-1 gap-6">
-                            
-                            {/* Top Performers */}
-                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
-                                <div className="flex justify-between items-center mb-6">
-                                    <div className="flex items-center gap-2">
-                                        <Trophy className="w-5 h-5 text-yellow-500" />
-                                        <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-1.5">
-                                            {topPerfDrillDown ? `Top Products: ${topPerfDrillDown.sku}` : 'Top Performers 2026 (Group SKU)'}
-                                            {!topPerfDrillDown && (
-                                                <div className="relative group flex items-center">
-                                                    <Info className="w-4 h-4 text-slate-400 hover:text-blue-500 cursor-help transition-colors" />
-                                                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-slate-800 text-white text-xs font-medium rounded shadow-lg text-center z-50">
-                                                        Click on any row below to drill down into SKU details.
-                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </h3>
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-3">
-                                        {topPerfDrillDown ? (
-                                            <button 
-                                                onClick={() => setTopPerfDrillDown(null)}
-                                                className="flex items-center gap-1.5 text-sm text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors font-bold border border-blue-200"
-                                            >
-                                                <ArrowLeft className="w-4 h-4" /> Back
-                                            </button>
-                                        ) : (
-                                            <div className="relative w-56">
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Filter list..." 
-                                                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded text-sm font-medium focus:outline-none focus:border-blue-500"
-                                                    value={topPerfSearch}
-                                                    onChange={(e) => setTopPerfSearch(e.target.value)}
-                                                />
-                                                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 max-h-72">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="text-slate-500 border-b border-slate-200 font-semibold">
-                                            <tr>
-                                                <th className="py-3 pl-3">Rank</th>
-                                                <th className="py-3">{topPerfDrillDown ? 'Product Name' : 'Group SKU / Top Product Name'}</th>
-                                                <th 
-                                                    className="py-3 text-right cursor-pointer hover:bg-slate-100 transition-colors select-none"
-                                                    onClick={() => setTopPerfSortMode('sales')}
-                                                    title="Click to sort by Sales"
-                                                >
-                                                    Sales (YTD 2026) {topPerfSortMode === 'sales' && <span className="text-blue-500 inline-block align-middle ml-1"><ArrowDown className="w-3 h-3" /></span>}
-                                                </th>
-                                                <th 
-                                                    className="py-3 pr-3 text-right cursor-pointer hover:bg-slate-100 transition-colors select-none"
-                                                    onClick={() => setTopPerfSortMode('yoy')}
-                                                    title="Click to sort by YoY Growth"
-                                                >
-                                                    %Growth YoY {topPerfSortMode === 'yoy' && <span className="text-blue-500 inline-block align-middle ml-1"><ArrowDown className="w-3 h-3" /></span>}
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {topPerfDrillDown ? (
-                                                topPerfDrillDown.allProducts.map((prod, idx) => {
-                                                    const yoy = prod.sales25 > 0 ? ((prod.value - prod.sales25) / prod.sales25) * 100 : null;
-                                                    return (
-                                                        <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                                            <td className="py-3.5 pl-3 font-semibold text-slate-400">#{idx + 1}</td>
-                                                            <td className="py-3.5 font-semibold text-slate-800">{prod.name}</td>
-                                                            <td className="py-3.5 text-right font-bold text-blue-700">฿{prod.value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</td>
-                                                            <td className="py-3.5 pr-3 text-right font-bold">
-                                                                {yoy !== null ? (
-                                                                    <span className={yoy >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                                        {yoy >= 0 ? '▲' : '▼'} {Math.abs(yoy).toFixed(1)}%
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="text-slate-400 text-xs">N/A</span>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })
-                                            ) : (
-                                                topPerformers.map((item, idx) => {
-                                                    let rankIcon = <span className="text-slate-400 font-semibold w-6 text-center inline-block">#{idx + 1}</span>;
-                                                    let rowClass = "border-b border-slate-100 hover:bg-blue-50/50 transition-colors cursor-pointer group";
-                                                    
-                                                    if (idx === 0) {
-                                                        rankIcon = <Trophy className="w-5 h-5 text-yellow-500 inline-block" />;
-                                                        rowClass = "bg-yellow-50/30 border-b border-yellow-200 hover:bg-yellow-100/50 transition-colors cursor-pointer group";
-                                                    } else if (idx === 1) {
-                                                        rankIcon = <Medal className="w-5 h-5 text-slate-400 inline-block" />;
-                                                    } else if (idx === 2) {
-                                                        rankIcon = <Medal className="w-5 h-5 text-orange-400 inline-block" />;
-                                                    }
-
-                                                    const yoy = item.sales25 > 0 ? ((item.value - item.sales25) / item.sales25) * 100 : null;
-
-                                                    return (
-                                                        <tr key={idx} className={rowClass} onClick={() => setTopPerfDrillDown(item)} title="Click to view all products in this SKU">
-                                                            <td className="py-3.5 pl-3 font-semibold">{rankIcon}</td>
-                                                            <td className="py-3.5">
-                                                                <div className="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">{item.sku}</div>
-                                                                <div className="text-xs text-slate-500 font-medium truncate max-w-[300px] mt-0.5">
-                                                                    <span className="text-slate-400 mr-1">Top Item:</span> {item.name}
-                                                                </div>
-                                                            </td>
-                                                            <td className="py-3.5 text-right font-bold text-blue-700">
-                                                                ฿{item.value.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}
-                                                            </td>
-                                                            <td className="py-3.5 pr-3 text-right font-bold">
-                                                                {yoy !== null ? (
-                                                                    <span className={yoy >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                                        {yoy >= 0 ? '▲' : '▼'} {Math.abs(yoy).toFixed(1)}%
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="text-slate-400 text-xs">N/A</span>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Charts Row 2.5: Top Customers (Sold-To Party) */}
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                            <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" /><h3 className="text-base font-extrabold text-slate-800 flex items-center gap-1.5">{topPerfDrillDown ? `Top Products: ${topPerfDrillDown.sku}` : 'Top Performers 2026 (Group SKU)'}</h3></div>
                                 <div className="flex items-center gap-3">
-                                    <Store className="w-6 h-6 text-purple-600" />
-                                    <div>
-                                        <h3 className="text-base font-extrabold text-slate-800">
-                                            Top Sold-To Party (2026)
-                                        </h3>
-                                        <p className="text-xs text-slate-500 font-medium mt-0.5">
-                                            Showing <span className="font-bold text-blue-600">{uniqueCustomersCount}</span> unique active outlets/chains based on current filters
-                                        </p>
-                                    </div>
-                                </div>
-                                
-                                <div className="relative w-64">
-                                    <input 
-                                        type="text" 
-                                        placeholder="Filter Customer or Channel..." 
-                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-medium focus:outline-none focus:border-blue-500 transition-colors"
-                                        value={customerSearch}
-                                        onChange={(e) => setCustomerSearch(e.target.value)}
-                                    />
-                                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                                    {topPerfDrillDown ? <button onClick={() => setTopPerfDrillDown(null)} className="flex items-center gap-1.5 text-sm text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors font-bold border border-blue-200"><ArrowLeft className="w-4 h-4" /> Back</button> : <div className="relative w-56"><input type="text" placeholder="Filter list..." className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded text-sm font-medium focus:outline-none focus:border-blue-500" value={topPerfSearch} onChange={(e) => setTopPerfSearch(e.target.value)} /><Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" /></div>}
                                 </div>
                             </div>
-
-                            <div className="overflow-x-auto custom-scrollbar max-h-80">
-                                <table className="w-full text-sm text-left border-collapse min-w-[700px]">
-                                    <thead className="sticky top-0 bg-slate-100 z-10 shadow-sm border-b border-slate-200">
-                                        <tr>
-                                            <th className="py-3 px-4 font-bold text-slate-700 w-16 text-center">Rank</th>
-                                            <th className="py-3 px-4 font-bold text-slate-700">Sold-To Party / Chain</th>
-                                            <th className="py-3 px-4 font-bold text-slate-700 w-40">Channel</th>
-                                            <th 
-                                                className="py-3 px-4 font-bold text-slate-700 text-right w-40 cursor-pointer hover:bg-slate-200 transition-colors select-none"
-                                                onClick={() => setTopCustomerSortMode('sales')}
-                                                title="Click to sort by Sales"
-                                            >
-                                                Sales (YTD 2026) {topCustomerSortMode === 'sales' && <span className="text-blue-600 inline-block align-middle ml-1"><ArrowDown className="w-3 h-3" /></span>}
-                                            </th>
-                                            <th 
-                                                className="py-3 px-4 font-bold text-slate-700 text-right w-32 cursor-pointer hover:bg-slate-200 transition-colors select-none"
-                                                onClick={() => setTopCustomerSortMode('yoy')}
-                                                title="Click to sort by YoY Growth"
-                                            >
-                                                %Growth YoY {topCustomerSortMode === 'yoy' && <span className="text-blue-600 inline-block align-middle ml-1"><ArrowDown className="w-3 h-3" /></span>}
-                                            </th>
-                                            <th className="py-3 px-4 font-bold text-slate-700 text-right w-32">% Proportion</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {topCustomers.length > 0 ? (
-                                            topCustomers.map((item, idx) => {
-                                                let rankColor = "text-slate-500";
-                                                if (idx === 0) rankColor = "text-yellow-600 font-extrabold text-base";
-                                                else if (idx === 1) rankColor = "text-slate-400 font-bold text-base";
-                                                else if (idx === 2) rankColor = "text-orange-500 font-bold text-base";
-
-                                                const proportion = kpi.s26 > 0 ? ((item.totalSales26 / kpi.s26) * 100).toFixed(1) : "0.0";
-                                                const yoy = item.totalSales25 > 0 ? ((item.totalSales26 - item.totalSales25) / item.totalSales25) * 100 : null;
-
-                                                return (
-                                                    <tr key={`${item.name}-${item.channel}`} className={`border-b border-slate-100 hover:bg-blue-50/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                                                        <td className={`py-3 px-4 text-center font-semibold ${rankColor}`}>
-                                                            #{idx + 1}
-                                                        </td>
-                                                        <td className="py-3 px-4 font-semibold text-slate-800">
-                                                            {item.name}
-                                                        </td>
-                                                        <td className="py-3 px-4">
-                                                            <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-1 rounded text-xs font-bold">
-                                                                {item.channel}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-3 px-4 text-right font-extrabold text-blue-700">
-                                                            ฿{item.totalSales26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}
-                                                        </td>
-                                                        <td className="py-3 px-4 text-right font-bold">
-                                                            {yoy !== null ? (
-                                                                <span className={yoy >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                                    {yoy >= 0 ? '▲' : '▼'} {Math.abs(yoy).toFixed(1)}%
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-slate-400 text-xs">N/A</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-3 px-4">
-                                                            <div className="flex items-center justify-end gap-2">
-                                                                <span className="font-bold text-slate-700 text-right w-10">{proportion}%</span>
-                                                                <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden flex-shrink-0">
-                                                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${proportion}%` }}></div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                        ) : (
-                                            <tr>
-                                                <td colSpan="6" className="py-12 text-center text-slate-400 font-medium">
-                                                    No customers found matching your criteria.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
+                            <div className="overflow-y-auto custom-scrollbar pr-2 max-h-72">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="text-slate-500 border-b border-slate-200 font-semibold"><tr><th className="py-3 pl-3">Rank</th><th className="py-3">Name</th><th className="py-3 text-right cursor-pointer" onClick={() => setTopPerfSortMode('sales')}>Sales {topPerfSortMode === 'sales' && <ArrowDown className="w-3 h-3 inline" />}</th><th className="py-3 pr-3 text-right cursor-pointer" onClick={() => setTopPerfSortMode('yoy')}>%Growth {topPerfSortMode === 'yoy' && <ArrowDown className="w-3 h-3 inline" />}</th></tr></thead>
+                                    <tbody>{topPerformers.map((item, idx) => {
+                                        const yoy = item.sales25 > 0 ? ((item.value - item.sales25) / item.sales25) * 100 : null;
+                                        return (<tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setTopPerfDrillDown(item)}><td className="py-3.5 pl-3 font-semibold">#{idx+1}</td><td className="py-3.5"><div className="font-semibold text-slate-800">{item.sku}</div><div className="text-xs text-slate-500 truncate max-w-xs">{item.name}</div></td><td className="py-3.5 text-right font-bold text-blue-700">฿{item.value.toLocaleString()}</td><td className={`py-3.5 pr-3 text-right font-bold ${yoy >= 0 ? 'text-green-600' : 'text-red-600'}`}>{yoy !== null ? `${yoy >= 0 ? '▲' : '▼'} ${Math.abs(yoy).toFixed(1)}%` : 'N/A'}</td></tr>);
+                                    })}</tbody>
                                 </table>
                             </div>
                         </div>
 
-                        {/* Charts Row 3: Channel Coverage Grid */}
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                                <div className="flex items-center gap-3">
-                                    <Grid3X3 className="w-6 h-6 text-orange-600" />
-                                    <div>
-                                        <h3 className="text-base font-bold text-slate-700">Channel Coverage Gap Analysis (2026)</h3>
-                                        <p className="text-xs text-slate-500 font-medium mt-0.5">
-                                            {coverageDrillChannel ? `Drilled down: ${coverageDrillChannel}` : 'Overview by Main Channel'}
-                                            {' • '}Click column header to drill down
-                                        </p>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex items-center gap-3">
-                                    {coverageDrillChannel && (
-                                        <button 
-                                            onClick={() => setCoverageDrillChannel(null)}
-                                            className="flex items-center gap-1.5 text-sm text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors font-semibold border border-blue-200"
-                                        >
-                                            <ArrowLeft className="w-4 h-4" /> Back
-                                        </button>
-                                    )}
-                                    <div className="relative">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Search SKU or Channel..." 
-                                            className="w-56 pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-medium focus:outline-none focus:border-blue-500 transition-colors"
-                                            value={coverageSearch}
-                                            onChange={(e) => setCoverageSearch(e.target.value)}
-                                        />
-                                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="overflow-x-auto custom-scrollbar max-h-[600px]">
-                                <table className="w-full text-sm text-left border-collapse min-w-[800px]">
-                                    <thead className="sticky top-0 bg-slate-100 z-10 shadow-sm border-b border-slate-200">
-                                        <tr>
-                                            <th className="py-4 px-4 font-bold text-slate-700 w-1/3 min-w-[250px]">
-                                                Group SKU
-                                                <div className="text-[10px] font-medium text-slate-500 mt-0.5">Sorted by Sales (High-Low)</div>
-                                            </th>
-                                            {coverageGrid.columns.map(col => {
-                                                const total = coverageGrid.columnTotals[col];
-                                                const isChain = !coverageDrillChannel && isChainBasedChannel(col);
-                                                return (
-                                                    <th 
-                                                        key={col} 
-                                                        className={`py-4 px-3 font-bold text-center min-w-[120px] ${!coverageDrillChannel ? 'cursor-pointer hover:bg-blue-50 text-blue-600' : 'text-slate-700'}`}
-                                                        onClick={() => !coverageDrillChannel && setCoverageDrillChannel(col)}
-                                                        title={!coverageDrillChannel ? "Click to drill down" : ""}
-                                                    >
-                                                        <div className="flex flex-col items-center">
-                                                            <div className="flex items-center gap-1.5 mb-1">
-                                                                {col}
-                                                                {!coverageDrillChannel && <ChevronDown className="w-3.5 h-3.5 opacity-60" />}
-                                                            </div>
-                                                            <div className="text-xs font-semibold text-slate-500">
-                                                                ฿{(total.sales/1000000).toFixed(1)}M
-                                                            </div>
-                                                            <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded mt-1 shadow-sm">
-                                                                {coverageDrillChannel ? <Package className="w-3 h-3 text-slate-400" /> : <Users className="w-3 h-3 text-slate-400" />}
-                                                                {total.count} {coverageDrillChannel ? 'Selling SKUs' : (isChain ? 'Chains' : 'Outlets')}
-                                                            </div>
-                                                        </div>
-                                                    </th>
-                                                );
-                                            })}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {coverageGrid.rows.length > 0 ? (
-                                            coverageGrid.rows.map((sku, idx) => (
-                                                <tr key={sku} className={`border-b border-slate-100 hover:bg-blue-50/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                                                    <td className="py-3 px-4 font-semibold text-slate-800 truncate max-w-[250px]" title={sku}>
-                                                        <div className="text-sm">{sku}</div>
-                                                        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-1">
-                                                            Total Avail: {coverageDrillChannel ? <Check className="w-3 h-3 text-green-500" /> : <Users className="w-3 h-3" />} <span className="font-semibold text-slate-600">{coverageGrid.rowTotals[sku] || 0}</span>
-                                                        </div>
-                                                    </td>
-                                                    {coverageGrid.columns.map(col => {
-                                                        const data = coverageGrid.matrix[sku][col] || { sales: 0, count: 0 };
-                                                        const isGap = data.count === 0;
-                                                        return (
-                                                            <td key={col} className="py-3 px-3 text-center border-l border-slate-50">
-                                                                {coverageDrillChannel ? (
-                                                                    isGap ? <span className="inline-block text-slate-300 font-light text-lg">-</span> : <Check className="w-5 h-5 text-green-500 mx-auto" />
-                                                                ) : (
-                                                                    isGap ? (
-                                                                        <span className="inline-block text-slate-300 font-light text-lg">-</span>
-                                                                    ) : (
-                                                                        <div className="flex flex-col items-center gap-1">
-                                                                            <span className="font-medium text-slate-600 text-xs">
-                                                                                ฿{(data.sales/1000000).toFixed(2)}M
-                                                                            </span>
-                                                                            <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 shadow-sm border border-blue-200">
-                                                                                <Users className="w-2.5 h-2.5" />
-                                                                                {data.count}
-                                                                            </span>
-                                                                        </div>
-                                                                    )
-                                                                )}
-                                                            </td>
-                                                        );
-                                                    })}
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={coverageGrid.columns.length + 1} className="py-16 text-center text-slate-400 font-medium">
-                                                    No products found matching "{coverageSearch}"
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            <div className="mt-4 flex items-center gap-2 text-xs text-slate-500 font-medium px-1 bg-slate-50 p-2 rounded-lg border border-slate-200 inline-block">
-                                <AlertCircle className="w-4 h-4 text-orange-400" />
-                                <span>Tip: Sorted by Sales. '-' is Gap. MT/Online/Inter/BJC counts Chains (Sub-channels), others count Outlets (Sold-to).</span>
-                            </div>
+                            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4"><div className="flex items-center gap-3"><Store className="w-6 h-6 text-purple-600" /><div><h3 className="text-base font-extrabold text-slate-800">Top Sold-To Party (2026)</h3><p className="text-xs text-slate-500 font-medium">Showing <span className="font-bold text-blue-600">{uniqueCustomersCount}</span> unique active outlets/chains</p></div></div><div className="relative w-64"><input type="text" placeholder="Filter Customer..." className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-medium focus:outline-none focus:border-blue-500" value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} /><Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" /></div></div>
+                            <div className="overflow-x-auto custom-scrollbar max-h-80"><table className="w-full text-sm text-left border-collapse min-w-[700px]"><thead className="sticky top-0 bg-slate-100 z-10 shadow-sm border-b border-slate-200"><tr><th className="py-3 px-4 font-bold text-slate-700 w-16 text-center">Rank</th><th className="py-3 px-4 font-bold text-slate-700">Sold-To Party / Chain</th><th className="py-3 px-4 font-bold text-slate-700 w-40">Channel</th><th className="py-3 px-4 font-bold text-slate-700 text-right w-40 cursor-pointer" onClick={() => setTopCustomerSortMode('sales')}>Sales {topCustomerSortMode === 'sales' && <ArrowDown className="w-3 h-3 inline" />}</th><th className="py-3 px-4 font-bold text-slate-700 text-right w-32 cursor-pointer" onClick={() => setTopCustomerSortMode('yoy')}>%Growth {topCustomerSortMode === 'yoy' && <ArrowDown className="w-3 h-3 inline" />}</th><th className="py-3 px-4 font-bold text-slate-700 text-right w-32">% Proportion</th></tr></thead><tbody>{topCustomers.map((item, idx) => {
+                                const proportion = kpi.s26 > 0 ? ((item.totalSales26 / kpi.s26) * 100).toFixed(1) : "0.0";
+                                const yoy = item.totalSales25 > 0 ? ((item.totalSales26 - item.totalSales25) / item.totalSales25) * 100 : null;
+                                return (<tr key={idx} className={`border-b border-slate-100 hover:bg-blue-50/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}><td className="py-3 px-4 text-center font-semibold text-slate-500">#{idx + 1}</td><td className="py-3 px-4 font-semibold text-slate-800">{item.name}</td><td className="py-3 px-4"><span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-1 rounded text-xs font-bold">{item.channel}</span></td><td className="py-3 px-4 text-right font-extrabold text-blue-700">฿{item.totalSales26.toLocaleString()}</td><td className={`py-3 px-4 text-right font-bold ${yoy >= 0 ? 'text-green-600' : 'text-red-600'}`}>{yoy !== null ? `${yoy >= 0 ? '▲' : '▼'} ${Math.abs(yoy).toFixed(1)}%` : 'N/A'}</td><td className="py-3 px-4"><div className="flex items-center justify-end gap-2"><span className="font-bold text-slate-700 text-right w-10">{proportion}%</span><div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden flex-shrink-0"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${proportion}%` }}></div></div></div></td></tr>);
+                            })}</tbody></table></div>
                         </div>
 
-                        {/* AI Strategic Insights */}
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4"><div className="flex items-center gap-3"><Grid3X3 className="w-6 h-6 text-orange-600" /><div><h3 className="text-base font-bold text-slate-700">Channel Coverage Gap Analysis (2026)</h3><p className="text-xs text-slate-500 font-medium">{coverageDrillChannel ? `Drilled down: ${coverageDrillChannel}` : 'Overview by Main Channel'}</p></div></div><div className="flex items-center gap-3">{coverageDrillChannel && <button onClick={() => setCoverageDrillChannel(null)} className="flex items-center gap-1.5 text-sm text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors font-semibold border border-blue-200"><ArrowLeft className="w-4 h-4" /> Back</button>}<div className="relative"><input type="text" placeholder="Search SKU..." className="w-56 pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-medium focus:outline-none focus:border-blue-500" value={coverageSearch} onChange={(e) => setCoverageSearch(e.target.value)} /><Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" /></div></div></div>
+                            <div className="overflow-x-auto custom-scrollbar max-h-[600px]"><table className="w-full text-sm text-left border-collapse min-w-[800px]"><thead className="sticky top-0 bg-slate-100 z-10 shadow-sm border-b border-slate-200"><tr><th className="py-4 px-4 font-bold text-slate-700 w-1/3 min-w-[250px]">Group SKU</th>{coverageGrid.columns.map(col => { const total = coverageGrid.columnTotals[col]; return (<th key={col} className={`py-4 px-3 font-bold text-center min-w-[120px] ${!coverageDrillChannel ? 'cursor-pointer hover:bg-blue-50 text-blue-600' : 'text-slate-700'}`} onClick={() => !coverageDrillChannel && setCoverageDrillChannel(col)}><div className="flex flex-col items-center"><div className="flex items-center gap-1.5 mb-1">{col} {!coverageDrillChannel && <ChevronDown className="w-3.5 h-3.5 opacity-60" />}</div><div className="text-xs font-semibold text-slate-500">฿{(total.sales/1000000).toFixed(1)}M</div><div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded mt-1 shadow-sm">{coverageDrillChannel ? <Package className="w-3 h-3 text-slate-400" /> : <Users className="w-3 h-3 text-slate-400" />} {total.count}</div></div></th>); })}</tr></thead><tbody>{coverageGrid.rows.map((sku, idx) => (<tr key={sku} className={`border-b border-slate-100 hover:bg-blue-50/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}><td className="py-3 px-4 font-semibold text-slate-800 truncate max-w-[250px]"><div className="text-sm">{sku}</div><div className="text-xs text-slate-500 font-medium mt-1">Total Avail: {coverageGrid.rowTotals[sku] || 0}</div></td>{coverageGrid.columns.map(col => { const data = coverageGrid.matrix[sku][col] || { sales: 0, count: 0 }; return (<td key={col} className="py-3 px-3 text-center border-l border-slate-50">{data.count === 0 ? <span className="text-slate-300 text-lg">-</span> : (coverageDrillChannel ? <Check className="w-5 h-5 text-green-500 mx-auto" /> : <div className="flex flex-col items-center gap-1"><span className="font-medium text-slate-600 text-xs">฿{(data.sales/1000000).toFixed(2)}M</span><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 border border-blue-200"><Users className="w-2.5 h-2.5" /> {data.count}</span></div>)}</td>); })}</tr>))}</tbody></table></div>
+                        </div>
+
                         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 rounded-xl shadow-lg text-white mt-8 border border-slate-700">
                             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 border-b border-slate-700/50 pb-6 gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-blue-500/20 p-3 rounded-xl border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-                                        <Sparkles className="w-8 h-8 text-blue-400" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-semibold flex items-center gap-3">
-                                            {dynamicRecommendations.title}
-                                        </h2>
-                                        <p className="text-sm text-slate-300 font-medium mt-1">
-                                            Generated based on real-time sales performance: <span className="text-blue-300 font-semibold">Growth {kpi.growthYoY >= 0 ? '+' : ''}{kpi.growthYoY.toFixed(1)}%</span> • Top Channel: <span className="text-blue-300 font-semibold">{channelMix[0]?.name || 'N/A'}</span>
-                                        </p>
-                                    </div>
-                                </div>
+                                <div className="flex items-center gap-4"><div className="bg-blue-500/20 p-3 rounded-xl border border-blue-500/30"><Sparkles className="w-8 h-8 text-blue-400" /></div><div><h2 className="text-xl font-semibold">{dynamicRecommendations.title}</h2><p className="text-sm text-slate-300">Generated based on real-time sales performance</p></div></div>
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {dynamicRecommendations.items.map((item, idx) => (
-                                    <div key={idx} className="bg-slate-800/60 p-5 rounded-xl border border-slate-600 hover:border-blue-400/50 hover:bg-slate-700 transition-all duration-300 group">
-                                        <h3 className="text-base font-semibold text-blue-300 mb-3 flex items-center gap-2 group-hover:text-blue-200">
-                                            <Lightbulb className="w-5 h-5" /> {item.head}
-                                        </h3>
-                                        <p className="text-sm text-slate-200 leading-relaxed font-normal">
-                                            {item.desc}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{dynamicRecommendations.items.map((item, idx) => (<div key={idx} className="bg-slate-800/60 p-5 rounded-xl border border-slate-600 hover:border-blue-400/50 hover:bg-slate-700 transition-all duration-300 group"><h3 className="text-base font-semibold text-blue-300 mb-3 flex items-center gap-2"><Lightbulb className="w-5 h-5" /> {item.head}</h3><p className="text-sm text-slate-200 leading-relaxed">{item.desc}</p></div>))}</div>
                         </div>
 
-                        {/* Footer */}
-                        <footer className="w-full text-center pt-8 pb-4 text-slate-400 font-medium text-sm">
-                            Developed by NPD Team - Version 1.0
-                        </footer>
-
+                        <footer className="w-full text-center pt-8 pb-4 text-slate-400 font-medium text-sm">Developed by NPD Team - Version 1.1</footer>
                     </main>
 
-                    {/* Upload Modal */}
                     {showUpload && (
                         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-0 animate-in fade-in zoom-in duration-200 overflow-hidden border border-slate-200">
-                                <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50/50">
-                                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                        <Database className="w-5 h-5 text-blue-600" /> Data Synchronization Status
-                                    </h2>
-                                    <button onClick={() => setShowUpload(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X className="w-5 h-5" /></button>
-                                </div>
-                                <div className="flex border-b border-slate-200 overflow-x-auto custom-scrollbar">
-                                    {['DACARE', 'DAOS', 'DABATTERY', 'DASP&Q', 'DALIFESTYLE'].map(tab => (
-                                        <button key={tab} onClick={() => setUploadTab(tab)} className={`flex-1 py-3 px-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${uploadTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>{tab}</button>
-                                    ))}
-                                </div>
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200">
+                                <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50/50"><h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Database className="w-5 h-5 text-blue-600" /> Data Sync Status</h2><button onClick={() => setShowUpload(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button></div>
+                                <div className="flex border-b border-slate-200 overflow-x-auto custom-scrollbar">{['DACARE', 'DATISSUE', 'DAOS', 'DABATTERY', 'DASP&Q', 'DALIFESTYLE'].map(tab => (<button key={tab} onClick={() => setUploadTab(tab)} className={`flex-1 py-3 px-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${uploadTab === tab ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>{tab}</button>))}</div>
                                 <div className="p-6 space-y-4 bg-slate-50/30">
                                     <SyncStatusSlot label="Sales 2025" status={filesStatus[uploadTab].s25} />
                                     <SyncStatusSlot label="Sales 2026" status={filesStatus[uploadTab].s26} />
-                                    <SyncStatusSlot label="Budget Channel 2026" status={filesStatus[uploadTab].bCh} />
-                                    <SyncStatusSlot label="Budget Product 2026" status={filesStatus[uploadTab].bPr} />
+                                    <SyncStatusSlot label="Budget Channel" status={filesStatus[uploadTab].bCh} />
+                                    <SyncStatusSlot label="Budget Product" status={filesStatus[uploadTab].bPr} />
                                 </div>
-                                <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-                                    <div className="text-xs text-slate-500 flex items-center gap-2 font-medium">
-                                        <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-orange-500 animate-pulse' : 'bg-green-500'}`}></div> Live from Google Sheets
-                                    </div>
-                                    <button onClick={() => setShowUpload(false)} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
-                                        {isSyncing ? 'Running in background...' : 'Close'}
-                                    </button>
-                                </div>
+                                <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-between items-center"><div className="text-xs text-slate-500 flex items-center gap-2 font-medium"><div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-orange-500 animate-pulse' : 'bg-green-500'}`}></div> Live from Google Sheets</div><button onClick={() => setShowUpload(false)} className="bg-slate-900 text-white px-6 py-2.5 rounded-lg text-sm font-medium">Close</button></div>
                             </div>
                         </div>
                     )}
