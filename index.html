@@ -567,25 +567,42 @@
         }, [salesData, budgetChannel, budgetProduct, selectedGroup, filterSubProduct, filterChannel, filterMonth]);
 
             const trendChartData = useMemo(() => {
+                const base2025 = filteredData.filter(d => d.Year === '2025');
                 const base2026 = filteredData.filter(d => d.Year === '2026');
+                
                 if (selectedGroup === 'ALL') {
                     return monthsList.map(m => {
-                        const monthData = base2026.filter(d => d.Month.startsWith(m));
-                        const dacare = monthData.filter(d => d.ProductGroup === 'DACARE').reduce((s, r) => s + r.NetPrice, 0);
-                        const datissue = monthData.filter(d => d.ProductGroup === 'DATISSUE').reduce((s, r) => s + r.NetPrice, 0);
-                        const daos = monthData.filter(d => d.ProductGroup === 'DAOS').reduce((s, r) => s + r.NetPrice, 0);
-                        const dabattery = monthData.filter(d => d.ProductGroup === 'DABATTERY').reduce((s, r) => s + r.NetPrice, 0);
-                        const dasp = monthData.filter(d => d.ProductGroup === 'DASP').reduce((s, r) => s + r.NetPrice, 0);
-                        const danb = monthData.filter(d => d.ProductGroup === 'DANB').reduce((s, r) => s + r.NetPrice, 0);
-                        const quality = monthData.filter(d => d.ProductGroup === 'QUALITY').reduce((s, r) => s + r.NetPrice, 0);
-                        const dalife = monthData.filter(d => d.ProductGroup === 'DALIFESTYLE').reduce((s, r) => s + r.NetPrice, 0);
-                        const total = dacare + datissue + daos + dabattery + dasp + danb + quality + dalife;
+                        const m25 = base2025.filter(d => d.Month.startsWith(m));
+                        const m26 = base2026.filter(d => d.Month.startsWith(m));
+
+                        const calc = (data, group) => data.filter(d => d.ProductGroup === group).reduce((s, r) => s + r.NetPrice, 0);
+
+                        const dacare25 = calc(m25, 'DACARE'); const dacare26 = calc(m26, 'DACARE');
+                        const datissue25 = calc(m25, 'DATISSUE'); const datissue26 = calc(m26, 'DATISSUE');
+                        const daos25 = calc(m25, 'DAOS'); const daos26 = calc(m26, 'DAOS');
+                        const dabattery25 = calc(m25, 'DABATTERY'); const dabattery26 = calc(m26, 'DABATTERY');
+                        const dasp25 = calc(m25, 'DASP'); const dasp26 = calc(m26, 'DASP');
+                        const danb25 = calc(m25, 'DANB'); const danb26 = calc(m26, 'DANB');
+                        const quality25 = calc(m25, 'QUALITY'); const quality26 = calc(m26, 'QUALITY');
+                        const dalife25 = calc(m25, 'DALIFESTYLE'); const dalife26 = calc(m26, 'DALIFESTYLE');
+
+                        const total25 = dacare25 + datissue25 + daos25 + dabattery25 + dasp25 + danb25 + quality25 + dalife25;
+                        const total26 = dacare26 + datissue26 + daos26 + dabattery26 + dasp26 + danb26 + quality26 + dalife26;
+
                         return {
-                            name: m, 'DACARE': dacare, 'DATISSUE': datissue, 'DAOS': daos, 'DABATTERY': dabattery, 'DASP': dasp, 'DANB': danb, 'QUALITY': quality, 'DALIFESTYLE': dalife, total: total === 0 ? null : total
+                            name: m, 
+                            'DACARE_25': dacare25 === 0 ? null : dacare25, 'DACARE_26': dacare26 === 0 ? null : dacare26,
+                            'DATISSUE_25': datissue25 === 0 ? null : datissue25, 'DATISSUE_26': datissue26 === 0 ? null : datissue26,
+                            'DAOS_25': daos25 === 0 ? null : daos25, 'DAOS_26': daos26 === 0 ? null : daos26,
+                            'DABATTERY_25': dabattery25 === 0 ? null : dabattery25, 'DABATTERY_26': dabattery26 === 0 ? null : dabattery26,
+                            'DASP_25': dasp25 === 0 ? null : dasp25, 'DASP_26': dasp26 === 0 ? null : dasp26,
+                            'DANB_25': danb25 === 0 ? null : danb25, 'DANB_26': danb26 === 0 ? null : danb26,
+                            'QUALITY_25': quality25 === 0 ? null : quality25, 'QUALITY_26': quality26 === 0 ? null : quality26,
+                            'DALIFESTYLE_25': dalife25 === 0 ? null : dalife25, 'DALIFESTYLE_26': dalife26 === 0 ? null : dalife26,
+                            total25: total25 === 0 ? null : total25, total26: total26 === 0 ? null : total26
                         };
                     });
                 } else {
-                    const base2025 = salesData.filter(d => d.ProductGroup === selectedGroup && d.Year === '2025' && (filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct) && (filterChannel === 'All' || d.Channel === filterChannel));
                     return monthsList.map(m => {
                         const val2025 = base2025.filter(d => d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
                         const val2026 = base2026.filter(d => d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
@@ -596,7 +613,7 @@
 
             const yAxisTicks = useMemo(() => {
                 const maxVal = trendChartData.reduce((max, d) => {
-                    if (selectedGroup === 'ALL') return Math.max(max, d.total || 0);
+                    if (selectedGroup === 'ALL') return Math.max(max, d.total25 || 0, d.total26 || 0);
                     else return Math.max(max, d['2025'] || 0, d['2026'] || 0);
                 }, 0);
                 if (maxVal === 0) return [0, 5000000];
@@ -809,7 +826,18 @@
                 if (isNaN(cx) || isNaN(cy)) return null;
                 const valInM = Number(value) / 1000000;
                 const formatted = valInM < 1 ? `${valInM.toFixed(2)}M` : `${valInM.toFixed(1)}M`;
-                return <text x={cx} y={cy} fill="#64748b" textAnchor="middle" fontSize={10}>{formatted}</text>;
+                return <text x={cx} y={cy} fill="#64748b" textAnchor="middle" fontSize={10} fontWeight={600}>{formatted}</text>;
+            };
+
+            const renderCustomLabel25 = (props) => {
+                const { x, y, width, value } = props;
+                if (value === 0 || value === undefined || value === null) return null;
+                const cx = (width && !isNaN(width)) ? x + width / 2 : x;
+                const cy = !isNaN(y) ? y - 10 : y;
+                if (isNaN(cx) || isNaN(cy)) return null;
+                const valInM = Number(value) / 1000000;
+                const formatted = valInM < 1 ? `${valInM.toFixed(2)}M` : `${valInM.toFixed(1)}M`;
+                return <text x={cx} y={cy} fill="#94a3b8" textAnchor="middle" fontSize={9} fontStyle="italic">{formatted}</text>;
             };
 
             return (
@@ -888,25 +916,40 @@
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
-                                <div className="flex justify-between items-center mb-6"><h3 className="text-base font-bold text-slate-700 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600" /> {selectedGroup === 'ALL' ? '2026 Monthly Trend (Stacked)' : 'Sales Trend 2025 vs 2026'}</h3></div>
+                                <div className="flex justify-between items-center mb-6"><h3 className="text-base font-bold text-slate-700 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600" /> {selectedGroup === 'ALL' ? '2026 Monthly Trend (Stacked YoY)' : 'Sales Trend 2025 vs 2026'}</h3></div>
                                 <div className="h-72">
                                     <ResponsiveContainer width="100%" height="100%">
                                         {selectedGroup === 'ALL' ? (
-                                            <ComposedChart data={trendChartData} barSize={24}>
+                                            <ComposedChart data={trendChartData} barGap={2}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                                 <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} axisLine={false} tickLine={false} />
                                                 <YAxis domain={[0, yAxisTicks[yAxisTicks.length - 1]]} ticks={yAxisTicks} tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
                                                 <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: '500'}} formatter={(v) => `฿${(v/1000000).toFixed(2)}M`} />
                                                 <Legend wrapperStyle={{fontSize: '12px', fontWeight: '500'}} />
-                                                <Bar dataKey="DACARE" stackId="a" fill="#1E40AF" />
-                                                <Bar dataKey="DATISSUE" stackId="a" fill="#38BDF8" />
-                                                <Bar dataKey="DAOS" stackId="a" fill="#F59E0B" />
-                                                <Bar dataKey="DABATTERY" stackId="a" fill="#DC2626" />
-                                                <Bar dataKey="DASP" stackId="a" fill="#15803D" />
-                                                <Bar dataKey="DANB" stackId="a" fill="#2DD4BF" />
-                                                <Bar dataKey="QUALITY" stackId="a" fill="#0891B2" />
-                                                <Bar dataKey="DALIFESTYLE" stackId="a" fill="#9333EA" />
-                                                <Line type="monotone" dataKey="total" stroke="none" dot={false} activeDot={false}><LabelList dataKey="total" position="top" content={renderCustomLabel} /></Line>
+                                                
+                                                {/* 2025 Stack (Faint) */}
+                                                <Bar dataKey="DACARE_25" name="DACARE '25" stackId="2025" fill="#1E40AF" fillOpacity={0.3} legendType="none" />
+                                                <Bar dataKey="DATISSUE_25" name="DATISSUE '25" stackId="2025" fill="#38BDF8" fillOpacity={0.3} legendType="none" />
+                                                <Bar dataKey="DAOS_25" name="DAOS '25" stackId="2025" fill="#F59E0B" fillOpacity={0.3} legendType="none" />
+                                                <Bar dataKey="DABATTERY_25" name="DABATTERY '25" stackId="2025" fill="#DC2626" fillOpacity={0.3} legendType="none" />
+                                                <Bar dataKey="DASP_25" name="DASP '25" stackId="2025" fill="#15803D" fillOpacity={0.3} legendType="none" />
+                                                <Bar dataKey="DANB_25" name="DANB '25" stackId="2025" fill="#2DD4BF" fillOpacity={0.3} legendType="none" />
+                                                <Bar dataKey="QUALITY_25" name="QUALITY '25" stackId="2025" fill="#0891B2" fillOpacity={0.3} legendType="none" />
+                                                <Bar dataKey="DALIFESTYLE_25" name="DALIFESTYLE '25" stackId="2025" fill="#9333EA" fillOpacity={0.3} legendType="none" />
+
+                                                {/* 2026 Stack (Solid) */}
+                                                <Bar dataKey="DACARE_26" name="DACARE '26" stackId="2026" fill="#1E40AF" />
+                                                <Bar dataKey="DATISSUE_26" name="DATISSUE '26" stackId="2026" fill="#38BDF8" />
+                                                <Bar dataKey="DAOS_26" name="DAOS '26" stackId="2026" fill="#F59E0B" />
+                                                <Bar dataKey="DABATTERY_26" name="DABATTERY '26" stackId="2026" fill="#DC2626" />
+                                                <Bar dataKey="DASP_26" name="DASP '26" stackId="2026" fill="#15803D" />
+                                                <Bar dataKey="DANB_26" name="DANB '26" stackId="2026" fill="#2DD4BF" />
+                                                <Bar dataKey="QUALITY_26" name="QUALITY '26" stackId="2026" fill="#0891B2" />
+                                                <Bar dataKey="DALIFESTYLE_26" name="DALIFESTYLE '26" stackId="2026" fill="#9333EA" />
+
+                                                {/* Hidden total lines for rendering top labels cleanly */}
+                                                <Line type="monotone" dataKey="total26" stroke="none" dot={false} activeDot={false} legendType="none" tooltipType="none"><LabelList dataKey="total26" position="top" content={renderCustomLabel} /></Line>
+                                                <Line type="monotone" dataKey="total25" stroke="none" dot={false} activeDot={false} legendType="none" tooltipType="none"><LabelList dataKey="total25" position="top" content={renderCustomLabel25} /></Line>
                                             </ComposedChart>
                                         ) : (
                                             <LineChart data={trendChartData}>
