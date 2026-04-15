@@ -188,18 +188,24 @@
             }
         };
 
-        const fetchCSV = (url) => {
-            if (!url) return Promise.reject(new Error('No URL provided'));
-            return new Promise((resolve, reject) => {
-                window.Papa.parse(url, {
-                    download: true,
-                    header: true,
-                    skipEmptyLines: true,
-                    worker: true,
-                    complete: (results) => resolve(results.data),
-                    error: (error) => reject(error)
+        // Optimized Fetching using Native Fetch (No Worker Overhead)
+        const fetchCSV = async (url) => {
+            if (!url) return null;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const csvText = await response.text();
+                return new Promise((resolve) => {
+                    window.Papa.parse(csvText, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => resolve(results.data)
+                    });
                 });
-            });
+            } catch (error) {
+                console.error('Fetch CSV Error:', error);
+                throw error;
+            }
         };
 
         // --- Sub-components ---
@@ -349,12 +355,23 @@
                 }
                 setFilesStatus(initialStatus);
 
+                let finalSales = [];
+                let finalBudgetChannel = [];
+                let finalBudgetProduct = [];
+
+                // Optimization: Fetch ALL groups concurrently to maximize network speed (Parallel Processing)
                 const groupPromises = Object.entries(DATA_SOURCES).map(async ([groupName, sources]) => {
                     const groupSales = [];
                     const groupBudgetChannel = [];
                     const groupBudgetProduct = [];
 
+                    setFilesStatus(prev => ({
+                        ...prev,
+                        [groupName]: { s25: 'loading', s26: 'loading', bCh: 'loading', bPr: 'loading' }
+                    }));
+
                     try {
+                        // Fetch all 4 files for this group simultaneously
                         const [s25Raw, s26Raw, bChRaw, bPrRaw] = await Promise.all([
                             fetchCSV(sources.s25).catch(() => null),
                             fetchCSV(sources.s26).catch(() => null),
@@ -366,7 +383,7 @@
                             for (let i=0; i<s25Raw.length; i++) {
                                 const row = s25Raw[i];
                                 const rawGrp = row['Product Group'] || row['ProductGroup'];
-                                if (rawGrp && rawGrp.toUpperCase().trim() !== groupName) continue; // Skip rows meant for other groups
+                                if (rawGrp && rawGrp.toUpperCase().trim() !== groupName) continue; 
                                 
                                 if (row['Product Name'] && row['Month']) {
                                     groupSales.push({
@@ -444,23 +461,20 @@
                     }
                 });
 
+                // Wait for ALL groups to finish processing concurrently
                 const results = await Promise.all(groupPromises);
 
-                let finalSales = [];
-                let finalBudgetChannel = [];
-                let finalBudgetProduct = [];
-
                 results.forEach(res => {
-                    for (let i=0; i<res.groupSales.length; i++) finalSales.push(res.groupSales[i]);
-                    for (let i=0; i<res.groupBudgetChannel.length; i++) finalBudgetChannel.push(res.groupBudgetChannel[i]);
-                    for (let i=0; i<res.groupBudgetProduct.length; i++) finalBudgetProduct.push(res.groupBudgetProduct[i]);
+                    for (let i = 0; i < res.groupSales.length; i++) finalSales.push(res.groupSales[i]);
+                    for (let i = 0; i < res.groupBudgetChannel.length; i++) finalBudgetChannel.push(res.groupBudgetChannel[i]);
+                    for (let i = 0; i < res.groupBudgetProduct.length; i++) finalBudgetProduct.push(res.groupBudgetProduct[i]);
                 });
 
                 setSalesData(finalSales);
                 setBudgetChannel(finalBudgetChannel);
                 setBudgetProduct(finalBudgetProduct);
                 setIsSyncing(false);
-                setTimeout(() => setShowUpload(false), 1500);
+                setTimeout(() => setShowUpload(false), 1200);
             };
 
             useEffect(() => {
@@ -811,7 +825,7 @@
                 const items = selectedGroup !== 'ALL' && groupRecs[selectedGroup] ? groupRecs[selectedGroup] : [
                     { head: "Peak Season & Momentum", desc: `ภาพรวม ${isGrowthPositive ? `โต +${growthVal}%` : `ติดลบ ${growthVal}%`} (Top Ch: ${topCh}). ข้อมูลปีที่แล้วชี้ว่าเดือน ${peakMonth25 || 'N/A'} คือช่วง High Season ของพอร์ตนี้ เตรียมแผน Supply Chain และ Marketing ให้พร้อมกอบโกยยอด` }, 
                     { head: topTrendingProduct.growth > 0 ? `Hero Product: ${topTrendingProduct.name}` : "Margin Protection", desc: topTrendingProduct.growth > 0 ? `สินค้ากลุ่ม ${topTrendingProduct.name} โตกระโดด +${topTrendingProduct.growth.toFixed(1)}% YoY ดันขึ้นแท่นหัวหอกหลัก จัด Bundle Pack หรือเพิ่ม Visibility หน้าเชลฟ์เพื่อขยาย Basket Size ด่วน` : `ตลาดยังซึม แนะนำลด Focus การทำราคา แล้วหันมา Push สินค้า High Margin เพื่อรักษากำไรบรรทัดสุดท้าย (Bottom Line)` }, 
-                    { head: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `Rising Channel: ${topTrendingChannel.name}` : "Core Channel Defense", desc: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `ช่องทาง ${topTrendingChannel.name} โตทะลุเป้า +${topTrendingChannel.growth.toFixed(1)}% YoY เป็น Blue Ocean ที่ควรโยก Trade Budget บางส่วนมาอัดโปรโมชั่นดึงยอดเพิ่มทันที` : `รักษาส่วนแบ่งในช่องทางหลักอย่าง ${topCh} ให้แน่น ป้องกันคู่แข่งแย่งพื้นที่ Shelf และ Share of Voice` }
+                    { head: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `Rising Channel: ${topTrendingChannel.name}` : "Core Channel Defense", desc: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `ช่องทาง ${topTrendingChannel.name} โตทะลุเป้า +${topTrendingChannel.growth.toFixed(1)}% YoY เป็น Blue Ocean ที่ควรโยก Trade Budget บางส่วนมาอัดโปรโมชั่นดึงยอดเพิ่มทันที` : `รักษส่วนแบ่งในช่องทางหลักอย่าง ${topCh} ให้แน่น ป้องกันคู่แข่งแย่งพื้นที่ Shelf และ Share of Voice` }
                 ];
                 return { title: `AI Strategic Insights: ${contextTitle}`, items };
             }, [selectedGroup, filterSubProduct, kpi, channelMix, salesData, filteredData]);
@@ -920,14 +934,13 @@
                                 <div className="h-72">
                                     <ResponsiveContainer width="100%" height="100%">
                                         {selectedGroup === 'ALL' ? (
-                                            <ComposedChart data={trendChartData} barGap={2}>
+                                            <ComposedChart data={trendChartData} barGap={4} maxBarSize={36}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                                 <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} axisLine={false} tickLine={false} />
                                                 <YAxis domain={[0, yAxisTicks[yAxisTicks.length - 1]]} ticks={yAxisTicks} tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
                                                 <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: '500'}} formatter={(v) => `฿${(v/1000000).toFixed(2)}M`} />
                                                 <Legend wrapperStyle={{fontSize: '12px', fontWeight: '500'}} />
                                                 
-                                                {/* 2025 Stack (Faint) */}
                                                 <Bar dataKey="DACARE_25" name="DACARE '25" stackId="2025" fill="#1E40AF" fillOpacity={0.3} legendType="none" />
                                                 <Bar dataKey="DATISSUE_25" name="DATISSUE '25" stackId="2025" fill="#38BDF8" fillOpacity={0.3} legendType="none" />
                                                 <Bar dataKey="DAOS_25" name="DAOS '25" stackId="2025" fill="#F59E0B" fillOpacity={0.3} legendType="none" />
@@ -937,7 +950,6 @@
                                                 <Bar dataKey="QUALITY_25" name="QUALITY '25" stackId="2025" fill="#0891B2" fillOpacity={0.3} legendType="none" />
                                                 <Bar dataKey="DALIFESTYLE_25" name="DALIFESTYLE '25" stackId="2025" fill="#9333EA" fillOpacity={0.3} legendType="none" />
 
-                                                {/* 2026 Stack (Solid) */}
                                                 <Bar dataKey="DACARE_26" name="DACARE '26" stackId="2026" fill="#1E40AF" />
                                                 <Bar dataKey="DATISSUE_26" name="DATISSUE '26" stackId="2026" fill="#38BDF8" />
                                                 <Bar dataKey="DAOS_26" name="DAOS '26" stackId="2026" fill="#F59E0B" />
@@ -947,7 +959,6 @@
                                                 <Bar dataKey="QUALITY_26" name="QUALITY '26" stackId="2026" fill="#0891B2" />
                                                 <Bar dataKey="DALIFESTYLE_26" name="DALIFESTYLE '26" stackId="2026" fill="#9333EA" />
 
-                                                {/* Hidden total lines for rendering top labels cleanly */}
                                                 <Line type="monotone" dataKey="total26" stroke="none" dot={false} activeDot={false} legendType="none" tooltipType="none"><LabelList dataKey="total26" position="top" content={renderCustomLabel} /></Line>
                                                 <Line type="monotone" dataKey="total25" stroke="none" dot={false} activeDot={false} legendType="none" tooltipType="none"><LabelList dataKey="total25" position="top" content={renderCustomLabel25} /></Line>
                                             </ComposedChart>
