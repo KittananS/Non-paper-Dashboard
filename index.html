@@ -989,11 +989,20 @@
                             </div>
                             <div className="overflow-y-auto custom-scrollbar pr-2 max-h-72">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="text-slate-500 border-b border-slate-200 font-semibold"><tr><th className="py-3 pl-3">Rank</th><th className="py-3">Name</th><th className="py-3 text-right cursor-pointer" onClick={() => setTopPerfSortMode('sales')}>Sales {topPerfSortMode === 'sales' && <ArrowDown className="w-3 h-3 inline" />}</th><th className="py-3 pr-3 text-right cursor-pointer" onClick={() => setTopPerfSortMode('yoy')}>%Growth {topPerfSortMode === 'yoy' && <ArrowDown className="w-3 h-3 inline" />}</th></tr></thead>
+                                    <thead className="text-slate-500 border-b border-slate-200 font-semibold">
+                                        <tr>
+                                            <th className="py-3 pl-3 w-16">Rank</th>
+                                            <th className="py-3">Name</th>
+                                            <th className="py-3 text-right cursor-pointer" onClick={() => setTopPerfSortMode('sales')}>Sales {topPerfSortMode === 'sales' && <ArrowDown className="w-3 h-3 inline" />}</th>
+                                            <th className="py-3 pr-3 text-right cursor-pointer" onClick={() => setTopPerfSortMode('yoy')}>%Growth {topPerfSortMode === 'yoy' && <ArrowDown className="w-3 h-3 inline" />}</th>
+                                            <th className="py-3 pr-3 text-right w-32">% Proportion</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>
                                         {topPerfDrillDown ? (
                                             topPerfDrillDown.allProducts.map((prod, idx) => {
                                                 const yoy = prod.sales25 > 0 ? ((prod.value - prod.sales25) / prod.sales25) * 100 : null;
+                                                const proportion = kpi.s26 > 0 ? ((prod.value / kpi.s26) * 100).toFixed(1) : "0.0";
                                                 return (
                                                     <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                                                         <td className="py-3.5 pl-3 font-semibold text-slate-400">#{idx + 1}</td>
@@ -1008,12 +1017,21 @@
                                                                 <span className="text-slate-400 font-medium">N/A</span>
                                                             )}
                                                         </td>
+                                                        <td className="py-3.5 pr-3">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <span className="font-bold text-slate-700 text-right w-10">{proportion}%</span>
+                                                                <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden flex-shrink-0">
+                                                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${proportion}%` }}></div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
                                                     </tr>
                                                 );
                                             })
                                         ) : (
                                             topPerformers.map((item, idx) => {
                                                 const yoy = item.sales25 > 0 ? ((item.value - item.sales25) / item.sales25) * 100 : null;
+                                                const proportion = kpi.s26 > 0 ? ((item.value / kpi.s26) * 100).toFixed(1) : "0.0";
                                                 return (
                                                     <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setTopPerfDrillDown(item)}>
                                                         <td className="py-3.5 pl-3 font-semibold">#{idx+1}</td>
@@ -1027,6 +1045,14 @@
                                                             ) : (
                                                                 <span className="text-slate-400 font-medium">N/A</span>
                                                             )}
+                                                        </td>
+                                                        <td className="py-3.5 pr-3">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <span className="font-bold text-slate-700 text-right w-10">{proportion}%</span>
+                                                                <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden flex-shrink-0">
+                                                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${proportion}%` }}></div>
+                                                                </div>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
