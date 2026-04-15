@@ -860,14 +860,65 @@
                 return { rows: sortedRows, columns, matrix, columnTotals, rowTotals };
             }, [salesData, selectedGroup, filterSubProduct, filterMonth, coverageDrillChannel, debouncedCoverageSearch]);
 
-            // --- Dynamic Recommendations ---
+            // --- Dynamic Recommendations (Data-Driven Insights) ---
             const dynamicRecommendations = useMemo(() => {
                 const isGrowthPositive = kpi.growthYoY >= 0;
                 const topCh = channelMix.length > 0 ? channelMix[0].name : 'N/A';
                 const growthVal = Math.abs(kpi.growthYoY).toFixed(1);
+                
                 let contextTitle = `Overview`;
                 if (filterSubProduct !== 'All') contextTitle = filterSubProduct;
                 else if (selectedGroup !== 'ALL') contextTitle = selectedGroup;
+
+                // --- Data Mining for Dynamic Insights ---
+                const valid2026MonthsSet = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
+                
+                // 1. Find Peak Month from Historical Data (2025)
+                const monthlySales25 = {};
+                salesData.filter(d => d.Year === '2025' && (selectedGroup === 'ALL' || d.ProductGroup === selectedGroup)).forEach(d => {
+                    const m = d.Month?.split('-')[0];
+                    if (m) monthlySales25[m] = (monthlySales25[m] || 0) + d.NetPrice;
+                });
+                let peakMonth25 = '';
+                let maxSales25 = 0;
+                Object.entries(monthlySales25).forEach(([m, s]) => {
+                    if (s > maxSales25) { maxSales25 = s; peakMonth25 = m; }
+                });
+
+                // 2. Find Top Trending Product & Rising Channel (from filteredData)
+                const subProdYTD = {};
+                const channelYTD = {};
+                
+                filteredData.forEach(d => {
+                    const monthPrefix = d.Month?.split('-')[0];
+                    const isYTD25 = d.Year === '2025' && valid2026MonthsSet.has(monthPrefix);
+                    
+                    if (d.SubProductGroup) {
+                        if (!subProdYTD[d.SubProductGroup]) subProdYTD[d.SubProductGroup] = { s26: 0, s25: 0 };
+                        if (d.Year === '2026') subProdYTD[d.SubProductGroup].s26 += d.NetPrice;
+                        else if (isYTD25) subProdYTD[d.SubProductGroup].s25 += d.NetPrice;
+                    }
+                    
+                    if (d.Channel) {
+                        if (!channelYTD[d.Channel]) channelYTD[d.Channel] = { s26: 0, s25: 0 };
+                        if (d.Year === '2026') channelYTD[d.Channel].s26 += d.NetPrice;
+                        else if (isYTD25) channelYTD[d.Channel].s25 += d.NetPrice;
+                    }
+                });
+
+                const getTopGrowth = (dataObj, threshold) => {
+                    let top = { name: 'N/A', growth: -Infinity };
+                    Object.entries(dataObj).forEach(([name, data]) => {
+                        if (data.s25 > threshold) {
+                            const growth = ((data.s26 - data.s25) / data.s25) * 100;
+                            if (growth > top.growth) top = { name, growth };
+                        }
+                    });
+                    return top;
+                };
+
+                const topTrendingProduct = getTopGrowth(subProdYTD, 50000); // 50k base filter
+                const topTrendingChannel = getTopGrowth(channelYTD, 100000); // 100k base filter
 
                 const subProductRecs = {
                     'Tissue': [
@@ -908,43 +959,29 @@
                     items = subProductRecs[filterSubProduct] || getGenericProductRecs(filterSubProduct);
                 } else {
                     const getGeneralRecs = () => [
-                        { head: isGrowthPositive ? "2026 Growth Momentum" : "2026 Turnaround", desc: isGrowthPositive ? `ปี 2026 เริ่มต้นดีโต ${growthVal}% YoY. รักษา Momentum ในช่องทาง ${topCh} แล้วขยายสินค้า Hero ไปยังช่องทางรอง` : `ปี 2026 ยอดขายชะลอตัว ${growthVal}%. ต้องเร่งทบทวนแผนช่องทางหลักและอัดโปรโมชั่นดึงยอดคืนในไตรมาสถัดไป` },
-                        { head: "Channel Optimization", desc: `ช่องทาง ${topCh} ยังคงเป็นเส้นเลือดใหญ่ (${kpi.s26 ? (channelMix[0]?.value/kpi.s26*100).toFixed(0) : 0}%). ควรกระจายความเสี่ยงไป Online หรือ MT อื่นๆ` },
-                        { head: "Profit Focus", desc: "เน้นสินค้า High Margin ในกลุ่ม DAOS เพื่อชดเชยการแข่งขันราคาในตลาด Mass ของ DACARE" }
+                        { 
+                            head: "Peak Season & Momentum", 
+                            desc: `ภาพรวม ${isGrowthPositive ? `โต +${growthVal}%` : `ติดลบ ${growthVal}%`} (Top Ch: ${topCh}). ข้อมูลปีที่แล้วชี้ว่าเดือน ${peakMonth25 || 'N/A'} คือช่วง High Season ของพอร์ตนี้ เตรียมแผน Supply Chain และ Marketing ให้พร้อมกอบโกยยอด` 
+                        },
+                        {
+                            head: topTrendingProduct.growth > 0 ? `Hero Product: ${topTrendingProduct.name}` : "Margin Protection",
+                            desc: topTrendingProduct.growth > 0 
+                                ? `สินค้ากลุ่ม ${topTrendingProduct.name} โตกระโดด +${topTrendingProduct.growth.toFixed(1)}% YoY ดันขึ้นแท่นหัวหอกหลัก จัด Bundle Pack หรือเพิ่ม Visibility หน้าเชลฟ์เพื่อขยาย Basket Size ด่วน`
+                                : `ตลาดยังซึม แนะนำลด Focus การทำราคา แล้วหันมา Push สินค้า High Margin เพื่อรักษากำไรบรรทัดสุดท้าย (Bottom Line)`
+                        },
+                        {
+                            head: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `Rising Channel: ${topTrendingChannel.name}` : "Core Channel Defense",
+                            desc: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh
+                                ? `ช่องทาง ${topTrendingChannel.name} โตทะลุเป้า +${topTrendingChannel.growth.toFixed(1)}% YoY เป็น Blue Ocean ที่ควรโยก Trade Budget บางส่วนมาอัดโปรโมชั่นดึงยอดเพิ่มทันที`
+                                : `รักษาส่วนแบ่งในช่องทางหลักอย่าง ${topCh} ให้แน่น ป้องกันคู่แข่งแย่งพื้นที่ Shelf และ Share of Voice`
+                        }
                     ];
 
-                    const groupRecs = {
-                        'DACARE': [
-                            { head: "Premium Hygiene 2026", desc: "เทรนด์ปีนี้คือ Premium Hygiene ผู้บริโภคยอมจ่ายแพงเพื่อสินค้าที่ดูดีและอ่อนโยนกว่าเดิม" },
-                            { head: "Aging Society", desc: "ตลาดผู้สูงอายุโตต่อเนื่อง ดันสินค้า Wipes สำหรับผู้ใหญ่เข้า MT/Pharmacy ให้มากขึ้น" },
-                            { head: "Travel Recovery", desc: "ท่องเที่ยวฟื้นตัว 100% จัดเซ็ต Travel Kit วางขาย CVS ดักนักท่องเที่ยว" }
-                        ],
-                        'DAOS': [
-                            { head: "Smart Hybrid Work", desc: "สินค้าออฟฟิศต้องเบาและพกพาได้ ตอบโจทย์การทำงานแบบ Hybrid Work ที่ยังคงอยู่" },
-                            { head: "Green Office", desc: "B2B มองหา Green Supply Chain. ชูจุดขายสินค้ารักษ์โลกเพื่อปิดดีล Corporate ใหญ่" },
-                            { head: "Gen Z Aesthetic", desc: "ดีไซน์ Minimal/Pastel ยังครองใจ Gen Z. ออกคอลเลกชันใหม่กระตุ้นการซื้อซ้ำ" }
-                        ],
-                        'DABATTERY': [
-                            { head: "Channel Expansion", desc: "วิเคราะห์ช่องว่างการจัดจำหน่ายในช่องทาง MT และ Online เพื่อเพิ่ม Coverage ของสินค้ากลุ่มแบตเตอรี่" },
-                            { head: "Visibility & Point of Sale", desc: "เพิ่มความโดดเด่น ณ จุดขาย (POSM) ในสาขาที่มี Traffic สูง เพื่อกระตุ้น Impulse Purchase" },
-                            { head: "Promotion Strategy", desc: "วางแผนทำ Bundle Pack หรือ Cross-promotion ร่วมกับสินค้ากลุ่มออฟฟิศ (DAOS) เพื่อเพิ่ม Basket Size" }
-                        ],
-                        'DASP&Q': [
-                            { head: "Channel Pack Size", desc: "CVS = Pack เล็ก, Online = Bulk Pack. แยก SKU ให้ชัดเพื่อไม่ให้แย่งยอดกันเอง" },
-                            { head: "Collab Marketing", desc: "Collab กับ Artist หรือ Character ดังเพื่อสร้างสีสันให้สินค้ากระดาษธรรมดาดูน่าสะสม" },
-                            { head: "Planner Niche", desc: "เจาะตลาดสมุด Planner/Journal ที่ยังมี Loyalty สูงและ Margin ดี" }
-                        ],
-                        'DALIFESTYLE': [
-                            { head: "Eco-Lifestyle", desc: "ชูจุดขาย Eco-friendly สำหรับสินค้าไลฟ์สไตล์ (ถุงผ้า/แก้วน้ำ) ตอบโจทย์เทรนด์รักษ์โลก 2026" },
-                            { head: "Corporate Gift", desc: "บุกตลาดของพรีเมียมองค์กร (Corporate Gift) ใช้จุดแข็ง Brand Double A สร้างความน่าเชื่อถือ" },
-                            { head: "Online Driven", desc: "ใช้ Social Commerce (TikTok/Shopee Live) เป็นช่องทางหลักในการขายสินค้ากลุ่มนี้เพื่อเข้าถึงคนรุ่นใหม่" }
-                        ]
-                    };
-                    items = selectedGroup === 'ALL' ? getGeneralRecs() : (groupRecs[selectedGroup] || getGeneralRecs());
+                    items = getGeneralRecs();
                 }
 
                 return { title: `AI Strategic Insights: ${contextTitle}`, items: items };
-            }, [selectedGroup, filterSubProduct, kpi, channelMix]);
+            }, [selectedGroup, filterSubProduct, kpi, channelMix, salesData, filteredData]);
 
             const COLORS = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
             const BLUE_PALETTE = ['#1e3a8a', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
