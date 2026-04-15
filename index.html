@@ -898,14 +898,14 @@
                                                 <YAxis domain={[0, yAxisTicks[yAxisTicks.length - 1]]} ticks={yAxisTicks} tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
                                                 <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: '500'}} formatter={(v) => `฿${(v/1000000).toFixed(2)}M`} />
                                                 <Legend wrapperStyle={{fontSize: '12px', fontWeight: '500'}} />
-                                                <Bar dataKey="DACARE" stackId="a" fill="#3b82f6" />
-                                                <Bar dataKey="DATISSUE" stackId="a" fill="#0ea5e9" />
-                                                <Bar dataKey="DAOS" stackId="a" fill="#f59e0b" />
-                                                <Bar dataKey="DABATTERY" stackId="a" fill="#ef4444" />
-                                                <Bar dataKey="DASP" stackId="a" fill="#10b981" />
-                                                <Bar dataKey="DANB" stackId="a" fill="#14b8a6" />
-                                                <Bar dataKey="QUALITY" stackId="a" fill="#06b6d4" />
-                                                <Bar dataKey="DALIFESTYLE" stackId="a" fill="#8b5cf6" />
+                                                <Bar dataKey="DACARE" stackId="a" fill="#1E40AF" />
+                                                <Bar dataKey="DATISSUE" stackId="a" fill="#38BDF8" />
+                                                <Bar dataKey="DAOS" stackId="a" fill="#F59E0B" />
+                                                <Bar dataKey="DABATTERY" stackId="a" fill="#DC2626" />
+                                                <Bar dataKey="DASP" stackId="a" fill="#15803D" />
+                                                <Bar dataKey="DANB" stackId="a" fill="#2DD4BF" />
+                                                <Bar dataKey="QUALITY" stackId="a" fill="#0891B2" />
+                                                <Bar dataKey="DALIFESTYLE" stackId="a" fill="#9333EA" />
                                                 <Line type="monotone" dataKey="total" stroke="none" dot={false} activeDot={false}><LabelList dataKey="total" position="top" content={renderCustomLabel} /></Line>
                                             </ComposedChart>
                                         ) : (
