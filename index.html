@@ -121,6 +121,11 @@
             return ['MT', 'INTER COMPANY', 'ONLINE', 'BJC'].includes(upper);
         };
 
+        const getImgFilename = (groupName) => {
+            // FIX: Remove special characters like '&' so DASP&Q matches daspq.png
+            return `image/${groupName.toLowerCase().replace(/&/g, '')}.png`;
+        };
+
         const GROUP_ORDER = ['DACARE', 'DATISSUE', 'DAOS', 'DABATTERY', 'DASP&Q', 'DALIFESTYLE'];
         const GROUP_COLORS = {
             'DACARE': 'text-blue-700 bg-blue-100/60',
@@ -330,9 +335,10 @@
                 setFilesStatus(initialStatus);
 
                 const groupPromises = Object.entries(DATA_SOURCES).map(async ([groupName, sources]) => {
-                    let groupSales = [];
-                    let groupBudgetChannel = [];
-                    let groupBudgetProduct = [];
+                    // Pre-allocate arrays if possible, or use push instead of concat to save memory overhead
+                    const groupSales = [];
+                    const groupBudgetChannel = [];
+                    const groupBudgetProduct = [];
 
                     try {
                         const [s25Raw, s26Raw, bChRaw, bPrRaw] = await Promise.all([
@@ -343,46 +349,63 @@
                         ]);
 
                         if (s25Raw) {
-                            const mapped = s25Raw.map(row => ({
-                                Month: row['Month'], ProductGroup: groupName, Channel: row['Channel'], SubChannel: row['Sub-channel'] || row['Sub-Channel'],
-                                SoldToParty: row['Sold-to party'] || row['Sold-To Party'], MaterialNumber: row['Material Number'], ProductName: row['Product Name'],
-                                SubProductGroup: row['Sub-product group'] || row['Sub-Product Group'], GroupSKU: row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'],
-                                NetPrice: cleanCurrency(row['Net Price']), Year: '2025'
-                            })).filter(r => r.ProductGroup && r.Month);
-                            groupSales = groupSales.concat(mapped);
+                            for (let i=0; i<s25Raw.length; i++) {
+                                const row = s25Raw[i];
+                                if (row['Product Name'] && row['Month']) {
+                                    groupSales.push({
+                                        Month: row['Month'], ProductGroup: groupName, Channel: row['Channel'], SubChannel: row['Sub-channel'] || row['Sub-Channel'],
+                                        SoldToParty: row['Sold-to party'] || row['Sold-To Party'], MaterialNumber: row['Material Number'], ProductName: row['Product Name'],
+                                        SubProductGroup: row['Sub-product group'] || row['Sub-Product Group'], GroupSKU: row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'],
+                                        NetPrice: cleanCurrency(row['Net Price']), Year: '2025'
+                                    });
+                                }
+                            }
                             setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s25: 'success' } }));
                         } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s25: 'error' } }));
 
                         if (s26Raw) {
-                            const mapped = s26Raw.map(row => ({
-                                Month: row['Month'], ProductGroup: groupName, Channel: row['Channel'], SubChannel: row['Sub-channel'] || row['Sub-Channel'],
-                                SoldToParty: row['Sold-to party'] || row['Sold-To Party'], MaterialNumber: row['Material Number'], ProductName: row['Product Name'],
-                                SubProductGroup: row['Sub-product group'] || row['Sub-Product Group'], GroupSKU: row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'],
-                                NetPrice: cleanCurrency(row['Net Price']), Year: '2026'
-                            })).filter(r => r.ProductGroup && r.Month);
-                            groupSales = groupSales.concat(mapped);
+                            for (let i=0; i<s26Raw.length; i++) {
+                                const row = s26Raw[i];
+                                if (row['Product Name'] && row['Month']) {
+                                    groupSales.push({
+                                        Month: row['Month'], ProductGroup: groupName, Channel: row['Channel'], SubChannel: row['Sub-channel'] || row['Sub-Channel'],
+                                        SoldToParty: row['Sold-to party'] || row['Sold-To Party'], MaterialNumber: row['Material Number'], ProductName: row['Product Name'],
+                                        SubProductGroup: row['Sub-product group'] || row['Sub-Product Group'], GroupSKU: row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'],
+                                        NetPrice: cleanCurrency(row['Net Price']), Year: '2026'
+                                    });
+                                }
+                            }
                             setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s26: 'success' } }));
                         } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s26: 'error' } }));
 
                         if (bChRaw) {
-                            const mapped = bChRaw.map(row => ({
-                                ProductGroup: groupName, Channel: row['Channel'], 
-                                Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
-                                Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
-                                Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
-                            })).filter(r => r.Channel && r.Channel !== 'TOTAL');
-                            groupBudgetChannel = groupBudgetChannel.concat(mapped);
+                            for (let i=0; i<bChRaw.length; i++) {
+                                const row = bChRaw[i];
+                                if (row['Channel'] && row['Channel'] !== 'TOTAL') {
+                                    groupBudgetChannel.push({
+                                        ProductGroup: groupName, Channel: row['Channel'], 
+                                        Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
+                                        Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
+                                        Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
+                                    });
+                                }
+                            }
                             setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bCh: 'success' } }));
                         } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bCh: 'error' } }));
 
                         if (bPrRaw) {
-                            const mapped = bPrRaw.map(row => ({
-                                ProductGroup: groupName, SubProductGroup: row['Sub-product Group'] || row['Sub-Product Group'], 
-                                Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
-                                Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
-                                Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
-                            })).filter(r => r.SubProductGroup && r.SubProductGroup !== 'TOTAL');
-                            groupBudgetProduct = groupBudgetProduct.concat(mapped);
+                            for (let i=0; i<bPrRaw.length; i++) {
+                                const row = bPrRaw[i];
+                                const subGroup = row['Sub-product Group'] || row['Sub-Product Group'];
+                                if (subGroup && subGroup !== 'TOTAL') {
+                                    groupBudgetProduct.push({
+                                        ProductGroup: groupName, SubProductGroup: subGroup, 
+                                        Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
+                                        Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
+                                        Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
+                                    });
+                                }
+                            }
                             setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bPr: 'success' } }));
                         } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bPr: 'error' } }));
 
@@ -402,9 +425,9 @@
                 let finalBudgetProduct = [];
 
                 results.forEach(res => {
-                    finalSales = finalSales.concat(res.groupSales);
-                    finalBudgetChannel = finalBudgetChannel.concat(res.groupBudgetChannel);
-                    finalBudgetProduct = finalBudgetProduct.concat(res.groupBudgetProduct);
+                    for (let i=0; i<res.groupSales.length; i++) finalSales.push(res.groupSales[i]);
+                    for (let i=0; i<res.groupBudgetChannel.length; i++) finalBudgetChannel.push(res.groupBudgetChannel[i]);
+                    for (let i=0; i<res.groupBudgetProduct.length; i++) finalBudgetProduct.push(res.groupBudgetProduct[i]);
                 });
 
                 setSalesData(finalSales);
@@ -759,10 +782,10 @@
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center h-full relative overflow-hidden group">
                                 <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none"></div>
                                 <div className="relative z-10 w-full flex flex-col h-full justify-center">
-                                    {selectedGroup !== 'ALL' && <img src={`image/${selectedGroup.toLowerCase()}.png`} alt={selectedGroup} className="w-full h-32 object-contain mb-4" />}
+                                    {selectedGroup !== 'ALL' && <img src={getImgFilename(selectedGroup)} alt={selectedGroup} className="w-full h-32 object-contain mb-4" />}
                                     {selectedGroup === 'ALL' && (
                                         <div className="grid grid-cols-3 gap-2 w-full h-auto max-h-32 mb-4 overflow-y-auto custom-scrollbar place-items-center">
-                                            {GROUP_ORDER.map(g => <img key={g} src={`image/${g.toLowerCase()}.png`} alt={g} className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup(g)} title={g} />)}
+                                            {GROUP_ORDER.map(g => <img key={g} src={getImgFilename(g)} alt={g} className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup(g)} title={g} />)}
                                         </div>
                                     )}
                                     <div className="text-sm font-bold text-slate-800 bg-white/80 backdrop-blur border border-slate-200 px-4 py-2 rounded-lg text-center mt-auto w-full truncate shadow-sm">
