@@ -134,6 +134,15 @@
             return ['MT', 'INTER COMPANY', 'ONLINE', 'BJC'].includes(upper);
         };
 
+        const GROUP_ORDER = ['DACARE', 'DAOS', 'DABATTERY', 'DASP&Q', 'DALIFESTYLE'];
+        const GROUP_COLORS = {
+            'DACARE': 'text-blue-700 bg-blue-100/60',
+            'DAOS': 'text-amber-700 bg-amber-100/60',
+            'DABATTERY': 'text-red-700 bg-red-100/60',
+            'DASP&Q': 'text-emerald-700 bg-emerald-100/60',
+            'DALIFESTYLE': 'text-purple-700 bg-purple-100/60',
+        };
+
         const DATA_SOURCES = {
             'DACARE': {
                 s25: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkxkoPt95gqqDZMeYvcSTFY5xSTLNUtoMqpUbMNLo92Ui447TqEPoXiUNs5XPIHvsR2n-L6CAtB3QF/pub?gid=0&single=true&output=csv',
@@ -202,13 +211,35 @@
                         <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                     </button>
                     {isOpen && (
-                        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
-                            <div className="sticky top-0 bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">Select {label}</div>
-                            {options.length > 0 ? options.map((opt) => (
-                                <button key={opt} className={`w-full text-left px-4 py-3 text-sm font-medium hover:bg-blue-50 transition-colors flex justify-between items-center ${opt === value ? 'text-blue-700 font-bold bg-blue-50/50' : 'text-slate-700'}`} onClick={() => { onChange(opt); setIsOpen(false); }}>
-                                    {opt}{opt === value && <div className="w-2 h-2 rounded-full bg-blue-600"></div>}
-                                </button>
-                            )) : <div className="px-4 py-3 text-sm text-slate-500 text-center italic font-medium">No options available</div>}
+                        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-[400px] overflow-y-auto animate-in fade-in zoom-in-95 duration-100 custom-scrollbar">
+                            <div className="sticky top-0 bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200 z-10">Select {label}</div>
+                            <div className="py-1">
+                                {options.length > 0 ? options.map((opt, index) => {
+                                    const optVal = typeof opt === 'string' ? opt : opt.val;
+                                    const optGroup = typeof opt === 'string' ? null : opt.group;
+                                    const isSelected = optVal === value;
+                                    
+                                    const prevOptGroup = index > 0 ? (typeof options[index-1] === 'string' ? null : options[index-1].group) : null;
+                                    const showGroupHeader = optGroup && optGroup !== prevOptGroup;
+
+                                    return (
+                                        <React.Fragment key={optVal}>
+                                            {showGroupHeader && (
+                                                <div className={`px-3 py-1.5 mt-2 mb-1 mx-2 text-[10px] font-extrabold uppercase tracking-wider rounded ${GROUP_COLORS[optGroup] || 'text-slate-500 bg-slate-100'}`}>
+                                                    {optGroup}
+                                                </div>
+                                            )}
+                                            <button 
+                                                className={`w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-slate-50 transition-colors flex justify-between items-center ${isSelected ? 'bg-blue-50/50 text-blue-700' : 'text-slate-700'}`} 
+                                                onClick={() => { onChange(optVal); setIsOpen(false); }}
+                                            >
+                                                <span className={`${isSelected ? 'font-bold' : ''} ${optGroup ? 'pl-2' : ''} truncate`}>{optVal}</span>
+                                                {isSelected && <div className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0"></div>}
+                                            </button>
+                                        </React.Fragment>
+                                    );
+                                }) : <div className="px-4 py-3 text-sm text-slate-500 text-center italic font-medium">No options available</div>}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -398,12 +429,46 @@
 
             const availableSubProducts = useMemo(() => {
                 const base = selectedGroup === 'ALL' ? salesData : salesData.filter(d => d.ProductGroup === selectedGroup);
-                return Array.from(new Set(base.map(d => d.SubProductGroup || '').filter(Boolean))).sort();
+                
+                const subProdMap = new Map();
+                base.forEach(d => {
+                    if (d.SubProductGroup && !subProdMap.has(d.SubProductGroup)) {
+                        subProdMap.set(d.SubProductGroup, d.ProductGroup);
+                    }
+                });
+
+                const list = Array.from(subProdMap.entries()).map(([name, group]) => ({ val: name, group }));
+                
+                list.sort((a, b) => {
+                    const gA = GROUP_ORDER.indexOf(a.group);
+                    const gB = GROUP_ORDER.indexOf(b.group);
+                    if (gA !== gB) return gA - gB;
+                    return a.val.localeCompare(b.val);
+                });
+                
+                return list;
             }, [salesData, selectedGroup]);
 
             const availableChannels = useMemo(() => {
                 const base = selectedGroup === 'ALL' ? salesData : salesData.filter(d => d.ProductGroup === selectedGroup);
-                return Array.from(new Set(base.map(d => d.Channel || '').filter(Boolean))).sort();
+                
+                // Aggregate sales by channel for the current year (2026) to determine sorting order
+                const channelSalesMap = {};
+                base.forEach(d => {
+                    const ch = d.Channel;
+                    if (ch) {
+                        if (!channelSalesMap[ch]) channelSalesMap[ch] = 0;
+                        if (d.Year === '2026') {
+                            channelSalesMap[ch] += d.NetPrice;
+                        }
+                    }
+                });
+
+                // Convert to array, sort by sales (descending), and extract channel names
+                return Object.entries(channelSalesMap)
+                    .map(([name, sales]) => ({ name, sales }))
+                    .sort((a, b) => b.sales - a.sales)
+                    .map(item => item.name);
             }, [salesData, selectedGroup]);
 
             const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -927,7 +992,7 @@
                                 <span className="text-sm font-bold text-slate-600 uppercase flex items-center gap-2">
                                     <Layers className="w-4 h-4" /> Filters:
                                 </span>
-                                <FilterDropdown label="Product" value={filterSubProduct} options={['All', ...availableSubProducts]} onChange={setFilterSubProduct} icon={<ShoppingBag className="w-4 h-4" />} />
+                                <FilterDropdown label="Product" value={filterSubProduct} options={[{val: 'All', group: null}, ...availableSubProducts]} onChange={setFilterSubProduct} icon={<ShoppingBag className="w-4 h-4" />} />
                                 <FilterDropdown label="Channel" value={filterChannel} options={['All', ...availableChannels]} onChange={setFilterChannel} icon={<Users className="w-4 h-4" />} />
                                 <FilterDropdown label="Month" value={filterMonth} options={['All', ...monthsList]} onChange={setFilterMonth} icon={<Calendar className="w-4 h-4" />} />
                                 {(filterSubProduct !== 'All' || filterChannel !== 'All' || filterMonth !== 'All') && (
