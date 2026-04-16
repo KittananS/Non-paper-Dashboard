@@ -690,8 +690,10 @@
                 const customerMap = {};
                 const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
                 filteredData.forEach(d => {
-                    const isMT = d.Channel?.toUpperCase() === 'MT';
-                    const customerName = isMT ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
+                    const upperCh = d.Channel?.toUpperCase() || '';
+                    const isSubChView = upperCh === 'MT' || upperCh === 'ONLINE';
+                    const customerName = isSubChView ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
+                    
                     const key = `${customerName}|${d.Channel || 'Unknown'}`;
                     if (!customerMap[key]) customerMap[key] = { name: customerName, channel: d.Channel || 'Unknown', totalSales26: 0, totalSales25: 0 };
                     if (d.Year === '2026') customerMap[key].totalSales26 += d.NetPrice;
@@ -713,8 +715,10 @@
             const uniqueCustomersCount = useMemo(() => {
                 const unique = new Set();
                 filteredData.filter(d => d.Year === '2026').forEach(d => {
-                    const isMT = d.Channel?.toUpperCase() === 'MT';
-                    const customerName = isMT ? d.SubChannel : d.SoldToParty;
+                    const upperCh = d.Channel?.toUpperCase() || '';
+                    const isSubChView = upperCh === 'MT' || upperCh === 'ONLINE';
+                    const customerName = isSubChView ? d.SubChannel : d.SoldToParty;
+                    
                     if (customerName) unique.add(`${customerName}|${d.Channel}`);
                 });
                 return unique.size;
