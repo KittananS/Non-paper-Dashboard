@@ -328,7 +328,7 @@
         };
 
         // --- AI Chat Widget Component ---
-        const FloatingChatWidget = ({ salesData, kpi, topPerformers, topCustomers, selectedGroup, filterMonth, filterChannel }) => {
+        const FloatingChatWidget = ({ salesData, kpi, topPerformers, topCustomers, selectedGroup, filterMonth, filterChannel, trendChartData, channelMix }) => {
             const [isOpen, setIsOpen] = useState(false);
             const [messages, setMessages] = useState([
                 { role: 'ai', content: 'สวัสดีครับ ผมคือ NPD Strategic AI Data Co-pilot ของคุณ ต้องการให้ผมวิเคราะห์ภาพรวมพอร์ตโฟลิโอ หรือเจาะลึกเฉพาะกลุ่มไหนเป็นพิเศษไหมครับ?' }
@@ -391,9 +391,18 @@
                         return `- ${g}: ฿${(v.s26/1000000).toFixed(2)}M (YoY: ${yoy !== 'N/A' ? yoy.toFixed(1) + '%' : 'N/A'})`;
                     }).join('\n');
 
-                // 2. Construct Filtered View Context
-                const topProductsText = topPerformers.slice(0, 5).map((p, i) => `${i+1}. ${p.sku} (฿${(p.value/1000000).toFixed(2)}M, YoY: ${p.sales25 > 0 ? (((p.value-p.sales25)/p.sales25)*100).toFixed(1) : 'N/A'}%)`).join('\n');
-                const topCustomersText = topCustomers.slice(0, 5).map((c, i) => `${i+1}. ${c.name} (฿${(c.totalSales26/1000000).toFixed(2)}M, YoY: ${c.totalSales25 > 0 ? (((c.totalSales26-c.totalSales25)/c.totalSales25)*100).toFixed(1) : 'N/A'}%)`).join('\n');
+                // 2. Construct Deep Filtered View Context
+                // Expanded to Top 10 and included rich sub-data
+                const topProductsText = topPerformers.slice(0, 10).map((p, i) => `${i+1}. ${p.sku} (฿${(p.value/1000000).toFixed(2)}M, YoY: ${p.sales25 > 0 ? (((p.value-p.sales25)/p.sales25)*100).toFixed(1) : 'N/A'}%) - Strategic Channels: ${(p.topChannels || []).join(', ') || 'N/A'}`).join('\n');
+                const topCustomersText = topCustomers.slice(0, 10).map((c, i) => `${i+1}. ${c.name} [${c.channel}] (฿${(c.totalSales26/1000000).toFixed(2)}M, YoY: ${c.totalSales25 > 0 ? (((c.totalSales26-c.totalSales25)/c.totalSales25)*100).toFixed(1) : 'N/A'}%) - Key Products: ${(c.topProducts || []).join(', ') || 'N/A'}`).join('\n');
+                
+                const channelMixText = channelMix.map(c => `${c.name}: ฿${(c.value/1000000).toFixed(2)}M`).join(', ');
+                
+                const monthlyTrendText = trendChartData.map(d => {
+                    const val25 = selectedGroup === 'ALL' ? d.total25 : d['2025'];
+                    const val26 = selectedGroup === 'ALL' ? d.total26 : d['2026'];
+                    return `${d.name}: '25=฿${(val25/1000000 || 0).toFixed(1)}M, '26=฿${(val26/1000000 || 0).toFixed(1)}M`;
+                }).join(' | ');
 
                 const dataContext = `
 [1. GLOBAL PORTFOLIO OVERVIEW (ข้อมูลรวมทั้งหมดของบริษัท ไม่อิง Filter)]
@@ -402,25 +411,32 @@ Global YoY Growth: ${globalYoY.toFixed(1)}%
 Performance by Product Group:
 ${groupDetails}
 
-[2. CURRENT FILTERED VIEW (ข้อมูลเฉพาะส่วนที่ User กำลังดูอยู่บนหน้าจอ)]
+[2. CURRENT FILTERED VIEW (เจาะลึกเฉพาะส่วนที่ User กำลังดูอยู่บนหน้าจอ)]
 Focus: Group=${selectedGroup}, Month=${filterMonth}, Channel=${filterChannel}
 Filtered YTD 2026: ฿${kpi.s26.toLocaleString()}
 Filtered YoY Growth: ${kpi.growthYoY.toFixed(1)}%
 Target Achieved: ${kpi.progress.toFixed(1)}%
 
-Top 5 Performers (Filtered View):
-${topProductsText}
+[3. CHANNEL MIX 2026 (ยอดขายแบ่งตามช่องทาง)]
+${channelMixText || 'N/A'}
 
-Top 5 Customers (Filtered View):
-${topCustomersText}
+[4. MONTHLY TREND (YTD 2025 vs 2026)]
+${monthlyTrendText || 'N/A'}
+
+[5. TOP 10 PERFORMING SKUs]
+${topProductsText || 'N/A'}
+
+[6. TOP 10 SOLD-TO PARTIES]
+${topCustomersText || 'N/A'}
                 `;
 
                 const systemPrompt = `คุณคือ Executive AI Assistant ประจำแผนก NPD/FMCG
 บุคลิกของคุณ: กระชับ ตรงประเด็น, ทรงพลัง หนักแน่น, เป็นธรรมชาติ จริงใจ, ไม่อ้อมค้อมและไม่มีคำเยินยอใดๆ ทั้งสิ้น ใช้ KISS Principle เสมอ
-หน้าที่: วิเคราะห์และให้คำแนะนำโดยอ้างอิงจากข้อมูล Context ที่แนบมาให้ ซึ่งมีทั้งภาพรวมบริษัท (Global) และข้อมูลย่อย (Filtered)
+หน้าที่: วิเคราะห์และให้คำแนะนำโดยอ้างอิงจากข้อมูล Context ด้านล่าง ข้อมูลเหล่านี้เป็น Data ที่คำนวณมาอย่างแม่นยำ 100% จากฐานข้อมูลย่อยเรียบร้อยแล้ว
 คำแนะนำในการตอบ: 
 - หากผู้ใช้ถามถึง "ภาพรวม" หรือเปรียบเทียบข้ามกลุ่ม ให้ดึงข้อมูลจาก [GLOBAL PORTFOLIO OVERVIEW] มาตอบ
-- หากผู้ใช้ถามถึงข้อมูลเฉพาะเจาะจงที่หน้าจอกำลังแสดงอยู่ ให้ใช้ [CURRENT FILTERED VIEW]
+- หากผู้ใช้ถามเรื่องเทรนด์รายเดือน ให้ดูจาก [MONTHLY TREND]
+- หากถามเรื่องสินค้าหรือลูกค้า ให้เจาะลึกที่ [TOP 10 PERFORMING SKUs] และ [TOP 10 SOLD-TO PARTIES]
 ข้อห้าม: ห้ามแต่งข้อมูลตัวเลขเองเด็ดขาด ถ้าไม่รู้ให้ตอบว่าข้อมูลไม่เพียงพอ
 
 ใช้สัญลักษณ์ **ข้อความ** เมื่อต้องการเน้นคำสำคัญ (Bold)
@@ -431,7 +447,7 @@ ${topCustomersText}
                     systemInstruction: { parts: [{ text: systemPrompt }] }
                 };
 
-                const apiKey = ""; // API Key provided by execution environment
+                const apiKey = ""; // ใส่ Gemini API Key ของคุณที่นี่เมื่อนำไป Deploy บน Vercel
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
                 // Implementation of Exponential Backoff to handle network throttling/timeouts smoothly
@@ -441,7 +457,8 @@ ${topCustomersText}
                         try {
                             const response = await fetch(url, options);
                             if (!response.ok) {
-                                throw new Error(`HTTP error! status: ${response.status}`);
+                                const errData = await response.json().catch(() => ({}));
+                                throw new Error(errData.error?.message || `HTTP error! status: ${response.status}`);
                             }
                             return await response.json();
                         } catch (error) {
@@ -462,7 +479,8 @@ ${topCustomersText}
                     
                     setMessages(prev => [...prev, { role: 'ai', content: aiText }]);
                 } catch (error) {
-                    setMessages(prev => [...prev, { role: 'ai', content: "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ AI แบบอัตโนมัติ กรุณาลองใหม่อีกครั้งครับ" }]);
+                    console.error("AI Connection Error:", error);
+                    setMessages(prev => [...prev, { role: 'ai', content: `เชื่อมต่อ AI ล้มเหลว: ${error.message || 'กรุณาตรวจสอบ API Key'}` }]);
                 } finally {
                     setIsLoading(false);
                 }
@@ -1412,7 +1430,7 @@ ${topCustomersText}
                         <footer className="w-full text-center pt-8 pb-4 text-slate-400 font-medium text-sm">Developed by NPD Team - Version 1.1</footer>
                     </main>
 
-                    {/* Inject Floating AI Widget */}
+                    {/* Inject Floating AI Widget with expanded Context Props */}
                     <FloatingChatWidget 
                         salesData={salesData}
                         kpi={kpi} 
@@ -1420,7 +1438,9 @@ ${topCustomersText}
                         topCustomers={topCustomers} 
                         selectedGroup={selectedGroup} 
                         filterMonth={filterMonth} 
-                        filterChannel={filterChannel} 
+                        filterChannel={filterChannel}
+                        trendChartData={trendChartData}
+                        channelMix={channelMix}
                     />
 
                     {showUpload && (
