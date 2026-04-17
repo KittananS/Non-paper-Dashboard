@@ -23,6 +23,19 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
+        
+        /* Chatbot specific scrollbar */
+        .chat-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .chat-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .chat-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        
         body {
             background-color: #f8fafc;
         }
@@ -96,7 +109,7 @@
             Upload, TrendingUp, Target, Users, DollarSign, LayoutDashboard, Activity,
             PieChart: PieIcon, X, Search, ChevronDown, Calendar, Layers, ShoppingBag, 
             Trophy, Medal, Store, ArrowLeft, Grid3X3, AlertCircle, MapPin, Lightbulb, Sparkles, ArrowRightCircle, Package, Check,
-            RefreshCw, Database, CheckCircle2, XCircle, Info, ArrowDown
+            RefreshCw, Database, CheckCircle2, XCircle, Info, ArrowDown, MessageCircle, Send, Bot
         } = LucideProxy;
 
         // --- Hooks ---
@@ -314,6 +327,213 @@
             );
         };
 
+        // --- AI Chat Widget Component ---
+        const FloatingChatWidget = ({ salesData, kpi, topPerformers, topCustomers, selectedGroup, filterMonth, filterChannel }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const [messages, setMessages] = useState([
+                { role: 'ai', content: 'สวัสดีครับ ผมคือ NPD Strategic AI Data Co-pilot ของคุณ ต้องการให้ผมวิเคราะห์ภาพรวมพอร์ตโฟลิโอ หรือเจาะลึกเฉพาะกลุ่มไหนเป็นพิเศษไหมครับ?' }
+            ]);
+            const [input, setInput] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const messagesEndRef = useRef(null);
+
+            const scrollToBottom = () => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            };
+
+            useEffect(() => {
+                if (isOpen) scrollToBottom();
+            }, [messages, isOpen]);
+
+            // Custom Markdown Parser for Bold (**) and Line breaks (\n)
+            const formatMessage = (text) => {
+                return text.split('\n').map((line, lineIdx) => (
+                    <div key={lineIdx} className="min-h-[1em] mb-1 last:mb-0">
+                        {line.split(/(\*\*.*?\*\*)/g).map((part, partIdx) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                                return <strong key={partIdx} className="font-extrabold text-blue-800">{part.slice(2, -2)}</strong>;
+                            }
+                            return <span key={partIdx}>{part}</span>;
+                        })}
+                    </div>
+                ));
+            };
+
+            const handleSend = async () => {
+                if (!input.trim() || isLoading) return;
+                const userMsg = input.trim();
+                setInput('');
+                setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+                setIsLoading(true);
+
+                // 1. Construct Global Data Context (Unfiltered)
+                const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
+                let global26 = 0, global25 = 0;
+                const groupPerf = {};
+                
+                salesData.forEach(d => {
+                    if (d.Year === '2026') {
+                        global26 += d.NetPrice;
+                        if(!groupPerf[d.ProductGroup]) groupPerf[d.ProductGroup] = { s26: 0, s25: 0 };
+                        groupPerf[d.ProductGroup].s26 += d.NetPrice;
+                    } else if (d.Year === '2025' && valid2026Months.has(d.Month?.split('-')[0])) {
+                        global25 += d.NetPrice;
+                        if(!groupPerf[d.ProductGroup]) groupPerf[d.ProductGroup] = { s26: 0, s25: 0 };
+                        groupPerf[d.ProductGroup].s25 += d.NetPrice;
+                    }
+                });
+
+                const globalYoY = global25 > 0 ? ((global26 - global25) / global25) * 100 : 0;
+                const groupDetails = Object.entries(groupPerf)
+                    .sort((a,b) => b[1].s26 - a[1].s26)
+                    .map(([g, v]) => {
+                        const yoy = v.s25 > 0 ? ((v.s26 - v.s25) / v.s25) * 100 : 'N/A';
+                        return `- ${g}: ฿${(v.s26/1000000).toFixed(2)}M (YoY: ${yoy !== 'N/A' ? yoy.toFixed(1) + '%' : 'N/A'})`;
+                    }).join('\n');
+
+                // 2. Construct Filtered View Context
+                const topProductsText = topPerformers.slice(0, 5).map((p, i) => `${i+1}. ${p.sku} (฿${(p.value/1000000).toFixed(2)}M, YoY: ${p.sales25 > 0 ? (((p.value-p.sales25)/p.sales25)*100).toFixed(1) : 'N/A'}%)`).join('\n');
+                const topCustomersText = topCustomers.slice(0, 5).map((c, i) => `${i+1}. ${c.name} (฿${(c.totalSales26/1000000).toFixed(2)}M, YoY: ${c.totalSales25 > 0 ? (((c.totalSales26-c.totalSales25)/c.totalSales25)*100).toFixed(1) : 'N/A'}%)`).join('\n');
+
+                const dataContext = `
+[1. GLOBAL PORTFOLIO OVERVIEW (ข้อมูลรวมทั้งหมดของบริษัท ไม่อิง Filter)]
+Total 2026 YTD: ฿${global26.toLocaleString()}
+Global YoY Growth: ${globalYoY.toFixed(1)}%
+Performance by Product Group:
+${groupDetails}
+
+[2. CURRENT FILTERED VIEW (ข้อมูลเฉพาะส่วนที่ User กำลังดูอยู่บนหน้าจอ)]
+Focus: Group=${selectedGroup}, Month=${filterMonth}, Channel=${filterChannel}
+Filtered YTD 2026: ฿${kpi.s26.toLocaleString()}
+Filtered YoY Growth: ${kpi.growthYoY.toFixed(1)}%
+Target Achieved: ${kpi.progress.toFixed(1)}%
+
+Top 5 Performers (Filtered View):
+${topProductsText}
+
+Top 5 Customers (Filtered View):
+${topCustomersText}
+                `;
+
+                const systemPrompt = `คุณคือ Executive AI Assistant ประจำแผนก NPD/FMCG
+บุคลิกของคุณ: กระชับ ตรงประเด็น, ทรงพลัง หนักแน่น, เป็นธรรมชาติ จริงใจ, ไม่อ้อมค้อมและไม่มีคำเยินยอใดๆ ทั้งสิ้น ใช้ KISS Principle เสมอ
+หน้าที่: วิเคราะห์และให้คำแนะนำโดยอ้างอิงจากข้อมูล Context ที่แนบมาให้ ซึ่งมีทั้งภาพรวมบริษัท (Global) และข้อมูลย่อย (Filtered)
+คำแนะนำในการตอบ: 
+- หากผู้ใช้ถามถึง "ภาพรวม" หรือเปรียบเทียบข้ามกลุ่ม ให้ดึงข้อมูลจาก [GLOBAL PORTFOLIO OVERVIEW] มาตอบ
+- หากผู้ใช้ถามถึงข้อมูลเฉพาะเจาะจงที่หน้าจอกำลังแสดงอยู่ ให้ใช้ [CURRENT FILTERED VIEW]
+ข้อห้าม: ห้ามแต่งข้อมูลตัวเลขเองเด็ดขาด ถ้าไม่รู้ให้ตอบว่าข้อมูลไม่เพียงพอ
+
+ใช้สัญลักษณ์ **ข้อความ** เมื่อต้องการเน้นคำสำคัญ (Bold)
+ตอบเป็นภาษาไทยทั้งหมด`;
+
+                try {
+                    const apiKey = ""; // API Key provided by execution environment
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: `ข้อมูลปัจจุบัน:\n${dataContext}\n\nคำถามจากผู้บริหาร: ${userMsg}` }] }],
+                            systemInstruction: { parts: [{ text: systemPrompt }] }
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error('API Error');
+                    const data = await response.json();
+                    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "ขออภัยครับ ไม่สามารถประมวลผลข้อมูลได้ในขณะนี้";
+                    
+                    setMessages(prev => [...prev, { role: 'ai', content: aiText }]);
+                } catch (error) {
+                    setMessages(prev => [...prev, { role: 'ai', content: "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ AI กรุณาลองใหม่อีกครั้งครับ" }]);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            return (
+                <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+                    {/* Chat Window */}
+                    {isOpen && (
+                        <div className="bg-white w-[380px] sm:w-[450px] h-[600px] max-h-[80vh] rounded-2xl shadow-2xl border border-slate-200 mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200">
+                            {/* Header */}
+                            <div className="bg-slate-900 text-white p-4 flex justify-between items-center shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-blue-500/20 p-2 rounded-lg"><Sparkles className="w-5 h-5 text-blue-400" /></div>
+                                    <div>
+                                        <h3 className="font-bold text-sm">NPD Strategic AI</h3>
+                                        <p className="text-[10px] text-slate-400">Data Co-pilot (Active)</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white transition-colors p-1"><X className="w-5 h-5" /></button>
+                            </div>
+                            
+                            {/* Messages */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 chat-scrollbar">
+                                {messages.map((msg, idx) => (
+                                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-slate-700 rounded-bl-none border border-slate-200'}`}>
+                                            {formatMessage(msg.content)}
+                                        </div>
+                                    </div>
+                                ))}
+                                {isLoading && (
+                                    <div className="flex justify-start">
+                                        <div className="bg-white border border-slate-200 text-slate-400 max-w-[85%] rounded-2xl rounded-bl-none px-4 py-3 text-sm shadow-sm flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div>
+                                            <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                                            <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                                        </div>
+                                    </div>
+                                )}
+                                <div ref={messagesEndRef} />
+                            </div>
+                            
+                            {/* Input */}
+                            <div className="p-3 bg-white border-t border-slate-200 shrink-0">
+                                <div className="relative flex items-center">
+                                    <input 
+                                        type="text" 
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                        placeholder="Ask about the dashboard..."
+                                        className="w-full bg-slate-100 border-none rounded-full py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                        disabled={isLoading}
+                                    />
+                                    <button 
+                                        onClick={handleSend}
+                                        disabled={isLoading || !input.trim()}
+                                        className="absolute right-2 p-1.5 text-blue-600 hover:bg-blue-50 rounded-full transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
+                                    >
+                                        <Send className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* FAB Button with Highlight */}
+                    <div className="relative">
+                        {!isOpen && (
+                            <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 flex items-center animate-in fade-in slide-in-from-right-4 duration-700 pointer-events-none">
+                                <div className="bg-slate-900 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap flex items-center gap-2 border border-slate-700">
+                                    <Sparkles className="w-4 h-4 text-blue-400 animate-pulse" /> 
+                                    Ask AI Co-pilot
+                                </div>
+                                <div className="w-2 h-2 bg-slate-900 rotate-45 -ml-1 border-r border-t border-slate-700"></div>
+                            </div>
+                        )}
+                        {!isOpen && <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-60"></div>}
+                        <button 
+                            onClick={() => setIsOpen(!isOpen)}
+                            className={`relative w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-transform hover:scale-105 z-10 ${isOpen ? 'bg-slate-800 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                        >
+                            {isOpen ? <X className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
         // --- Main Component ---
         function Dashboard() {
             const [salesData, setSalesData] = useState([]);
@@ -323,7 +543,7 @@
             const [selectedGroup, setSelectedGroup] = useState('ALL'); 
             const [showUpload, setShowUpload] = useState(false);
             const [isSyncing, setIsSyncing] = useState(false);
-            const [show2025Trend, setShow2025Trend] = useState(true); // New state for toggling 2025 data
+            const [show2025Trend, setShow2025Trend] = useState(true);
             
             // Search States
             const [topPerfSearch, setTopPerfSearch] = useState('');
@@ -553,7 +773,6 @@
                     return matchGroup && matchSub && matchChannel && matchMonth;
                 };
                 
-                // ใช้ฐานข้อมูลรวมปี 2026 เป็น Baseline YTD ដើម្បីให้เทียบข้อมูลกับ 2025 ได้ถูกต้องครบถ้วน
                 const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0])); 
                 
                 const data2026 = salesData.filter(d => d.Year === '2026' && filterFn(d));
@@ -679,7 +898,6 @@
                         if (!skuMap[key].products[pName]) skuMap[key].products[pName] = { val26: 0, val25: 0, channels: {} };
                         skuMap[key].products[pName].val26 += d.NetPrice;
 
-                        // Strategic Channel Tracking
                         const upperCh = d.Channel?.toUpperCase() || '';
                         const isSubChView = ['MT', 'INTER COMPANY', 'ONLINE', 'BJC'].includes(upperCh);
                         const channelName = isSubChView ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
@@ -739,7 +957,6 @@
                     }
                 });
                 
-                // แปลงเป็น Array พร้อมหา Top Products โดยใช้ Pareto Rule (80/20)
                 let list = Object.values(customerMap).filter(item => item.totalSales26 > 0 || item.totalSales25 > 0).map(item => {
                     const topProducts = getParetoTopItems(item.products || {});
                     return { ...item, topProducts };
@@ -822,60 +1039,6 @@
                 return { rows: sortedRows, columns, matrix, columnTotals, rowTotals };
             }, [salesData, selectedGroup, filterSubProduct, filterMonth, coverageDrillChannel, debouncedCoverageSearch]);
 
-            const dynamicRecommendations = useMemo(() => {
-                const isGrowthPositive = kpi.growthYoY >= 0; const topCh = channelMix.length > 0 ? channelMix[0].name : 'N/A'; const growthVal = Math.abs(kpi.growthYoY).toFixed(1);
-                let contextTitle = filterSubProduct !== 'All' ? filterSubProduct : (selectedGroup !== 'ALL' ? selectedGroup : 'Overview');
-                const valid2026MonthsSet = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
-                const monthlySales25 = {}; salesData.filter(d => d.Year === '2025' && (selectedGroup === 'ALL' || d.ProductGroup === selectedGroup)).forEach(d => { const m = d.Month?.split('-')[0]; if (m) monthlySales25[m] = (monthlySales25[m] || 0) + d.NetPrice; });
-                let peakMonth25 = ''; let maxSales25 = 0; Object.entries(monthlySales25).forEach(([m, s]) => { if (s > maxSales25) { maxSales25 = s; peakMonth25 = m; } });
-                const subProdYTD = {}; const channelYTD = {};
-                filteredData.forEach(d => {
-                    const monthPrefix = d.Month?.split('-')[0]; const isYTD25 = d.Year === '2025' && valid2026MonthsSet.has(monthPrefix);
-                    if (d.SubProductGroup) { if (!subProdYTD[d.SubProductGroup]) subProdYTD[d.SubProductGroup] = { s26: 0, s25: 0 }; if (d.Year === '2026') subProdYTD[d.SubProductGroup].s26 += d.NetPrice; else if (isYTD25) subProdYTD[d.SubProductGroup].s25 += d.NetPrice; }
-                    if (d.Channel) { if (!channelYTD[d.Channel]) channelYTD[d.Channel] = { s26: 0, s25: 0 }; if (d.Year === '2026') channelYTD[d.Channel].s26 += d.NetPrice; else if (isYTD25) channelYTD[d.Channel].s25 += d.NetPrice; }
-                });
-                const getTopGrowth = (dataObj, threshold) => { let top = { name: 'N/A', growth: -Infinity }; Object.entries(dataObj).forEach(([name, data]) => { if (data.s25 > threshold) { const growth = ((data.s26 - data.s25) / data.s25) * 100; if (growth > top.growth) top = { name, growth }; } }); return top; };
-                const topTrendingProduct = getTopGrowth(subProdYTD, 50000); const topTrendingChannel = getTopGrowth(channelYTD, 100000);
-                
-                const groupRecs = {
-                    'DACARE': [
-                        { head: "Premium Hygiene 2026", desc: "เทรนด์ปีนี้คือ Premium Hygiene ผู้บริโภคยอมจ่ายแพงเพื่อสินค้าที่ดูดีและอ่อนโยนกว่าเดิม" },
-                        { head: "Aging Society", desc: "ตลาดผู้สูงอายุโตต่อเนื่อง ดันสินค้า Wipes สำหรับผู้ใหญ่เข้า MT/Pharmacy ให้มากขึ้น" }
-                    ],
-                    'DAOS': [
-                        { head: "Smart Hybrid Work", desc: "สินค้าออฟฟิศต้องเบาและพกพาได้ ตอบโจทย์การทำงานแบบ Hybrid Work ที่ยังคงอยู่" },
-                        { head: "Green Office", desc: "B2B มองหา Green Supply Chain. ชูจุดขายสินค้ารักษ์โลกเพื่อปิดดีล Corporate ใหญ่" }
-                    ],
-                    'DABATTERY': [
-                        { head: "Channel Expansion", desc: "วิเคราะห์ช่องว่างการจัดจำหน่ายในช่องทาง MT และ Online เพื่อเพิ่ม Coverage ของสินค้ากลุ่มแบตเตอรี่" },
-                        { head: "Promotion Strategy", desc: "วางแผนทำ Bundle Pack หรือ Cross-promotion ร่วมกับสินค้ากลุ่มออฟฟิศ (DAOS) เพื่อเพิ่ม Basket Size" }
-                    ],
-                    'DASP': [
-                        { head: "Ergonomic Focus", desc: "ดันสินค้ากลุ่มที่ช่วยลดแรง (Force Reduction) ตอบโจทย์เทรนด์ออฟฟิศยุคใหม่" },
-                        { head: "Cross-Selling", desc: "จัดเซ็ตคู่กับกลุ่มกระดาษ (DAOS) หรือทำโปรโมชั่นระดับ Corporate เพื่อขยายพอร์ต" }
-                    ],
-                    'DANB': [
-                        { head: "Design Aesthetic", desc: "สมุดบันทึกและ Planner ยังมี Loyalty สูง เน้นดีไซน์ปกที่สะท้อน Lifestyle ของ Gen Z" },
-                        { head: "Seasonal Launch", desc: "เตรียมออกคอลเลกชันช่วง Back-to-School และ New Year Gifting" }
-                    ],
-                    'QUALITY': [
-                        { head: "Premium Segment", desc: "เจาะตลาดกระดาษ Premium สำหรับงานพิมพ์ระดับสูง ที่ผู้บริโภคเน้นคุณภาพมากกว่าราคา" },
-                        { head: "B2B Expansion", desc: "ขยายฐานลูกค้า Corporate ที่ต้องการงานนำเสนอหรือเอกสารที่ดูเป็นมืออาชีพ" }
-                    ],
-                    'DALIFESTYLE': [
-                        { head: "Eco-Lifestyle", desc: "ชูจุดขาย Eco-friendly สำหรับสินค้าไลฟ์สไตล์ (ถุงผ้า/แก้วน้ำ) ตอบโจทย์เทรนด์รักษ์โลก 2026" },
-                        { head: "Online Driven", desc: "ใช้ Social Commerce เป็นช่องทางหลักในการขายสินค้ากลุ่มนี้เพื่อเข้าถึงคนรุ่นใหม่" }
-                    ]
-                };
-
-                const items = selectedGroup !== 'ALL' && groupRecs[selectedGroup] ? groupRecs[selectedGroup] : [
-                    { head: "Peak Season & Momentum", desc: `ภาพรวม ${isGrowthPositive ? `โต +${growthVal}%` : `ติดลบ ${growthVal}%`} (Top Ch: ${topCh}). ข้อมูลปีที่แล้วชี้ว่าเดือน ${peakMonth25 || 'N/A'} คือช่วง High Season ของพอร์ตนี้ เตรียมแผน Supply Chain และ Marketing ให้พร้อมกอบโกยยอด` }, 
-                    { head: topTrendingProduct.growth > 0 ? `Hero Product: ${topTrendingProduct.name}` : "Margin Protection", desc: topTrendingProduct.growth > 0 ? `สินค้ากลุ่ม ${topTrendingProduct.name} โตกระโดด +${topTrendingProduct.growth.toFixed(1)}% YoY ดันขึ้นแท่นหัวหอกหลัก จัด Bundle Pack หรือเพิ่ม Visibility หน้าเชลฟ์เพื่อขยาย Basket Size ด่วน` : `ตลาดยังซึม แนะนำลด Focus การทำราคา แล้วหันมา Push สินค้า High Margin เพื่อรักษากำไรบรรทัดสุดท้าย (Bottom Line)` }, 
-                    { head: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `Rising Channel: ${topTrendingChannel.name}` : "Core Channel Defense", desc: topTrendingChannel.growth > 0 && topTrendingChannel.name !== topCh ? `ช่องทาง ${topTrendingChannel.name} โตทะลุเป้า +${topTrendingChannel.growth.toFixed(1)}% YoY เป็น Blue Ocean ที่ควรโยก Trade Budget บางส่วนมาอัดโปรโมชั่นดึงยอดเพิ่มทันที` : `รักษาส่วนแบ่งในช่องทางหลักอย่าง ${topCh} ให้แน่น ป้องกันคู่แข่งแย่งพื้นที่ Shelf และ Share of Voice` }
-                ];
-                return { title: `AI Strategic Insights: ${contextTitle}`, items };
-            }, [selectedGroup, filterSubProduct, kpi, channelMix, salesData, filteredData]);
-
             const BLUE_PALETTE = ['#1e3a8a', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
 
             const renderCustomLabel = (props) => {
@@ -901,7 +1064,7 @@
             };
 
             return (
-                <div ref={dashboardRef} className="bg-slate-50 min-h-screen font-sans text-slate-800 pb-10 w-full">
+                <div ref={dashboardRef} className="bg-slate-50 min-h-screen font-sans text-slate-800 pb-10 w-full relative">
                     <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
                         <div className="w-full px-6 py-3 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 min-h-[4rem]">
                             <div className="flex items-center gap-3 shrink-0">
@@ -1227,15 +1390,19 @@
                             <div className="overflow-x-auto custom-scrollbar max-h-[600px]"><table className="w-full text-sm text-left border-collapse min-w-[800px]"><thead className="sticky top-0 bg-slate-100 z-10 shadow-sm border-b border-slate-200"><tr><th className="py-4 px-4 font-bold text-slate-700 w-1/3 min-w-[250px]">Group SKU</th>{coverageGrid.columns.map(col => { const total = coverageGrid.columnTotals[col]; return (<th key={col} className={`py-4 px-3 font-bold text-center min-w-[120px] ${!coverageDrillChannel ? 'cursor-pointer hover:bg-blue-50 text-blue-600' : 'text-slate-700'}`} onClick={() => !coverageDrillChannel && setCoverageDrillChannel(col)}><div className="flex flex-col items-center"><div className="flex items-center gap-1.5 mb-1">{col} {!coverageDrillChannel && <ChevronDown className="w-3.5 h-3.5 opacity-60" />}</div><div className="text-xs font-semibold text-slate-500">฿{(total.sales/1000000).toFixed(1)}M</div><div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded mt-1 shadow-sm">{coverageDrillChannel ? <Package className="w-3 h-3 text-slate-400" /> : <Users className="w-3 h-3 text-slate-400" />} {total.count}</div></div></th>); })}</tr></thead><tbody>{coverageGrid.rows.map((sku, idx) => (<tr key={sku} className={`border-b border-slate-100 hover:bg-blue-50/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}><td className="py-3 px-4 font-semibold text-slate-800 truncate max-w-[250px]"><div className="text-sm">{sku}</div><div className="text-xs text-slate-500 font-medium mt-1">Total Avail: {coverageGrid.rowTotals[sku] || 0}</div></td>{coverageGrid.columns.map(col => { const data = coverageGrid.matrix[sku][col] || { sales: 0, count: 0 }; return (<td key={col} className="py-3 px-3 text-center border-l border-slate-50">{data.count === 0 ? <span className="text-slate-300 text-lg">-</span> : (coverageDrillChannel ? <Check className="w-5 h-5 text-green-500 mx-auto" /> : <div className="flex flex-col items-center gap-1"><span className="font-medium text-slate-600 text-xs">฿{(data.sales/1000000).toFixed(2)}M</span><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 border border-blue-200"><Users className="w-2.5 h-2.5" /> {data.count}</span></div>)}</td>); })}</tr>))}</tbody></table></div>
                         </div>
 
-                        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 rounded-xl shadow-lg text-white mt-8 border border-slate-700">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 border-b border-slate-700/50 pb-6 gap-4">
-                                <div className="flex items-center gap-4"><div className="bg-blue-500/20 p-3 rounded-xl border border-blue-500/30"><Sparkles className="w-8 h-8 text-blue-400" /></div><div><h2 className="text-xl font-semibold">{dynamicRecommendations.title}</h2><p className="text-sm text-slate-300">Generated based on real-time sales performance</p></div></div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{dynamicRecommendations.items.map((item, idx) => (<div key={idx} className="bg-slate-800/60 p-5 rounded-xl border border-slate-600 hover:border-blue-400/50 hover:bg-slate-700 transition-all duration-300 group"><h3 className="text-base font-semibold text-blue-300 mb-3 flex items-center gap-2"><Lightbulb className="w-5 h-5" /> {item.head}</h3><p className="text-sm text-slate-200 leading-relaxed">{item.desc}</p></div>))}</div>
-                        </div>
-
                         <footer className="w-full text-center pt-8 pb-4 text-slate-400 font-medium text-sm">Developed by NPD Team - Version 1.1</footer>
                     </main>
+
+                    {/* Inject Floating AI Widget */}
+                    <FloatingChatWidget 
+                        salesData={salesData}
+                        kpi={kpi} 
+                        topPerformers={topPerformers} 
+                        topCustomers={topCustomers} 
+                        selectedGroup={selectedGroup} 
+                        filterMonth={filterMonth} 
+                        filterChannel={filterChannel} 
+                    />
 
                     {showUpload && (
                         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-md">
