@@ -327,6 +327,24 @@
             );
         };
 
+        // --- Image Fallback Component ---
+        const ImageWithFallback = ({ src, alt, className, onClick, title }) => {
+            const [error, setError] = useState(false);
+            if (error) {
+                // Render faint gray text placeholder if image fails to load
+                return (
+                    <div 
+                        className={`flex items-center justify-center text-slate-300 font-bold text-center select-none tracking-wide ${className.includes('h-32') ? 'text-sm h-32 w-full mb-4' : 'text-[9px] h-10 w-full p-1 bg-slate-50/50 rounded-md border border-slate-100'} ${onClick ? 'cursor-pointer hover:bg-slate-100 transition-colors' : ''}`}
+                        onClick={onClick}
+                        title={title || alt}
+                    >
+                        {alt}
+                    </div>
+                );
+            }
+            return <img src={src} alt={alt} className={className} onClick={onClick} title={title} onError={() => setError(true)} />;
+        };
+
         // --- AI Chat Widget Component ---
         const FloatingChatWidget = ({ salesData, kpi, topPerformers, topCustomers, selectedGroup, filterMonth, filterChannel, trendChartData, channelMix }) => {
             const [isOpen, setIsOpen] = useState(false);
@@ -548,25 +566,13 @@ ${topCustomersText || 'N/A'}
                         </div>
                     )}
 
-                    {/* FAB Button with Highlight */}
-                    <div className="relative">
-                        {!isOpen && (
-                            <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 flex items-center animate-in fade-in slide-in-from-right-4 duration-700 pointer-events-none">
-                                <div className="bg-slate-900 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap flex items-center gap-2 border border-slate-700">
-                                    <Sparkles className="w-4 h-4 text-blue-400 animate-pulse" /> 
-                                    Ask AI Co-pilot
-                                </div>
-                                <div className="w-2 h-2 bg-slate-900 rotate-45 -ml-1 border-r border-t border-slate-700"></div>
-                            </div>
-                        )}
-                        {!isOpen && <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-60"></div>}
-                        <button 
-                            onClick={() => setIsOpen(!isOpen)}
-                            className={`relative w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-transform hover:scale-105 z-10 ${isOpen ? 'bg-slate-800 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-                        >
-                            {isOpen ? <X className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
-                        </button>
-                    </div>
+                    {/* FAB Button */}
+                    <button 
+                        onClick={() => setIsOpen(!isOpen)}
+                        className={`w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-transform hover:scale-105 z-10 ${isOpen ? 'bg-slate-800 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                    >
+                        {isOpen ? <X className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
+                    </button>
                 </div>
             );
         };
@@ -1141,10 +1147,10 @@ ${topCustomersText || 'N/A'}
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center h-full relative overflow-hidden group">
                                 <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none"></div>
                                 <div className="relative z-10 w-full flex flex-col h-full justify-center">
-                                    {selectedGroup !== 'ALL' && <img src={getImgFilename(selectedGroup)} alt={selectedGroup} className="w-full h-32 object-contain mb-4" />}
+                                    {selectedGroup !== 'ALL' && <ImageWithFallback src={getImgFilename(selectedGroup)} alt={selectedGroup} className="w-full h-32 object-contain mb-4" />}
                                     {selectedGroup === 'ALL' && (
                                         <div className="grid grid-cols-3 gap-2 w-full h-auto max-h-32 mb-4 overflow-y-auto custom-scrollbar place-items-center">
-                                            {GROUP_ORDER.map(g => <img key={g} src={getImgFilename(g)} alt={g} className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup(g)} title={g} />)}
+                                            {GROUP_ORDER.map(g => <ImageWithFallback key={g} src={getImgFilename(g)} alt={g} className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup(g)} title={g} />)}
                                         </div>
                                     )}
                                     <div className="text-sm font-bold text-slate-800 bg-white/80 backdrop-blur border border-slate-200 px-4 py-2 rounded-lg text-center mt-auto w-full truncate shadow-sm">
