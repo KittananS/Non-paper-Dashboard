@@ -350,7 +350,7 @@
             const [isOpen, setIsOpen] = useState(false);
             const [isExpanded, setIsExpanded] = useState(false);
             const [messages, setMessages] = useState([
-                { role: 'ai', content: 'สวัสดีครับ ผมคือ NPD Strategic AI Data Co-pilot ของคุณ ต้องการให้ผมวิเคราะห์ภาพรวมพอร์ตโฟลิโอ หรือเจาะลึกเฉพาะกลุ่มไหนเป็นพิเศษไหมครับ?\n\n**หากต้องการใช้ Feature นี้ เข้าไปใช้ที่ Link :** https://gemini.google.com/share/6ec46ec7b5bc' }
+                { role: 'ai', content: 'สวัสดีครับ ผมคือ NPD Strategic AI Data Co-pilot ของคุณ ต้องการให้ผมวิเคราะห์ภาพรวมพอร์ตโฟลิโอ หรือเจาะลึกเฉพาะกลุ่มไหนเป็นพิเศษไหมครับ?\n\nหากต้องการใช้ Feature นี้ เข้าไปใช้ที่ Link : https://gemini.google.com/share/23cfce395c0e' }
             ]);
             const [input, setInput] = useState('');
             const [isLoading, setIsLoading] = useState(false);
@@ -413,14 +413,23 @@
                 for (let i = 0; i < lines.length; i++) {
                     let line = lines[i].trim();
 
-                    // Table Detection
-                    if (line.startsWith('|') && line.endsWith('|')) {
+                    // Table Detection (Robust parsing to catch messy LLM dividers like ---::---:---)
+                    const isDividerRow = /^[\s|:\-]{3,}$/.test(line) && line.includes('-');
+                    
+                    if (isDividerRow) {
                         inTable = true;
-                        // Skip table divider rows (e.g., |---|---|)
-                        const isDivider = /^\|[\s\-:]+\|$/.test(line);
-                        if (isDivider) continue;
+                        continue; // ทิ้งบรรทัดขยะ ไม่นำไป Render
+                    }
 
-                        const cells = line.split('|').slice(1, -1).map(c => c.trim());
+                    const isTableRow = line.startsWith('|') || line.endsWith('|') || (inTable && line.includes('|'));
+
+                    if (isTableRow) {
+                        inTable = true;
+                        let cleanLine = line;
+                        if (cleanLine.startsWith('|')) cleanLine = cleanLine.substring(1);
+                        if (cleanLine.endsWith('|')) cleanLine = cleanLine.substring(0, cleanLine.length - 1);
+                        
+                        const cells = cleanLine.split('|').map(c => c.trim());
                         if (!tableHeader) {
                             tableHeader = cells;
                         } else {
