@@ -349,7 +349,7 @@
         const FloatingChatWidget = ({ salesData, kpi, topPerformers, topCustomers, selectedGroup, filterMonth, filterChannel, trendChartData, channelMix }) => {
             const [isOpen, setIsOpen] = useState(false);
             const [messages, setMessages] = useState([
-                { role: 'ai', content: 'สวัสดีครับ ผมคือ NPD Strategic AI Data Co-pilot ของคุณ ต้องการให้ผมวิเคราะห์ภาพรวมพอร์ตโฟลิโอ หรือเจาะลึกเฉพาะกลุ่มไหนเป็นพิเศษไหมครับ?' }
+                { role: 'ai', content: 'สวัสดีครับ ผมคือ NPD Strategic AI Data Co-pilot ของคุณ ต้องการให้ผมวิเคราะห์ภาพรวมพอร์ตโฟลิโอ หรือเจาะลึกเฉพาะกลุ่มไหนเป็นพิเศษไหมครับ?\n\n**หากต้องการใช้ Feature นี้ เข้าไปใช้ที่ Link : https://gemini.google.com/share/d9e55e71abd5**' }
             ]);
             const [input, setInput] = useState('');
             const [isLoading, setIsLoading] = useState(false);
