@@ -355,7 +355,7 @@
             const [isGemini3Available, setIsGemini3Available] = useState(false);
 
             const [messages, setMessages] = useState([
-                { role: 'ai', content: 'สวัสดีครับ ผมคือ NPD Strategic AI Data Co-pilot ของคุณ ต้องการให้ผมวิเคราะห์ภาพรวมพอร์ตโฟลิโอ หรือเจาะลึกเฉพาะกลุ่มไหนเป็นพิเศษไหมครับ?\n\nหากต้องการใช้ Feature นี้ เข้าไปใช้ที่ Link : https://gemini.google.com/share/b3bf34abbe28\n**ถ้าอยู่ในหน้า Gemini แล้วไม่ต้อง Click ซ้ำ**' }
+                { role: 'ai', content: 'สวัสดีครับ ผมคือ NPD Strategic AI Data Co-pilot ของคุณ ต้องการให้ผมวิเคราะห์ภาพรวมพอร์ตโฟลิโอ หรือเจาะลึกเฉพาะกลุ่มไหนเป็นพิเศษไหมครับ?\n\nหากต้องการใช้ Feature นี้ เข้าไปใช้ที่ Link : https://gemini.google.com/share/b91151524d37\n**ถ้าอยู่ในหน้า Gemini แล้วไม่ต้อง Click ซ้ำ**' }
             ]);
             const [input, setInput] = useState('');
             const [isLoading, setIsLoading] = useState(false);
@@ -685,7 +685,9 @@ ${topCustomersText || 'N/A'}
             const [budgetChannel, setBudgetChannel] = useState([]);
             const [budgetProduct, setBudgetProduct] = useState([]);
             
-            const [selectedGroup, setSelectedGroup] = useState('ALL'); 
+            // Multiple Selection State
+            const [selectedGroups, setSelectedGroups] = useState(['ALL']); 
+            
             const [showUpload, setShowUpload] = useState(false);
             const [isSyncing, setIsSyncing] = useState(false);
             const [show2025Trend, setShow2025Trend] = useState(true);
@@ -863,8 +865,26 @@ ${topCustomersText || 'N/A'}
                 syncAllData();
             }, []);
 
+            // Multiple Selection Logic Function
+            const toggleGroup = (group) => {
+                if (group === 'ALL') {
+                    setSelectedGroups(['ALL']);
+                } else {
+                    let newGroups = selectedGroups.filter(g => g !== 'ALL');
+                    if (newGroups.includes(group)) {
+                        newGroups = newGroups.filter(g => g !== group);
+                        if (newGroups.length === 0) newGroups = ['ALL'];
+                    } else {
+                        newGroups.push(group);
+                    }
+                    newGroups.sort((a, b) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b));
+                    setSelectedGroups(newGroups);
+                }
+                setFilterSubProduct('All');
+            };
+
             const availableSubProducts = useMemo(() => {
-                const base = selectedGroup === 'ALL' ? salesData : salesData.filter(d => d.ProductGroup === selectedGroup);
+                const base = selectedGroups.includes('ALL') ? salesData : salesData.filter(d => selectedGroups.includes(d.ProductGroup));
                 const subProdMap = new Map();
                 base.forEach(d => {
                     if (d.SubProductGroup && !subProdMap.has(d.SubProductGroup)) {
@@ -879,10 +899,10 @@ ${topCustomersText || 'N/A'}
                     return a.val.localeCompare(b.val);
                 });
                 return list;
-            }, [salesData, selectedGroup]);
+            }, [salesData, selectedGroups]);
 
             const availableChannels = useMemo(() => {
-                const base = selectedGroup === 'ALL' ? salesData : salesData.filter(d => d.ProductGroup === selectedGroup);
+                const base = selectedGroups.includes('ALL') ? salesData : salesData.filter(d => selectedGroups.includes(d.ProductGroup));
                 const channelSalesMap = {};
                 base.forEach(d => {
                     const ch = d.Channel;
@@ -895,23 +915,23 @@ ${topCustomersText || 'N/A'}
                     .map(([name, sales]) => ({ name, sales }))
                     .sort((a, b) => b.sales - a.sales)
                     .map(item => item.name);
-            }, [salesData, selectedGroup]);
+            }, [salesData, selectedGroups]);
 
             const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
             const filteredData = useMemo(() => {
                 return salesData.filter(d => {
-                    const matchGroup = selectedGroup === 'ALL' || d.ProductGroup === selectedGroup;
+                    const matchGroup = selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup);
                     const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
                     const matchChannel = filterChannel === 'All' || d.Channel === filterChannel;
                     const matchMonth = filterMonth === 'All' || (d.Month && d.Month.startsWith(filterMonth));
                     return matchGroup && matchSub && matchChannel && matchMonth;
                 });
-            }, [salesData, selectedGroup, filterSubProduct, filterChannel, filterMonth]);
+            }, [salesData, selectedGroups, filterSubProduct, filterChannel, filterMonth]);
 
             const kpi = useMemo(() => {
                 const filterFn = (d) => {
-                    const matchGroup = selectedGroup === 'ALL' || d.ProductGroup === selectedGroup;
+                    const matchGroup = selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup);
                     const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
                     const matchChannel = filterChannel === 'All' || d.Channel === filterChannel;
                     const matchMonth = filterMonth === 'All' || (d.Month && d.Month.startsWith(filterMonth));
@@ -935,7 +955,7 @@ ${topCustomersText || 'N/A'}
 
                 if (isSubFiltered && isChannelFiltered) { target26 = null; forecast26 = null; plan27 = null; }
                 else if (isSubFiltered) {
-                    const relevant = budgetProduct.filter(b => (selectedGroup === 'ALL' || b.ProductGroup === selectedGroup) && b.SubProductGroup === filterSubProduct);
+                    const relevant = budgetProduct.filter(b => (selectedGroups.includes('ALL') || selectedGroups.includes(b.ProductGroup)) && b.SubProductGroup === filterSubProduct);
                     if (relevant.length === 0) { target26 = null; forecast26 = null; plan27 = null; }
                     else { 
                         target26 = relevant.reduce((a,b) => a + b.Target2026, 0); 
@@ -943,7 +963,7 @@ ${topCustomersText || 'N/A'}
                         plan27 = relevant.reduce((a,b) => a + b.Plan2027, 0); 
                     }
                 } else if (isChannelFiltered) {
-                    const relevant = budgetChannel.filter(b => (selectedGroup === 'ALL' || b.ProductGroup === selectedGroup) && b.Channel === filterChannel);
+                    const relevant = budgetChannel.filter(b => (selectedGroups.includes('ALL') || selectedGroups.includes(b.ProductGroup)) && b.Channel === filterChannel);
                     if (relevant.length === 0) { target26 = null; forecast26 = null; plan27 = null; }
                     else { 
                         target26 = relevant.reduce((a,b) => a + b.Target2026, 0); 
@@ -951,7 +971,7 @@ ${topCustomersText || 'N/A'}
                         plan27 = relevant.reduce((a,b) => a + b.Plan2027, 0); 
                     }
                 } else {
-                    const relevant = budgetChannel.filter(b => (selectedGroup === 'ALL' || b.ProductGroup === selectedGroup));
+                    const relevant = budgetChannel.filter(b => (selectedGroups.includes('ALL') || selectedGroups.includes(b.ProductGroup)));
                     target26 = relevant.reduce((a,b) => a + b.Target2026, 0); 
                     forecast26 = relevant.reduce((a,b) => a + b.Forecast2026, 0); 
                     plan27 = relevant.reduce((a,b) => a + b.Plan2027, 0);
@@ -959,13 +979,13 @@ ${topCustomersText || 'N/A'}
                 const progress = (target26 && target26 > 0) ? (s26 / target26) * 100 : 0;
             const growthPlan = (target26 && plan27 && target26 > 0) ? ((plan27 - target26) / target26) * 100 : 0;
             return { s26, s25_YTD, growthYoY, target26, forecast26, plan27, progress, growthPlan };
-        }, [salesData, budgetChannel, budgetProduct, selectedGroup, filterSubProduct, filterChannel, filterMonth]);
+        }, [salesData, budgetChannel, budgetProduct, selectedGroups, filterSubProduct, filterChannel, filterMonth]);
 
             const trendChartData = useMemo(() => {
                 const base2025 = filteredData.filter(d => d.Year === '2025');
                 const base2026 = filteredData.filter(d => d.Year === '2026');
                 
-                if (selectedGroup === 'ALL') {
+                if (selectedGroups.includes('ALL')) {
                     return monthsList.map(m => {
                         const m25 = base2025.filter(d => d.Month.startsWith(m));
                         const m26 = base2026.filter(d => d.Month.startsWith(m));
@@ -1004,11 +1024,11 @@ ${topCustomersText || 'N/A'}
                         return { name: m, '2025': val2025, '2026': val2026 === 0 ? null : val2026 };
                     });
                 }
-            }, [salesData, filteredData, selectedGroup, filterSubProduct, filterChannel]);
+            }, [salesData, filteredData, selectedGroups, filterSubProduct, filterChannel]);
 
             const yAxisTicks = useMemo(() => {
                 const maxVal = trendChartData.reduce((max, d) => {
-                    if (selectedGroup === 'ALL') return Math.max(max, d.total25 || 0, d.total26 || 0);
+                    if (selectedGroups.includes('ALL')) return Math.max(max, d.total25 || 0, d.total26 || 0);
                     else return Math.max(max, d['2025'] || 0, d['2026'] || 0);
                 }, 0);
                 if (maxVal === 0) return [0, 5000000];
@@ -1023,7 +1043,7 @@ ${topCustomersText || 'N/A'}
                 const ticks = [];
                 for (let current = 0; current <= maxTick + (step * 0.1); current += step) ticks.push(current);
                 return ticks;
-            }, [trendChartData, selectedGroup]);
+            }, [trendChartData, selectedGroups]);
 
             const channelMix = useMemo(() => {
                 const data = {};
@@ -1131,7 +1151,7 @@ ${topCustomersText || 'N/A'}
                 const selectedMonthIndex = filterMonth === 'All' ? 11 : monthsList.indexOf(filterMonth);
                 const base2026 = salesData.filter(d => {
                     const matchYear = d.Year === '2026';
-                    const matchGroup = selectedGroup === 'ALL' || d.ProductGroup === selectedGroup;
+                    const matchGroup = selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup);
                     let matchMonth = true;
                     if (filterMonth !== 'All' && d.Month) {
                         const recordMonthIndex = monthsList.findIndex(m => d.Month.startsWith(m));
@@ -1182,7 +1202,7 @@ ${topCustomersText || 'N/A'}
                 sortedRows.forEach(sku => { columns.forEach(col => { if (cellUniqueItems[sku]?.[col]) { const count = coverageDrillChannel ? (matrix[sku][col].sales > 0 ? 1 : 0) : cellUniqueItems[sku][col].size; matrix[sku][col].count = count; rowTotals[sku] += count; } else matrix[sku][col] = { sales: 0, count: 0 }; }); });
                 columns.forEach(col => { columnTotals[col] = { sales: colSalesForHeader[col], count: coverageDrillChannel ? sortedRows.filter(s => matrix[s][col] && matrix[s][col].sales > 0).length : colUniqueItemsForHeader[col].size }; });
                 return { rows: sortedRows, columns, matrix, columnTotals, rowTotals };
-            }, [salesData, selectedGroup, filterSubProduct, filterMonth, coverageDrillChannel, debouncedCoverageSearch]);
+            }, [salesData, selectedGroups, filterSubProduct, filterMonth, coverageDrillChannel, debouncedCoverageSearch]);
 
             const BLUE_PALETTE = ['#1e3a8a', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
 
@@ -1218,11 +1238,18 @@ ${topCustomersText || 'N/A'}
                             </div>
                             <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto justify-start xl:justify-end">
                                 <div className="flex flex-wrap bg-slate-800 rounded-md p-1 gap-1">
-                                    {['ALL', ...GROUP_ORDER].map(group => (
-                                        <button key={group} onClick={() => { setSelectedGroup(group); setFilterSubProduct('All'); }} className={`px-4 py-1.5 text-sm font-semibold rounded transition-all ${selectedGroup === group ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-white'}`}>
-                                            {group}
-                                        </button>
-                                    ))}
+                                    {['ALL', ...GROUP_ORDER].map(group => {
+                                        const isSelected = selectedGroups.includes(group);
+                                        return (
+                                            <button 
+                                                key={group} 
+                                                onClick={() => toggleGroup(group)} 
+                                                className={`px-4 py-1.5 text-sm font-semibold rounded transition-all ${isSelected ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'}`}
+                                            >
+                                                {group}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                                 <button onClick={() => syncAllData()} disabled={isSyncing} className={`flex items-center gap-2 text-white px-4 py-2 rounded text-sm font-semibold transition-colors shrink-0 ${isSyncing ? 'bg-blue-800 opacity-80 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>
                                     <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} /> <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
@@ -1235,8 +1262,8 @@ ${topCustomersText || 'N/A'}
                                 <FilterDropdown label="Product" value={filterSubProduct} options={[{val: 'All', group: null}, ...availableSubProducts]} onChange={setFilterSubProduct} icon={<ShoppingBag className="w-4 h-4" />} />
                                 <FilterDropdown label="Channel" value={filterChannel} options={['All', ...availableChannels]} onChange={setFilterChannel} icon={<Users className="w-4 h-4" />} />
                                 <FilterDropdown label="Month" value={filterMonth} options={['All', ...monthsList]} onChange={setFilterMonth} icon={<Calendar className="w-4 h-4" />} />
-                                {(filterSubProduct !== 'All' || filterChannel !== 'All' || filterMonth !== 'All') && (
-                                    <button onClick={() => { setFilterSubProduct('All'); setFilterChannel('All'); setFilterMonth('All'); }} className="text-sm text-red-600 hover:text-red-800 font-semibold ml-auto flex items-center gap-1 px-3 py-1.5 border border-red-200 rounded bg-red-50 hover:bg-red-100 transition-colors">
+                                {(filterSubProduct !== 'All' || filterChannel !== 'All' || filterMonth !== 'All' || !selectedGroups.includes('ALL')) && (
+                                    <button onClick={() => { setSelectedGroups(['ALL']); setFilterSubProduct('All'); setFilterChannel('All'); setFilterMonth('All'); }} className="text-sm text-red-600 hover:text-red-800 font-semibold ml-auto flex items-center gap-1 px-3 py-1.5 border border-red-200 rounded bg-red-50 hover:bg-red-100 transition-colors">
                                         <X className="w-4 h-4" /> Reset Filters
                                     </button>
                                 )}
@@ -1249,14 +1276,18 @@ ${topCustomersText || 'N/A'}
                             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center h-full relative overflow-hidden group">
                                 <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none"></div>
                                 <div className="relative z-10 w-full flex flex-col h-full justify-center">
-                                    {selectedGroup !== 'ALL' && <ImageWithFallback src={getImgFilename(selectedGroup)} alt={selectedGroup} className="w-full h-32 object-contain mb-4" />}
-                                    {selectedGroup === 'ALL' && (
+                                    {!selectedGroups.includes('ALL') && selectedGroups.length === 1 && (
+                                        <ImageWithFallback src={getImgFilename(selectedGroups[0])} alt={selectedGroups[0]} className="w-full h-32 object-contain mb-4" />
+                                    )}
+                                    {(selectedGroups.includes('ALL') || selectedGroups.length > 1) && (
                                         <div className="grid grid-cols-3 gap-2 w-full h-auto max-h-32 mb-4 overflow-y-auto custom-scrollbar place-items-center">
-                                            {GROUP_ORDER.map(g => <ImageWithFallback key={g} src={getImgFilename(g)} alt={g} className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => setSelectedGroup(g)} title={g} />)}
+                                            {(selectedGroups.includes('ALL') ? GROUP_ORDER : selectedGroups).map(g => (
+                                                <ImageWithFallback key={g} src={getImgFilename(g)} alt={g} className="h-10 w-auto object-contain drop-shadow-sm hover:scale-105 transition-transform cursor-pointer" onClick={() => toggleGroup(g)} title={g} />
+                                            ))}
                                         </div>
                                     )}
                                     <div className="text-sm font-bold text-slate-800 bg-white/80 backdrop-blur border border-slate-200 px-4 py-2 rounded-lg text-center mt-auto w-full truncate shadow-sm">
-                                        {selectedGroup === 'ALL' ? 'TOTAL PORTFOLIO' : selectedGroup}
+                                        {selectedGroups.includes('ALL') ? 'TOTAL PORTFOLIO' : selectedGroups.join(' + ')}
                                     </div>
                                 </div>
                             </div>
@@ -1287,7 +1318,7 @@ ${topCustomersText || 'N/A'}
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-base font-bold text-slate-700 flex items-center gap-2">
                                         <TrendingUp className="w-5 h-5 text-blue-600" /> 
-                                        {selectedGroup === 'ALL' ? '2026 Monthly Trend (Stacked YoY)' : 'Sales Trend 2025 vs 2026'}
+                                        {selectedGroups.includes('ALL') ? '2026 Monthly Trend (Stacked YoY)' : 'Sales Trend 2025 vs 2026'}
                                     </h3>
                                     <button 
                                         onClick={() => setShow2025Trend(!show2025Trend)}
@@ -1298,7 +1329,7 @@ ${topCustomersText || 'N/A'}
                                 </div>
                                 <div className="h-72">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        {selectedGroup === 'ALL' ? (
+                                        {selectedGroups.includes('ALL') ? (
                                             <ComposedChart data={trendChartData} barGap={4} maxBarSize={36}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                                 <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 500, fill: '#64748b'}} axisLine={false} tickLine={false} />
@@ -1544,7 +1575,7 @@ ${topCustomersText || 'N/A'}
                         kpi={kpi} 
                         topPerformers={topPerformers} 
                         topCustomers={topCustomers} 
-                        selectedGroup={selectedGroup} 
+                        selectedGroup={selectedGroups.includes('ALL') ? 'ALL' : selectedGroups.join(' + ')} 
                         filterMonth={filterMonth} 
                         filterChannel={filterChannel}
                         trendChartData={trendChartData}
