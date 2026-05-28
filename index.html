@@ -109,7 +109,7 @@
             Upload, TrendingUp, Target, Users, DollarSign, LayoutDashboard, Activity,
             PieChart: PieIcon, X, Search, ChevronDown, Calendar, Layers, ShoppingBag, 
             Trophy, Medal, Store, ArrowLeft, Grid3X3, AlertCircle, MapPin, Lightbulb, Sparkles, ArrowRightCircle, Package, Check,
-            RefreshCw, Database, CheckCircle2, XCircle, Info, ArrowDown, MessageCircle, Send, Bot, Maximize2, Minimize2
+            RefreshCw, Database, CheckCircle2, XCircle, Info, ArrowDown, MessageCircle, Send, Bot, Maximize2, Minimize2, Eye, EyeOff
         } = LucideProxy;
 
         // --- Hooks ---
@@ -691,6 +691,7 @@ ${topCustomersText || 'N/A'}
             const [showUpload, setShowUpload] = useState(false);
             const [isSyncing, setIsSyncing] = useState(false);
             const [show2025Trend, setShow2025Trend] = useState(true);
+            const [showForecast, setShowForecast] = useState(false); // Default hide forecast
             
             // Search States
             const [topPerfSearch, setTopPerfSearch] = useState('');
@@ -1341,27 +1342,48 @@ ${topCustomersText || 'N/A'}
 
                             <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.forecast26 === null ? 'opacity-70 grayscale' : ''}`}>
                                 <div className="flex justify-between items-start mb-2">
-                                    <span className="text-sm font-bold text-slate-500 uppercase">Forecast 2026</span>
-                                    <TrendingUp className="w-5 h-5 text-orange-600" />
+                                    <div className="flex items-center gap-1.5 group cursor-help relative">
+                                        <span className="text-sm font-bold text-slate-500 uppercase">Forecast 2026</span>
+                                        <Info className="w-4 h-4 text-slate-400" />
+                                        {/* Dynamic Forecast Tooltip */}
+                                        <div className="absolute top-full left-0 mt-1 w-64 p-3 bg-slate-800 text-white text-xs leading-relaxed rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 font-normal whitespace-normal border border-slate-700 pointer-events-none">
+                                            <span className="font-bold text-blue-300">วิธีคำนวณ (Dynamic Projection):</span><br/>
+                                            อิงยอดขายสะสมปัจจุบันเทียบกับสัดส่วนฤดูกาล (Seasonality) ของปี 2025 ในช่วงเวลาเดียวกัน<br/><br/>
+                                            <span className="text-slate-400 italic">*หากไม่มีประวัติ จะใช้สมการ Linear Run Rate อัตโนมัติ</span>
+                                        </div>
+                                    </div>
+                                    {kpi.forecast26 !== null && (
+                                        <button onClick={() => setShowForecast(!showForecast)} className="text-slate-400 hover:text-blue-600 transition-colors bg-slate-50 hover:bg-blue-50 p-1.5 rounded-md border border-slate-200">
+                                            {showForecast ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    )}
                                 </div>
                                 <div>
                                     {kpi.forecast26 !== null ? (
-                                        <>
-                                            <h3 className={`text-3xl font-bold ${kpi.forecastStatus?.isMissing ? 'text-orange-600' : 'text-slate-800'}`}>
-                                                {kpi.forecast26 === 0 ? 'TBC' : `฿${kpi.forecast26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
-                                            </h3>
-                                            <div className="flex items-center gap-1.5 mt-2">
-                                                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                                                <span className="text-xs text-slate-500 font-semibold tracking-wide">
-                                                    Data-Driven Projection 
-                                                    {kpi.forecastStatus && (
-                                                        <span className={kpi.forecastStatus.isMissing ? 'text-orange-600 font-bold ml-1' : 'text-green-600 font-bold ml-1'}>
-                                                            ({kpi.forecastStatus.percent.toFixed(1)}% of Target)
-                                                        </span>
-                                                    )}
-                                                </span>
+                                        showForecast ? (
+                                            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                                <h3 className={`text-3xl font-bold ${kpi.forecastStatus?.isMissing ? 'text-orange-600' : 'text-slate-800'}`}>
+                                                    {kpi.forecast26 === 0 ? 'TBC' : `฿${kpi.forecast26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
+                                                </h3>
+                                                <div className="flex items-center gap-1.5 mt-2">
+                                                    <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                                                    <span className="text-xs text-slate-500 font-semibold tracking-wide">
+                                                        Data-Driven Projection 
+                                                        {kpi.forecastStatus && (
+                                                            <span className={kpi.forecastStatus.isMissing ? 'text-orange-600 font-bold ml-1' : 'text-green-600 font-bold ml-1'}>
+                                                                ({kpi.forecastStatus.percent.toFixed(1)}% of Target)
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </>
+                                        ) : (
+                                            <div className="flex flex-col justify-center h-[68px]">
+                                                <button onClick={() => setShowForecast(true)} className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors bg-slate-100 hover:bg-slate-200 border border-slate-200 px-4 py-2.5 rounded-lg w-full border-dashed shadow-sm">
+                                                    <Eye className="w-4 h-4" /> Tap to reveal
+                                                </button>
+                                            </div>
+                                        )
                                     ) : (
                                         <div className="text-3xl font-semibold text-slate-300">N/A</div>
                                     )}
