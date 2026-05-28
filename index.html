@@ -953,6 +953,14 @@ ${topCustomersText || 'N/A'}
                 const isSubFiltered = filterSubProduct !== 'All';
                 const isChannelFiltered = filterChannel !== 'All';
 
+                // Для Forecasting 2026 ให้คำนวณจากยอดทั้งปีที่ไม่มีการ Filter เดือน
+                const filterFnIgnoreMonth = (d) => {
+                    const matchGroup = selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup);
+                    const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
+                    const matchChannel = filterChannel === 'All' || d.Channel === filterChannel;
+                    return matchGroup && matchSub && matchChannel;
+                };
+
                 if (isSubFiltered && isChannelFiltered) { target26 = null; forecast26 = null; plan27 = null; }
                 else if (isSubFiltered) {
                     const relevant = budgetProduct.filter(b => (selectedGroups.includes('ALL') || selectedGroups.includes(b.ProductGroup)) && b.SubProductGroup === filterSubProduct);
@@ -976,10 +984,39 @@ ${topCustomersText || 'N/A'}
                     forecast26 = relevant.reduce((a,b) => a + b.Forecast2026, 0); 
                     plan27 = relevant.reduce((a,b) => a + b.Plan2027, 0);
                 }
+
+                // --- DYNAMIC FORECAST 2026 (Seasonality Adjusted) ---
+                const total25_FullYear = salesData.filter(d => d.Year === '2025' && filterFnIgnoreMonth(d)).reduce((a, b) => a + b.NetPrice, 0);
+                const ytd25_ForForecast = salesData.filter(d => d.Year === '2025' && filterFnIgnoreMonth(d) && valid2026Months.has(d.Month?.split('-')[0])).reduce((a, b) => a + b.NetPrice, 0);
+                const ytd26_ForForecast = salesData.filter(d => d.Year === '2026' && filterFnIgnoreMonth(d)).reduce((a, b) => a + b.NetPrice, 0);
+
+                let dynamicForecast26 = null;
+                if (ytd25_ForForecast > 0 && total25_FullYear > 0) {
+                    // Projection based on 2025 Seasonality Curve
+                    dynamicForecast26 = ytd26_ForForecast * (total25_FullYear / ytd25_ForForecast);
+                } else if (ytd26_ForForecast > 0 && valid2026Months.size > 0) {
+                    // Linear Run Rate (Fallback for new products with no 2025 history)
+                    dynamicForecast26 = (ytd26_ForForecast / valid2026Months.size) * 12;
+                }
+
+                // Use dynamic forecast instead of static LE if available
+                const finalForecast = dynamicForecast26 !== null ? dynamicForecast26 : forecast26;
+
                 const progress = (target26 && target26 > 0) ? (s26 / target26) * 100 : 0;
-            const growthPlan = (target26 && plan27 && target26 > 0) ? ((plan27 - target26) / target26) * 100 : 0;
-            return { s26, s25_YTD, growthYoY, target26, forecast26, plan27, progress, growthPlan };
-        }, [salesData, budgetChannel, budgetProduct, selectedGroups, filterSubProduct, filterChannel, filterMonth]);
+                const growthPlan = (target26 && plan27 && target26 > 0) ? ((plan27 - target26) / target26) * 100 : 0;
+                
+                // Forecast vs Target status
+                let forecastStatus = null;
+                if (finalForecast && target26 > 0) {
+                    const pct = (finalForecast / target26) * 100;
+                    forecastStatus = {
+                        percent: pct,
+                        isMissing: pct < 100
+                    };
+                }
+
+                return { s26, s25_YTD, growthYoY, target26, forecast26: finalForecast, plan27, progress, growthPlan, forecastStatus };
+            }, [salesData, budgetChannel, budgetProduct, selectedGroups, filterSubProduct, filterChannel, filterMonth]);
 
             const trendChartData = useMemo(() => {
                 const base2025 = filteredData.filter(d => d.Year === '2025');
@@ -1303,8 +1340,32 @@ ${topCustomersText || 'N/A'}
                             </div>
 
                             <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.forecast26 === null ? 'opacity-70 grayscale' : ''}`}>
-                                <div className="flex justify-between items-start mb-2"><span className="text-sm font-bold text-slate-500 uppercase">Forecast 2026</span><TrendingUp className="w-5 h-5 text-orange-600" /></div>
-                                <div>{kpi.forecast26 !== null ? <h3 className="text-3xl font-bold text-slate-800">{kpi.forecast26 === 0 ? 'TBC' : `฿${kpi.forecast26.toLocaleString()}`}</h3> : <div className="text-3xl font-semibold text-slate-300">N/A</div>}<p className="text-sm text-slate-400 font-medium mt-2">Latest Estimate</p></div>
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-sm font-bold text-slate-500 uppercase">Forecast 2026</span>
+                                    <TrendingUp className="w-5 h-5 text-orange-600" />
+                                </div>
+                                <div>
+                                    {kpi.forecast26 !== null ? (
+                                        <>
+                                            <h3 className={`text-3xl font-bold ${kpi.forecastStatus?.isMissing ? 'text-orange-600' : 'text-slate-800'}`}>
+                                                {kpi.forecast26 === 0 ? 'TBC' : `฿${kpi.forecast26.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
+                                            </h3>
+                                            <div className="flex items-center gap-1.5 mt-2">
+                                                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                                                <span className="text-xs text-slate-500 font-semibold tracking-wide">
+                                                    Data-Driven Projection 
+                                                    {kpi.forecastStatus && (
+                                                        <span className={kpi.forecastStatus.isMissing ? 'text-orange-600 font-bold ml-1' : 'text-green-600 font-bold ml-1'}>
+                                                            ({kpi.forecastStatus.percent.toFixed(1)}% of Target)
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="text-3xl font-semibold text-slate-300">N/A</div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className={`bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full ${kpi.plan27 === null ? 'opacity-70 grayscale' : ''}`}>
