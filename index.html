@@ -948,6 +948,112 @@
             </div>
         );
 
+        const NPDVitalityWidget = ({ npdData, kpi }) => (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden group">
+                <div className="absolute -top-4 -right-4 p-6 opacity-5 group-hover:scale-110 group-hover:opacity-10 transition-all duration-500 pointer-events-none">
+                    <Lightbulb className="w-32 h-32 text-purple-600" />
+                </div>
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-purple-100 p-2 rounded-lg"><Lightbulb className="w-5 h-5 text-purple-600" /></div>
+                            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">NPD Vitality Index</h3>
+                        </div>
+                        <div className="group/tooltip cursor-help relative">
+                            <Info className="w-4 h-4 text-slate-400" />
+                            <div className="absolute top-full right-0 mt-1 w-64 p-4 bg-slate-800 text-white text-xs leading-relaxed rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 font-normal whitespace-normal border border-slate-700 pointer-events-none">
+                                <span className="font-bold text-purple-300">NPD Definition:</span><br/>
+                                สินค้าที่มีการบันทึกยอดขายครั้งแรก (First Recorded Sale) ภายใน 12 เดือนสะสมย้อนหลัง (Rolling 12 Months) เทียบกับยอดรวมปัจจุบัน เพื่อวัดพลังของการออกสินค้าใหม่
+                            </div>
+                        </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium mb-6 leading-snug">Sales contribution from products launched <br/>in the last 12 rolling months.</p>
+                </div>
+                <div className="relative z-10 mt-auto">
+                    <div className="flex items-baseline gap-2 mb-3">
+                        <h3 className="text-5xl font-extrabold text-slate-800 tracking-tight leading-none">{npdData.vitalityIndex.toFixed(1)}<span className="text-3xl text-slate-500 font-bold">%</span></h3>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 mb-5 overflow-hidden shadow-inner">
+                        <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(npdData.vitalityIndex, 100)}%` }}></div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <div className="flex justify-between items-center text-sm bg-slate-50 p-2 rounded-lg border border-slate-100">
+                            <span className="text-slate-500 font-medium">NPD Sales 2026</span>
+                            <span className="font-bold text-purple-700">฿{(npdData.totalNPDSales26 / 1000000).toFixed(2)}M</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm p-2">
+                            <span className="text-slate-500 font-medium">Total Portfolio Sales</span>
+                            <span className="font-bold text-slate-800">฿{(kpi.s26 / 1000000).toFixed(2)}M</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const TopNPDWidget = ({ npdData }) => (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2 flex flex-col">
+                <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-indigo-500" />
+                        <h3 className="text-base font-extrabold text-slate-800">Top Performing NPDs (2026)</h3>
+                    </div>
+                    <span className="text-xs font-semibold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full border border-indigo-100 shadow-sm">{npdData.topNPDs.length} New Products</span>
+                </div>
+                <div className="overflow-y-auto custom-scrollbar pr-2 h-[220px]">
+                    {npdData.topNPDs.length > 0 ? (
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-slate-500 border-b border-slate-200 font-semibold sticky top-0 bg-white z-10">
+                                <tr>
+                                    <th className="py-2 pl-2 w-12">Rank</th>
+                                    <th className="py-2">Product Name</th>
+                                    <th className="py-2">Key Channels</th>
+                                    <th className="py-2 text-right">Sales 2026</th>
+                                    <th className="py-2 pr-2 text-right w-24">Share of NPD</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {npdData.topNPDs.slice(0, 10).map((prod, idx) => {
+                                    const share = npdData.totalNPDSales26 > 0 ? ((prod.sales26 / npdData.totalNPDSales26) * 100).toFixed(1) : "0.0";
+                                    return (
+                                        <tr key={idx} className="border-b border-slate-50 hover:bg-indigo-50/40 transition-colors group">
+                                            <td className="py-3 pl-2 font-semibold text-slate-400">#{idx + 1}</td>
+                                            <td className="py-3">
+                                                <div className="font-semibold text-slate-800 truncate max-w-[220px]" title={prod.name}>{prod.name}</div>
+                                                <div className="text-[10px] text-slate-400 font-medium mt-0.5">{prod.sku}</div>
+                                            </td>
+                                            <td className="py-3">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {prod.topChannels.slice(0, 2).map(c => (
+                                                        <span key={c} className="px-2 py-0.5 bg-white text-slate-600 text-[10px] font-medium rounded border border-slate-200 truncate max-w-[100px] shadow-[0_1px_2px_rgba(0,0,0,0.02)]" title={c}>{c}</span>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td className="py-3 text-right font-bold text-indigo-700">฿{prod.sales26.toLocaleString()}</td>
+                                            <td className="py-3 pr-2 text-right">
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <span className="font-bold text-slate-600">{share}%</span>
+                                                    <div className="w-12 h-1 bg-slate-200 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${share}%` }}></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 py-10">
+                            <Package className="w-12 h-12 mb-3 opacity-30 text-indigo-500" />
+                            <p className="font-semibold text-slate-500 text-sm">No new products found</p>
+                            <p className="text-xs text-slate-400 mt-1">Try adjusting the filter criteria.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+
+        // --- Main Component ---
         function Dashboard() {
             const [salesData, setSalesData] = useState([]);
             const [budgetChannel, setBudgetChannel] = useState([]);
@@ -1442,6 +1548,82 @@
                 return unique.size;
             }, [filteredData]);
 
+            const npdData = useMemo(() => {
+                const productStats = {};
+                const monthMap = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
+                
+                // 1. Find the very first month of sale for each product across ALL historical data
+                salesData.forEach(d => {
+                    const m = d.Month ? d.Month.substring(0, 3) : null;
+                    if (!m || !d.ProductName) return;
+                    const mIdx = monthMap[m];
+                    if (mIdx === undefined) return;
+                    
+                    // Calculate absolute month index (Base Year 2025 = 0)
+                    const absMonth = (parseInt(d.Year) - 2025) * 12 + mIdx;
+                    
+                    if (!productStats[d.ProductName]) {
+                        productStats[d.ProductName] = { firstAbsMonth: absMonth };
+                    } else {
+                        if (absMonth < productStats[d.ProductName].firstAbsMonth) {
+                            productStats[d.ProductName].firstAbsMonth = absMonth;
+                        }
+                    }
+                });
+
+                // 2. Find the current latest month in the dataset to calculate the "Last 12 Months" window dynamically
+                let maxAbsMonth = 0;
+                salesData.forEach(d => {
+                    if (d.Year === '2026') {
+                        const m = d.Month ? d.Month.substring(0, 3) : null;
+                        if (m && monthMap[m] !== undefined) {
+                            const absMonth = 12 + monthMap[m];
+                            if (absMonth > maxAbsMonth) maxAbsMonth = absMonth;
+                        }
+                    }
+                });
+                
+                if (maxAbsMonth === 0) maxAbsMonth = 16; // Fallback to May 2026 if no 2026 data yet
+                const thresholdMonth = maxAbsMonth - 11; // Last 12 months (e.g., if max is 16, threshold is 5 (Jun 25))
+
+                const npdProducts = new Set();
+                Object.entries(productStats).forEach(([pName, stats]) => {
+                    // If the first recorded sale is within the last 12 months, flag as NPD
+                    if (stats.firstAbsMonth >= thresholdMonth) {
+                        npdProducts.add(pName);
+                    }
+                });
+
+                let totalNPDSales26 = 0;
+                const npdList = {};
+
+                // 3. Calculate metrics based on FILTERED 2026 data
+                filteredData.filter(d => d.Year === '2026').forEach(d => {
+                    if (npdProducts.has(d.ProductName)) {
+                        totalNPDSales26 += d.NetPrice;
+                        if (!npdList[d.ProductName]) {
+                            npdList[d.ProductName] = { name: d.ProductName, sku: d.GroupSKU, sales26: 0, channels: {} };
+                        }
+                        npdList[d.ProductName].sales26 += d.NetPrice;
+                        const ch = d.Channel || 'Unknown';
+                        npdList[d.ProductName].channels[ch] = (npdList[d.ProductName].channels[ch] || 0) + d.NetPrice;
+                    }
+                });
+
+                const topNPDs = Object.values(npdList)
+                    .sort((a, b) => b.sales26 - a.sales26)
+                    .map(item => {
+                        const topChannels = getParetoTopItems(item.channels, 3);
+                        return { ...item, topChannels };
+                    });
+
+                return {
+                    totalNPDSales26,
+                    topNPDs,
+                    vitalityIndex: kpi.s26 > 0 ? (totalNPDSales26 / kpi.s26) * 100 : 0
+                };
+            }, [salesData, filteredData, kpi.s26]);
+
             const coverageGrid = useMemo(() => {
                 const selectedMonthIndex = filterMonth === 'All' ? 11 : monthsList.indexOf(filterMonth);
                 const base2026 = salesData.filter(d => {
@@ -1562,14 +1744,14 @@
                             <ChannelMixWidget channelMix={channelMix} kpi={kpi} />
                         </div>
 
-                        <TopPerformersWidget topPerformers={topPerformers} topPerfDrillDown={topPerfDrillDown} setTopPerfDrillDown={setTopPerfDrillDown} topPerfSearch={topPerfSearch} setTopPerfSearch={setTopPerfSearch} topPerfSortMode={topPerfSortMode} setTopPerfSortMode={setTopPerfSortMode} kpi={kpi} />
-                        
-                        <TopCustomersWidget topCustomers={topCustomers} uniqueCustomersCount={uniqueCustomersCount} customerSearch={customerSearch} setCustomerSearch={setCustomerSearch} topCustomerSortMode={topCustomerSortMode} setTopCustomerSortMode={setTopCustomerSortMode} kpi={kpi} topCustomerDrillDown={topCustomerDrillDown} setTopCustomerDrillDown={setTopCustomerDrillDown} />
+                        {}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <NPDVitalityWidget npdData={npdData} kpi={kpi} />
+                            <TopNPDWidget npdData={npdData} />
+                        </div>
 
-                        <CoverageGapWidget coverageGrid={coverageGrid} coverageDrillChannel={coverageDrillChannel} setCoverageDrillChannel={setCoverageDrillChannel} coverageSearch={coverageSearch} setCoverageSearch={setCoverageSearch} />
-
-                        <footer className="w-full text-center pt-8 pb-4 text-[#86868b] font-medium text-sm">
-                            <p>Developed by NPD Team • Version 2.0 (Apple UI Edition)</p>
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                            <div className="flex justify-between items-center mb-6">
                         </footer>
                     </main>
 
