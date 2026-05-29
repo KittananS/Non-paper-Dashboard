@@ -143,7 +143,8 @@
             let cumulative = 0;
             const result = [];
             for (let i = 0; i < entries.length; i++) {
-                result.push(entries[i][0]);
+                const pct = ((entries[i][1] / total) * 100).toFixed(1);
+                result.push({ name: entries[i][0], pct });
                 cumulative += entries[i][1];
                 if (cumulative / total >= threshold || result.length >= maxItems) break;
             }
@@ -676,7 +677,9 @@
                                             <td className="py-4 px-2">
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {(prod.topChannels || []).map(c => (
-                                                        <span key={c} className="px-2 py-0.5 bg-white border border-black/5 text-[#86868b] text-[10px] font-medium rounded-md truncate max-w-[120px] shadow-[0_1px_2px_rgba(0,0,0,0.02)]" title={c}>{c}</span>
+                                                        <span key={c.name} className="px-2 py-0.5 bg-white border border-black/5 text-[#86868b] text-[10px] font-medium rounded-md truncate max-w-[160px] shadow-[0_1px_2px_rgba(0,0,0,0.02)]" title={`${c.name} (${c.pct}%)`}>
+                                                            {c.name} ({c.pct}%)
+                                                        </span>
                                                     ))}
                                                 </div>
                                             </td>
@@ -711,7 +714,9 @@
                                             <td className="py-4 px-2">
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {(item.topChannels || []).map(c => (
-                                                        <span key={c} className="px-2 py-0.5 bg-white border border-black/5 text-[#86868b] text-[10px] font-medium rounded-md truncate max-w-[120px] shadow-[0_1px_2px_rgba(0,0,0,0.02)]" title={c}>{c}</span>
+                                                        <span key={c.name} className="px-2 py-0.5 bg-white border border-black/5 text-[#86868b] text-[10px] font-medium rounded-md truncate max-w-[160px] shadow-[0_1px_2px_rgba(0,0,0,0.02)]" title={`${c.name} (${c.pct}%)`}>
+                                                            {c.name} ({c.pct}%)
+                                                        </span>
                                                     ))}
                                                 </div>
                                             </td>
@@ -836,7 +841,9 @@
                                             <td className="py-4 px-4">
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {item.topProducts.map(p => (
-                                                        <span key={p} className="px-2 py-0.5 bg-white border border-black/5 text-[#86868b] text-[10px] font-medium rounded-md truncate max-w-[120px] shadow-[0_1px_2px_rgba(0,0,0,0.02)]" title={p}>{p}</span>
+                                                        <span key={p.name} className="px-2 py-0.5 bg-white border border-black/5 text-[#86868b] text-[10px] font-medium rounded-md truncate max-w-[160px] shadow-[0_1px_2px_rgba(0,0,0,0.02)]" title={`${p.name} (${p.pct}%)`}>
+                                                            {p.name} ({p.pct}%)
+                                                        </span>
                                                     ))}
                                                 </div>
                                             </td>
