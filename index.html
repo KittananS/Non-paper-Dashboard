@@ -949,7 +949,7 @@
         );
 
         const NPDVitalityWidget = ({ npdData, kpi }) => (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden group">
+            <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between relative overflow-hidden group">
                 <div className="absolute -top-4 -right-4 p-6 opacity-5 group-hover:scale-110 group-hover:opacity-10 transition-all duration-500 pointer-events-none">
                     <Lightbulb className="w-32 h-32 text-purple-600" />
                 </div>
@@ -991,7 +991,7 @@
         );
 
         const TopNPDWidget = ({ npdData }) => (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2 flex flex-col">
+            <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] lg:col-span-2 flex flex-col">
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-indigo-500" />
@@ -1750,8 +1750,39 @@
                             <TopNPDWidget npdData={npdData} />
                         </div>
 
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col">
-                            <div className="flex justify-between items-center mb-6">
+                        <TopPerformersWidget 
+                            topPerformers={topPerformers} 
+                            topPerfDrillDown={topPerfDrillDown} 
+                            setTopPerfDrillDown={setTopPerfDrillDown} 
+                            topPerfSearch={topPerfSearch} 
+                            setTopPerfSearch={setTopPerfSearch} 
+                            topPerfSortMode={topPerfSortMode} 
+                            setTopPerfSortMode={setTopPerfSortMode} 
+                            kpi={kpi} 
+                        />
+                        
+                        <TopCustomersWidget 
+                            topCustomers={topCustomers} 
+                            uniqueCustomersCount={uniqueCustomersCount} 
+                            customerSearch={customerSearch} 
+                            setCustomerSearch={setCustomerSearch} 
+                            topCustomerSortMode={topCustomerSortMode} 
+                            setTopCustomerSortMode={setTopCustomerSortMode} 
+                            kpi={kpi} 
+                            topCustomerDrillDown={topCustomerDrillDown} 
+                            setTopCustomerDrillDown={setTopCustomerDrillDown} 
+                        />
+
+                        <CoverageGapWidget 
+                            coverageGrid={coverageGrid} 
+                            coverageDrillChannel={coverageDrillChannel} 
+                            setCoverageDrillChannel={setCoverageDrillChannel} 
+                            coverageSearch={coverageSearch} 
+                            setCoverageSearch={setCoverageSearch} 
+                        />
+
+                        <footer className="w-full text-center pt-8 pb-4 text-[#86868b] font-medium text-sm">
+                            Developed by NPD Team - Version 1.2
                         </footer>
                     </main>
 
