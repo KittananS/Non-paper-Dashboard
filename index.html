@@ -521,12 +521,12 @@
             </div>
         );
 
-        const TrendChartWidget = ({ trendChartData, selectedGroups, show2025Trend, setShow2025Trend, yAxisTicks }) => (
+        const TrendChartWidget = ({ trendChartData, show2025Trend, setShow2025Trend, yAxisTicks }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] lg:col-span-2">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-base font-bold text-[#1d1d1f] flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-[#0071e3]" /> 
-                        {selectedGroups.includes('ALL') ? '2026 Monthly Trend (Stacked YoY)' : 'Sales Trend 2025 vs 2026'}
+                        Sales Trend 2025 vs 2026
                     </h3>
                     <button 
                         onClick={() => setShow2025Trend(!show2025Trend)}
@@ -537,50 +537,24 @@
                 </div>
                 <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                        {selectedGroups.includes('ALL') ? (
-                            <ComposedChart data={trendChartData} barGap={4} maxBarSize={36}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
-                                <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 500, fill: '#86868b'}} axisLine={false} tickLine={false} />
-                                <YAxis domain={[0, yAxisTicks[yAxisTicks.length - 1]]} ticks={yAxisTicks} tick={{fontSize: 12, fontWeight: 500, fill: '#86868b'}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
-                                <Tooltip cursor={{fill: '#f5f5f7'}} contentStyle={{borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 14px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: '500', backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)'}} formatter={(v) => `฿${(v/1000000).toFixed(2)}M`} />
-                                <Legend wrapperStyle={{fontSize: '12px', fontWeight: '500', color: '#86868b'}} />
-                                
-                                {show2025Trend && (
-                                    <React.Fragment>
-                                        <Bar dataKey="DACARE_25" name="DACARE '25" stackId="2025" fill="#0071e3" fillOpacity={0.25} legendType="none" />
-                                        <Bar dataKey="DATISSUE_25" name="DATISSUE '25" stackId="2025" fill="#34c759" fillOpacity={0.25} legendType="none" />
-                                        <Bar dataKey="DAOS_25" name="DAOS '25" stackId="2025" fill="#ff9500" fillOpacity={0.25} legendType="none" />
-                                        <Bar dataKey="DABATTERY_25" name="DABATTERY '25" stackId="2025" fill="#ff3b30" fillOpacity={0.25} legendType="none" />
-                                        <Bar dataKey="DASP_25" name="DASP '25" stackId="2025" fill="#30b0c7" fillOpacity={0.25} legendType="none" />
-                                        <Bar dataKey="DANB_25" name="DANB '25" stackId="2025" fill="#5e5ce6" fillOpacity={0.25} legendType="none" />
-                                        <Bar dataKey="QUALITY_25" name="QUALITY '25" stackId="2025" fill="#32ade6" fillOpacity={0.25} legendType="none" />
-                                        <Bar dataKey="DALIFESTYLE_25" name="DALIFESTYLE '25" stackId="2025" fill="#af52de" fillOpacity={0.25} legendType="none" />
-                                        <Line type="monotone" dataKey="total25" stroke="none" dot={false} activeDot={false} legendType="none" tooltipType="none"><LabelList dataKey="total25" position="top" content={renderCustomLabel25} /></Line>
-                                    </React.Fragment>
-                                )}
-
-                                <Bar dataKey="DACARE_26" name="DACARE '26" stackId="2026" fill="#0071e3" radius={[0, 0, 0, 0]} />
-                                <Bar dataKey="DATISSUE_26" name="DATISSUE '26" stackId="2026" fill="#34c759" />
-                                <Bar dataKey="DAOS_26" name="DAOS '26" stackId="2026" fill="#ff9500" />
-                                <Bar dataKey="DABATTERY_26" name="DABATTERY '26" stackId="2026" fill="#ff3b30" />
-                                <Bar dataKey="DASP_26" name="DASP '26" stackId="2026" fill="#30b0c7" />
-                                <Bar dataKey="DANB_26" name="DANB '26" stackId="2026" fill="#5e5ce6" />
-                                <Bar dataKey="QUALITY_26" name="QUALITY '26" stackId="2026" fill="#32ade6" />
-                                <Bar dataKey="DALIFESTYLE_26" name="DALIFESTYLE '26" stackId="2026" fill="#af52de" radius={[4, 4, 0, 0]} />
-
-                                <Line type="monotone" dataKey="total26" stroke="none" dot={false} activeDot={false} legendType="none" tooltipType="none"><LabelList dataKey="total26" position="top" content={renderCustomLabel} /></Line>
-                            </ComposedChart>
-                        ) : (
-                            <LineChart data={trendChartData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
-                                <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 500, fill: '#86868b'}} axisLine={false} tickLine={false} />
-                                <YAxis domain={[0, yAxisTicks[yAxisTicks.length - 1]]} ticks={yAxisTicks} tick={{fontSize: 12, fontWeight: 500, fill: '#86868b'}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
-                                <Tooltip contentStyle={{borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 14px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: '500', backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)'}} formatter={(v) => `฿${(v/1000000).toFixed(2)}M`} />
-                                <Legend wrapperStyle={{fontSize: '12px', fontWeight: '500', color: '#86868b'}} />
-                                <Line type="monotone" dataKey="2026" stroke="#0071e3" strokeWidth={3} dot={{r:4, fill: '#0071e3'}} activeDot={{r: 6, strokeWidth: 0}}><LabelList dataKey="2026" position="top" content={renderCustomLabel} /></Line>
-                                {show2025Trend && <Line type="monotone" dataKey="2025" stroke="#c7c7cc" strokeDasharray="5 5" strokeWidth={2} dot={{r:4, fill: '#c7c7cc'}} />}
-                            </LineChart>
-                        )}
+                        <ComposedChart data={trendChartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="color26" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#0071e3" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#0071e3" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
+                            <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 500, fill: '#86868b'}} axisLine={false} tickLine={false} />
+                            <YAxis domain={[0, yAxisTicks[yAxisTicks.length - 1]]} ticks={yAxisTicks} tick={{fontSize: 12, fontWeight: 500, fill: '#86868b'}} tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
+                            <Tooltip cursor={{fill: '#f5f5f7', strokeWidth: 1, stroke: '#e5e5ea', strokeDasharray: '3 3'}} contentStyle={{borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 14px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: '500', backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)'}} formatter={(v) => `฿${(v/1000000).toFixed(2)}M`} />
+                            <Legend wrapperStyle={{fontSize: '12px', fontWeight: '500', color: '#86868b'}} />
+                            
+                            {show2025Trend && <Line type="monotone" dataKey="sales25" name="2025 Actual" stroke="#86868b" strokeWidth={2} strokeDasharray="5 5" dot={{r: 4, fill: '#86868b'}} activeDot={{r: 6, strokeWidth: 0}} />}
+                            <Area type="monotone" dataKey="sales26" name="2026 Actual/Proj." stroke="#0071e3" strokeWidth={3} fillOpacity={1} fill="url(#color26)" dot={{r: 4, fill: '#0071e3'}} activeDot={{r: 6, strokeWidth: 0}}>
+                                <LabelList dataKey="sales26" position="top" content={renderCustomLabel} />
+                            </Area>
+                        </ComposedChart>
                     </ResponsiveContainer>
                 </div>
             </div>
@@ -624,6 +598,145 @@
                 </div>
             </div>
         );
+
+        const PortfolioMixWidget = ({ filteredData, monthsList }) => {
+            const [mixLevel, setMixLevel] = useState('SubProduct');
+
+            const { chartData, keys, colors } = useMemo(() => {
+                const data26 = filteredData.filter(d => d.Year === '2026');
+                const dimension = mixLevel === 'ProductGroup' ? 'ProductGroup' : (mixLevel === 'SubProduct' ? 'SubProductGroup' : 'GroupSKU');
+
+                // หา Total เพื่อจับ 7 อันดับแรก และจัดที่เหลือลง 'Others' ป้องกันสีระเบิดในกราฟ
+                const totals = {};
+                data26.forEach(d => {
+                    const key = d[dimension] || 'Unknown';
+                    totals[key] = (totals[key] || 0) + d.NetPrice;
+                });
+
+                const sortedKeys = Object.entries(totals).sort((a,b) => b[1] - a[1]);
+                const topKeys = sortedKeys.slice(0, 7).map(k => k[0]);
+                const keysToUse = sortedKeys.length > 8 ? [...topKeys, 'Others'] : sortedKeys.map(k => k[0]);
+
+                const monthlyMap = {};
+                monthsList.forEach(m => monthlyMap[m] = { month: m, total: 0 });
+                
+                data26.forEach(d => {
+                    const m = d.Month ? d.Month.substring(0, 3) : null;
+                    if (!m || !monthlyMap[m]) return;
+                    let key = d[dimension] || 'Unknown';
+                    if (!keysToUse.includes(key)) key = 'Others';
+
+                    monthlyMap[m][key] = (monthlyMap[m][key] || 0) + d.NetPrice;
+                    monthlyMap[m].total += d.NetPrice;
+                });
+
+                const chartData = monthsList.map(m => {
+                    const row = { name: m, total: monthlyMap[m].total };
+                    keysToUse.forEach(k => {
+                        row[`${k}_abs`] = monthlyMap[m][k] || 0; // เก็บยอดขายจริงไว้ใช้ใน Tooltip
+                        row[k] = monthlyMap[m].total > 0 ? ((monthlyMap[m][k] || 0) / monthlyMap[m].total) * 100 : 0; // ใช้ % เพื่อวาด 100% Stacked Bar
+                    });
+                    return row;
+                });
+
+                const colors = {};
+                keysToUse.forEach((k, idx) => {
+                    colors[k] = APPLE_PALETTE[idx % APPLE_PALETTE.length];
+                    if (k === 'Others') colors[k] = '#e5e5ea';
+                });
+
+                return { chartData, keys: keysToUse, colors };
+            }, [filteredData, mixLevel, monthsList]);
+
+            const CustomMixTooltip = ({ active, payload, label }) => {
+                if (active && payload && payload.length) {
+                    const total = payload[0].payload.total;
+                    return (
+                        <div className="bg-white/95 backdrop-blur-xl border border-black/5 p-4 rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] min-w-[240px]">
+                            <div className="text-sm font-bold text-[#1d1d1f] mb-1">{label} 2026</div>
+                            <div className="text-xs text-[#86868b] font-medium mb-3 pb-2 border-b border-[#e5e5ea]">Total Sales: ฿{(total / 1000000).toFixed(2)}M</div>
+                            <div className="space-y-2.5">
+                                {/* เรียงลำดับจากค่า Absolute มากไปน้อยตอนแสดงผลใน Tooltip */}
+                                {[...payload].sort((a,b) => b.payload[`${b.dataKey}_abs`] - a.payload[`${a.dataKey}_abs`]).map((entry, index) => {
+                                    const absVal = entry.payload[`${entry.dataKey}_abs`];
+                                    if (absVal === 0) return null;
+                                    return (
+                                        <div key={index} className="flex justify-between items-center text-xs">
+                                            <div className="flex items-center gap-2 max-w-[140px]">
+                                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: entry.color }}></div>
+                                                <span className="text-[#1d1d1f] font-medium truncate" title={entry.dataKey}>{entry.dataKey}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-right">
+                                                <span className="font-semibold text-[#1d1d1f]">฿{(absVal/1000000).toFixed(2)}M</span>
+                                                <span className="text-[#86868b] font-semibold w-10 text-right">{entry.value.toFixed(1)}%</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                }
+                return null;
+            };
+
+            return (
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] lg:col-span-3 flex flex-col">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div className="flex items-center gap-2 group cursor-help relative">
+                            <Layers className="w-5 h-5 text-[#30b0c7]" />
+                            <h3 className="text-base font-bold text-[#1d1d1f]">Portfolio Mix (MoM 2026)</h3>
+                            <Info className="w-3.5 h-3.5 text-[#86868b]" />
+                            <div className="absolute top-full left-0 mt-2 w-64 p-4 bg-white/90 backdrop-blur-xl text-[#1d1d1f] text-xs leading-relaxed rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 font-normal border border-black/5 pointer-events-none">
+                                <span className="font-semibold text-[#0071e3]">100% Stacked View:</span><br/>
+                                เปรียบเทียบสัดส่วนยอดขาย (Mix %) ในแต่ละเดือน เพื่อวิเคราะห์ว่าโครงสร้างพอร์ตเปลี่ยนไปทิศทางใด
+                            </div>
+                        </div>
+                        <div className="flex bg-[#e3e3e8] p-1 rounded-xl">
+                            <button 
+                                onClick={() => setMixLevel('ProductGroup')}
+                                className={`px-4 py-1.5 text-xs font-semibold rounded-[8px] transition-all ${mixLevel === 'ProductGroup' ? 'bg-white text-[#1d1d1f] shadow-[0_1px_4px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`}
+                            >
+                                Product Group
+                            </button>
+                            <button 
+                                onClick={() => setMixLevel('SubProduct')}
+                                className={`px-4 py-1.5 text-xs font-semibold rounded-[8px] transition-all ${mixLevel === 'SubProduct' ? 'bg-white text-[#1d1d1f] shadow-[0_1px_4px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`}
+                            >
+                                Sub-Product
+                            </button>
+                            <button 
+                                onClick={() => setMixLevel('GroupSKU')}
+                                className={`px-4 py-1.5 text-xs font-semibold rounded-[8px] transition-all ${mixLevel === 'GroupSKU' ? 'bg-white text-[#1d1d1f] shadow-[0_1px_4px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`}
+                            >
+                                Group SKU
+                            </button>
+                        </div>
+                    </div>
+                    <div className="h-80 w-full relative">
+                        {chartData.some(d => d.total > 0) ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
+                                    <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 500, fill: '#86868b'}} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{fontSize: 12, fontWeight: 500, fill: '#86868b'}} tickFormatter={(v) => `${v}%`} axisLine={false} tickLine={false} domain={[0, 100]} />
+                                    <Tooltip content={<CustomMixTooltip />} cursor={{fill: '#f5f5f7'}} />
+                                    <Legend wrapperStyle={{fontSize: '11px', fontWeight: '500', color: '#86868b', paddingTop: '10px'}} />
+                                    {keys.map(k => (
+                                        <Bar key={k} dataKey={k} stackId="a" fill={colors[k]} maxBarSize={48} />
+                                    ))}
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-[#86868b]">
+                                <Layers className="w-10 h-10 mb-2 opacity-20" />
+                                <span className="text-sm font-medium">No data available for selected filters</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
 
         const TopPerformersWidget = ({ topPerformers, topPerfDrillDown, setTopPerfDrillDown, topPerfSearch, setTopPerfSearch, topPerfSortMode, setTopPerfSortMode, kpi }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
@@ -1378,52 +1491,15 @@
                 const base2025 = filteredData.filter(d => d.Year === '2025');
                 const base2026 = filteredData.filter(d => d.Year === '2026');
                 
-                if (selectedGroups.includes('ALL')) {
-                    return monthsList.map(m => {
-                        const m25 = base2025.filter(d => d.Month.startsWith(m));
-                        const m26 = base2026.filter(d => d.Month.startsWith(m));
-
-                        const calc = (data, group) => data.filter(d => d.ProductGroup === group).reduce((s, r) => s + r.NetPrice, 0);
-
-                        const dacare25 = calc(m25, 'DACARE'); const dacare26 = calc(m26, 'DACARE');
-                        const datissue25 = calc(m25, 'DATISSUE'); const datissue26 = calc(m26, 'DATISSUE');
-                        const daos25 = calc(m25, 'DAOS'); const daos26 = calc(m26, 'DAOS');
-                        const dabattery25 = calc(m25, 'DABATTERY'); const dabattery26 = calc(m26, 'DABATTERY');
-                        const dasp25 = calc(m25, 'DASP'); const dasp26 = calc(m26, 'DASP');
-                        const danb25 = calc(m25, 'DANB'); const danb26 = calc(m26, 'DANB');
-                        const quality25 = calc(m25, 'QUALITY'); const quality26 = calc(m26, 'QUALITY');
-                        const dalife25 = calc(m25, 'DALIFESTYLE'); const dalife26 = calc(m26, 'DALIFESTYLE');
-
-                        const total25 = dacare25 + datissue25 + daos25 + dabattery25 + dasp25 + danb25 + quality25 + dalife25;
-                        const total26 = dacare26 + datissue26 + daos26 + dabattery26 + dasp26 + danb26 + quality26 + dalife26;
-
-                        return {
-                            name: m, 
-                            'DACARE_25': dacare25 === 0 ? null : dacare25, 'DACARE_26': dacare26 === 0 ? null : dacare26,
-                            'DATISSUE_25': datissue25 === 0 ? null : datissue25, 'DATISSUE_26': datissue26 === 0 ? null : datissue26,
-                            'DAOS_25': daos25 === 0 ? null : daos25, 'DAOS_26': daos26 === 0 ? null : daos26,
-                            'DABATTERY_25': dabattery25 === 0 ? null : dabattery25, 'DABATTERY_26': dabattery26 === 0 ? null : dabattery26,
-                            'DASP_25': dasp25 === 0 ? null : dasp25, 'DASP_26': dasp26 === 0 ? null : dasp26,
-                            'DANB_25': danb25 === 0 ? null : danb25, 'DANB_26': danb26 === 0 ? null : danb26,
-                            'QUALITY_25': quality25 === 0 ? null : quality25, 'QUALITY_26': quality26 === 0 ? null : quality26,
-                            'DALIFESTYLE_25': dalife25 === 0 ? null : dalife25, 'DALIFESTYLE_26': dalife26 === 0 ? null : dalife26,
-                            total25: total25 === 0 ? null : total25, total26: total26 === 0 ? null : total26
-                        };
-                    });
-                } else {
-                    return monthsList.map(m => {
-                        const val2025 = base2025.filter(d => d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
-                        const val2026 = base2026.filter(d => d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
-                        return { name: m, '2025': val2025, '2026': val2026 === 0 ? null : val2026 };
-                    });
-                }
-            }, [salesData, filteredData, selectedGroups, filterSubProduct, filterChannel]);
+                return monthsList.map(m => {
+                    const val2025 = base2025.filter(d => d.Month && d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
+                    const val2026 = base2026.filter(d => d.Month && d.Month.startsWith(m)).reduce((s, r) => s + r.NetPrice, 0);
+                    return { name: m, sales25: val2025 === 0 ? null : val2025, sales26: val2026 === 0 ? null : val2026 };
+                });
+            }, [filteredData, monthsList]);
 
             const yAxisTicks = useMemo(() => {
-                const maxVal = trendChartData.reduce((max, d) => {
-                    if (selectedGroups.includes('ALL')) return Math.max(max, d.total25 || 0, d.total26 || 0);
-                    else return Math.max(max, d['2025'] || 0, d['2026'] || 0);
-                }, 0);
+                const maxVal = trendChartData.reduce((max, d) => Math.max(max, d.sales25 || 0, d.sales26 || 0), 0);
                 if (maxVal === 0) return [0, 5000000];
                 const targetMax = maxVal * 1.15;
                 const roughStep = targetMax / 4; 
@@ -1742,11 +1818,14 @@
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <TrendChartWidget trendChartData={trendChartData} selectedGroups={selectedGroups} show2025Trend={show2025Trend} setShow2025Trend={setShow2025Trend} yAxisTicks={yAxisTicks} />
+                            <TrendChartWidget trendChartData={trendChartData} show2025Trend={show2025Trend} setShow2025Trend={setShow2025Trend} yAxisTicks={yAxisTicks} />
                             <ChannelMixWidget channelMix={channelMix} kpi={kpi} />
                         </div>
 
-                        {}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <PortfolioMixWidget filteredData={filteredData} monthsList={monthsList} />
+                        </div>
+
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <NPDVitalityWidget npdData={npdData} kpi={kpi} />
                             <TopNPDWidget npdData={npdData} />
