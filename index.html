@@ -1212,6 +1212,7 @@
 
             const base2026 = useMemo(() => filteredData.filter(d => d.Year === '2026'), [filteredData]);
 
+            // Reset when global data changes significantly
             useEffect(() => {
                 setBreadcrumbs([]);
                 setSearch('');
@@ -1234,6 +1235,7 @@
                 });
                 const totalLocations = uniqueLocs.size;
 
+                // คำนวณ Detail (ช่องทางขาย) เสมอ ไม่ว่าระดับชั้นไหน
                 const channelMap = {};
                 data.forEach(d => {
                     const ch = d.Channel || 'Unknown';
@@ -1296,7 +1298,7 @@
                                 <input 
                                     type="text" 
                                     placeholder={`Search ${currentLevelName}...`} 
-                                    className="w-full pl-9 pr-3 py-2.5 bg-[#f5f5f7] border border-transparent focus:border-[#0071e3]/30 focus:bg-white focus:ring-4 focus:ring-[#0071e3]/10 rounded-[12px] text-sm font-medium transition-all placeholder:text-[#86868b] outline-none"
+                                    className="w-full pl-9 pr-3 py-2 bg-[#f5f5f7] border border-transparent focus:border-[#0071e3]/30 focus:bg-white focus:ring-4 focus:ring-[#0071e3]/10 rounded-[12px] text-sm font-medium transition-all placeholder:text-[#86868b] outline-none"
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                 />
@@ -1367,13 +1369,15 @@
 
                     {detail && (
                         <div className="flex flex-col mt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="bg-[#1d1d1f]/5 p-1.5 rounded-lg">
-                                    <MapPin className="w-4 h-4 text-[#1d1d1f]" />
+                            {list && (
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="bg-[#1d1d1f]/5 p-1.5 rounded-lg">
+                                        <MapPin className="w-4 h-4 text-[#1d1d1f]" />
+                                    </div>
+                                    <h4 className="text-sm font-bold text-[#1d1d1f]">Locations Breakdown</h4>
+                                    <span className="text-xs font-semibold text-[#86868b] ml-1">for current view</span>
                                 </div>
-                                <h4 className="text-sm font-bold text-[#1d1d1f]">Locations Breakdown</h4>
-                                <span className="text-xs font-semibold text-[#86868b] ml-1">for current view</span>
-                            </div>
+                            )}
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                                 {Object.keys(detail.channels).length > 0 ? (
                                     Object.entries(detail.channels).map(([ch, data]) => (
@@ -1406,10 +1410,6 @@
         };
 
         const SkuHealthWidget = ({ filteredData }) => {
-            const [healthSearch, setHealthSearch] = useState('');
-            const debouncedHealthSearch = useDebounce(healthSearch, 300);
-            const [drillDown, setDrillDown] = useState(null);
-
             const returnData = useMemo(() => {
                 const data26 = filteredData.filter(d => d.Year === '2026');
                 let grossSales = 0;
@@ -1444,29 +1444,16 @@
                     .map(([sku, data]) => {
                         const rate = data.gross > 0 ? (data.returns / data.gross) * 100 : (data.returns > 0 ? 100 : 0);
                         const topChannel = Object.entries(data.channels).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
-                        return { sku, name: data.name, returns: data.returns, rate, topChannel, channels: data.channels };
+                        return { sku, name: data.name, returns: data.returns, rate, topChannel };
                     })
                     .sort((a, b) => b.returns - a.returns);
 
                 return { totalReturns, overallRate, topReturns };
             }, [filteredData]);
 
-            const filteredReturnList = useMemo(() => {
-                let list = returnData.topReturns;
-                if (debouncedHealthSearch.length >= 2) {
-                    const term = debouncedHealthSearch.toLowerCase();
-                    list = list.filter(item => item.sku.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
-                }
-                return list;
-            }, [returnData.topReturns, debouncedHealthSearch]);
-
-            const handleRowClick = (item) => {
-                setDrillDown(item);
-            };
-
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
-                    <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                         <div className="flex items-center gap-3">
                             <div className="bg-[#ff3b30]/10 p-2 rounded-xl">
                                 <AlertCircle className="w-6 h-6 text-[#ff3b30]" />
@@ -1476,123 +1463,65 @@
                                 <p className="text-xs text-[#86868b] font-medium">Monitoring product returns and top affected channels.</p>
                             </div>
                         </div>
-                        {!drillDown && (
-                            <div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full xl:w-auto">
-                                <div className="relative w-full md:w-64">
-                                    <input 
-                                        type="text" 
-                                        placeholder="Search SKU..." 
-                                        className="w-full pl-9 pr-3 py-2.5 bg-[#f5f5f7] border-0 rounded-[12px] text-sm font-medium focus:ring-2 focus:ring-[#0071e3]/20 focus:outline-none transition-all placeholder:text-[#86868b]" 
-                                        value={healthSearch} 
-                                        onChange={(e) => setHealthSearch(e.target.value)} 
-                                    />
-                                    <Search className="w-4 h-4 text-[#86868b] absolute left-3 top-3" />
-                                </div>
-                                <div className="flex items-center gap-4 bg-[#f5f5f7] px-4 py-2.5 rounded-[16px] border border-black/5 w-full md:w-auto shrink-0">
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider">Total Returns</span>
-                                        <span className="text-sm font-bold text-[#1d1d1f]">฿{returnData.totalReturns.toLocaleString()}</span>
-                                    </div>
-                                    <div className="w-px h-8 bg-black/10"></div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider">Overall Rate</span>
-                                        <span className={`text-sm font-bold ${returnData.overallRate > 3 ? 'text-[#ff3b30]' : 'text-[#34c759]'}`}>
-                                            {returnData.overallRate.toFixed(2)}%
-                                        </span>
-                                    </div>
-                                </div>
+                        <div className="flex items-center gap-4 bg-[#f5f5f7] px-4 py-2.5 rounded-[16px] border border-black/5 w-full md:w-auto">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider">Total Returns</span>
+                                <span className="text-sm font-bold text-[#1d1d1f]">฿{returnData.totalReturns.toLocaleString()}</span>
                             </div>
-                        )}
+                            <div className="w-px h-8 bg-black/10"></div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider">Overall Rate</span>
+                                <span className={`text-sm font-bold ${returnData.overallRate > 3 ? 'text-[#ff3b30]' : 'text-[#34c759]'}`}>
+                                    {returnData.overallRate.toFixed(2)}%
+                                </span>
+                            </div>
+                        </div>
                     </div>
 
-                    {drillDown ? (
-                        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                            <button onClick={() => setDrillDown(null)} className="flex items-center gap-1.5 text-sm text-[#0071e3] hover:text-[#0056b3] font-semibold mb-4 transition-colors">
-                                <ArrowLeft className="w-4 h-4" /> Back to list
-                            </button>
-                            <div className="bg-[#f5f5f7]/50 p-6 rounded-[20px] mb-6">
-                                <h2 className="text-xl font-bold text-[#1d1d1f] mb-1">{drillDown.name}</h2>
-                                <p className="text-sm text-[#86868b] font-medium mb-4">{drillDown.sku}</p>
-                                <div className="flex gap-6">
-                                    <div>
-                                        <span className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider">Total Returned</span>
-                                        <div className="text-lg font-bold text-[#ff3b30]">฿{drillDown.returns.toLocaleString()}</div>
-                                    </div>
-                                    <div>
-                                        <span className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider">Return Rate</span>
-                                        <div className="text-lg font-bold text-[#1d1d1f]">{drillDown.rate.toFixed(1)}%</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="overflow-x-auto custom-scrollbar border border-black/5 rounded-xl">
-                                <table className="w-full text-sm text-left border-collapse min-w-[500px]">
-                                    <thead className="bg-[#f5f5f7] border-b border-black/5">
-                                        <tr className="text-[#86868b] font-semibold text-xs uppercase tracking-wider">
-                                            <th className="py-3 px-4">Channel</th>
-                                            <th className="py-3 px-4 text-right">Return Value</th>
-                                            <th className="py-3 px-4 text-right">% of Total SKU Return</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {Object.entries(drillDown.channels).sort((a,b) => b[1] - a[1]).map(([ch, val], idx) => (
-                                            <tr key={ch} className={`border-b border-[#e5e5ea]/50 ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f5f5f7]/30'}`}>
-                                                <td className="py-3.5 px-4 font-medium text-[#1d1d1f]">{ch}</td>
-                                                <td className="py-3.5 px-4 text-right font-bold">฿{val.toLocaleString()}</td>
-                                                <td className="py-3.5 px-4 text-right font-semibold text-[#86868b]">
-                                                    {((val/drillDown.returns)*100).toFixed(1)}%
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="overflow-y-auto overflow-x-auto custom-scrollbar border border-black/5 rounded-xl max-h-[380px]">
-                            <table className="w-full text-sm text-left border-collapse min-w-[700px]">
-                                <thead className="bg-[#f5f5f7] border-b border-black/5 sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.05)]">
-                                    <tr className="text-[#86868b] font-semibold text-xs uppercase tracking-wider">
-                                        <th className="py-3 px-4 w-16 text-center bg-[#f5f5f7]">Rank</th>
-                                        <th className="py-3 px-4 bg-[#f5f5f7]">Product Name</th>
-                                        <th className="py-3 px-4 text-right w-32 bg-[#f5f5f7]">Return Value</th>
-                                        <th className="py-3 px-4 text-right w-24 bg-[#f5f5f7]">Return Rate</th>
-                                        <th className="py-3 px-4 w-40 bg-[#f5f5f7]">Top Return Channel</th>
+                    <div className="overflow-y-auto overflow-x-auto custom-scrollbar border border-black/5 rounded-xl max-h-[380px]">
+                        <table className="w-full text-sm text-left border-collapse min-w-[700px]">
+                            <thead className="bg-[#f5f5f7] border-b border-black/5 sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.05)]">
+                                <tr className="text-[#86868b] font-semibold text-xs uppercase tracking-wider">
+                                    <th className="py-3 px-4 w-16 text-center bg-[#f5f5f7]">Rank</th>
+                                    <th className="py-3 px-4 bg-[#f5f5f7]">Product Name</th>
+                                    <th className="py-3 px-4 text-right w-32 bg-[#f5f5f7]">Return Value</th>
+                                    <th className="py-3 px-4 text-right w-24 bg-[#f5f5f7]">Return Rate</th>
+                                    <th className="py-3 px-4 w-40 bg-[#f5f5f7]">Top Return Channel</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {returnData.topReturns.length > 0 ? returnData.topReturns.map((item, idx) => (
+                                    <tr key={item.sku} className={`border-b border-[#e5e5ea]/50 hover:bg-[#ff3b30]/5 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f5f5f7]/30'}`}>
+                                        <td className="py-3.5 px-4 text-center font-bold text-[#86868b]">#{idx + 1}</td>
+                                        <td className="py-3.5 px-4">
+                                            <div className="font-semibold text-[#1d1d1f] truncate max-w-[280px]" title={item.name}>{item.name}</div>
+                                            <div className="text-[10px] text-[#86868b] font-medium mt-0.5">{item.sku}</div>
+                                        </td>
+                                        <td className="py-3.5 px-4 text-right font-bold text-[#1d1d1f]">฿{item.returns.toLocaleString()}</td>
+                                        <td className="py-3.5 px-4 text-right">
+                                            <span className={`font-bold px-2 py-1 rounded-md ${item.rate > 3 ? 'text-[#ff3b30] bg-[#ff3b30]/10' : 'text-[#1d1d1f] bg-[#e5e5ea]'}`}>
+                                                {item.rate.toFixed(1)}%
+                                            </span>
+                                        </td>
+                                        <td className="py-3.5 px-4">
+                                            <span className="text-xs font-semibold text-[#86868b] border border-black/5 bg-white px-2 py-1 rounded-md shadow-sm">
+                                                {item.topChannel}
+                                            </span>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredReturnList.length > 0 ? filteredReturnList.map((item, idx) => (
-                                        <tr key={item.sku} onClick={() => handleRowClick(item)} className={`border-b border-[#e5e5ea]/50 hover:bg-[#ff3b30]/5 cursor-pointer transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f5f5f7]/30'}`}>
-                                            <td className="py-3.5 px-4 text-center font-bold text-[#86868b]">#{idx + 1}</td>
-                                            <td className="py-3.5 px-4">
-                                                <div className="font-semibold text-[#1d1d1f] truncate max-w-[280px]" title={item.name}>{item.name}</div>
-                                                <div className="text-[10px] text-[#86868b] font-medium mt-0.5">{item.sku}</div>
-                                            </td>
-                                            <td className="py-3.5 px-4 text-right font-bold text-[#1d1d1f]">฿{item.returns.toLocaleString()}</td>
-                                            <td className="py-3.5 px-4 text-right">
-                                                <span className={`font-bold px-2 py-1 rounded-md ${item.rate > 3 ? 'text-[#ff3b30] bg-[#ff3b30]/10' : 'text-[#1d1d1f] bg-[#e5e5ea]'}`}>
-                                                    {item.rate.toFixed(1)}%
-                                                </span>
-                                            </td>
-                                            <td className="py-3.5 px-4">
-                                                <span className="text-xs font-semibold text-[#86868b] border border-black/5 bg-white px-2 py-1 rounded-md shadow-sm">
-                                                    {item.topChannel}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    )) : (
-                                        <tr>
-                                            <td colSpan="5" className="py-10 text-center text-[#86868b]">
-                                                <div className="flex flex-col items-center justify-center gap-2">
-                                                    <CheckCircle2 className="w-8 h-8 text-[#34c759] opacity-80" />
-                                                    <span className="font-medium text-sm">No product returns matching your search or filter.</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                                )) : (
+                                    <tr>
+                                        <td colSpan="5" className="py-10 text-center text-[#86868b]">
+                                            <div className="flex flex-col items-center justify-center gap-2">
+                                                <CheckCircle2 className="w-8 h-8 text-[#34c759] opacity-80" />
+                                                <span className="font-medium text-sm">No product returns detected in the current filter.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             );
         };
@@ -1825,205 +1754,6 @@
                                         {isCopied ? 'Copied to Clipboard!' : `Copy ${selectedGap.missed.length} Customers`}
                                     </button>
                                 </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const ProductPresenceWidget = ({ filteredData }) => {
-            const [breadcrumbs, setBreadcrumbs] = useState([]);
-            const [search, setSearch] = useState('');
-
-            const base2026 = useMemo(() => filteredData.filter(d => d.Year === '2026'), [filteredData]);
-
-            useEffect(() => {
-                setBreadcrumbs([]);
-                setSearch('');
-            }, [filteredData]);
-
-            const levelNames = ['Sub-Product Group', 'Group SKU', 'Product Name'];
-            const currentLevelIdx = breadcrumbs.length;
-            const currentLevelName = levelNames[currentLevelIdx] || 'Detail';
-
-            const { list, detail, totalLocations } = useMemo(() => {
-                let data = base2026;
-                if (breadcrumbs.length > 0) data = data.filter(d => d.SubProductGroup === breadcrumbs[0]);
-                if (breadcrumbs.length > 1) data = data.filter(d => d.GroupSKU === breadcrumbs[1]);
-                if (breadcrumbs.length > 2) data = data.filter(d => d.ProductName === breadcrumbs[2]);
-
-                const uniqueLocs = new Set();
-                data.forEach(d => {
-                    const loc = isChainBasedChannel(d.Channel) ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
-                    if (loc !== 'Unknown') uniqueLocs.add(`${d.Channel}|${loc}`);
-                });
-                const totalLocations = uniqueLocs.size;
-
-                const channelMap = {};
-                data.forEach(d => {
-                    const ch = d.Channel || 'Unknown';
-                    const loc = isChainBasedChannel(d.Channel) ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
-                    if (loc === 'Unknown') return;
-                    
-                    if (!channelMap[ch]) channelMap[ch] = new Set();
-                    channelMap[ch].add(loc);
-                });
-
-                const formattedDetail = {};
-                Object.keys(channelMap).sort().forEach(ch => {
-                    const locs = Array.from(channelMap[ch]).sort();
-                    formattedDetail[ch] = { locations: locs, count: locs.length };
-                });
-                const detailData = { channels: formattedDetail, total: totalLocations };
-
-                if (breadcrumbs.length < 3) {
-                    let groupBy = 'SubProductGroup';
-                    if (breadcrumbs.length === 1) groupBy = 'GroupSKU';
-                    if (breadcrumbs.length === 2) groupBy = 'ProductName';
-
-                    const map = {};
-                    data.forEach(d => {
-                        const key = d[groupBy] || 'Unknown';
-                        if (!map[key]) map[key] = { name: key, sales: 0, locations: new Set() };
-                        map[key].sales += (d.NetPrice || 0);
-
-                        const loc = isChainBasedChannel(d.Channel) ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
-                        if (loc !== 'Unknown') map[key].locations.add(`${d.Channel}|${loc}`);
-                    });
-
-                    let arr = Object.values(map).map(v => ({ ...v, count: v.locations.size }));
-                    arr.sort((a, b) => b.sales - a.sales);
-
-                    if (search) {
-                        const term = search.toLowerCase();
-                        arr = arr.filter(item => item.name.toLowerCase().includes(term));
-                    }
-                    return { list: arr, detail: detailData, totalLocations };
-                } else {
-                    return { list: null, detail: detailData, totalLocations };
-                }
-            }, [base2026, breadcrumbs, search]);
-
-            return (
-                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-[#0071e3]/10 p-2 rounded-xl">
-                                <MapPin className="w-6 h-6 text-[#0071e3]" />
-                            </div>
-                            <div>
-                                <h3 className="text-base font-bold text-[#1d1d1f]">Product Presence Summary (2026)</h3>
-                                <p className="text-xs text-[#86868b] font-medium">Drill-down to see distribution spread across channels.</p>
-                            </div>
-                        </div>
-                        {breadcrumbs.length < 3 && (
-                            <div className="relative w-full md:w-64">
-                                <input 
-                                    type="text" 
-                                    placeholder={`Search ${currentLevelName}...`} 
-                                    className="w-full pl-9 pr-3 py-2.5 bg-[#f5f5f7] border border-transparent focus:border-[#0071e3]/30 focus:bg-white focus:ring-4 focus:ring-[#0071e3]/10 rounded-[12px] text-sm font-medium transition-all placeholder:text-[#86868b] outline-none"
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                />
-                                <Search className="w-4 h-4 text-[#86868b] absolute left-3 top-2.5" />
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 mb-4">
-                        <div className="flex items-center gap-1.5 text-sm font-medium bg-[#f5f5f7]/80 p-1.5 rounded-[14px] overflow-x-auto custom-scrollbar border border-black/5 w-full xl:w-auto">
-                            <button onClick={() => {setBreadcrumbs([]); setSearch('');}} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap ${breadcrumbs.length === 0 ? 'bg-white text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,0.06)] font-bold' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#e8e8ed]'}`}>
-                                <LayoutList className="w-4 h-4" /> All Categories
-                            </button>
-                            {breadcrumbs.map((crumb, idx) => (
-                                <React.Fragment key={idx}>
-                                    <ChevronRight className="w-4 h-4 text-[#d1d1d6] flex-shrink-0" />
-                                    <button onClick={() => {setBreadcrumbs(breadcrumbs.slice(0, idx + 1)); setSearch('');}} className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap truncate max-w-[180px] ${breadcrumbs.length === idx + 1 ? 'bg-white text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,0.06)] font-bold' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#e8e8ed]'}`} title={crumb}>
-                                        {crumb}
-                                    </button>
-                                </React.Fragment>
-                            ))}
-                        </div>
-                        
-                        <div className="flex items-center gap-2 bg-gradient-to-r from-[#34c759]/10 to-[#34c759]/5 text-[#28a745] px-4 py-2 rounded-[14px] text-sm font-bold tracking-wide border border-[#34c759]/20 shadow-sm shrink-0">
-                            <CheckCircle2 className="w-5 h-5" />
-                            Total Unique Presence: {totalLocations} Locations
-                        </div>
-                    </div>
-
-                    {list && (
-                        <div className="overflow-x-auto custom-scrollbar border border-black/5 rounded-xl max-h-[380px] bg-white mb-6">
-                            <table className="w-full text-sm text-left border-collapse min-w-[600px]">
-                                <thead className="sticky top-0 bg-[#f5f5f7]/95 backdrop-blur z-10 shadow-[0_1px_0_#e5e5ea]">
-                                    <tr>
-                                        <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider w-16 text-center">Rank</th>
-                                        <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider">{currentLevelName}</th>
-                                        <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider text-right w-40">Sales 2026</th>
-                                        <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider text-right w-56">Active Locations</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {list.length > 0 ? list.map((item, idx) => {
-                                        const maxCount = Math.max(...list.map(i => i.count));
-                                        const pct = maxCount > 0 ? (item.count / maxCount) * 100 : 0;
-                                        return (
-                                            <tr key={item.name} onClick={() => { setBreadcrumbs([...breadcrumbs, item.name]); setSearch(''); }} className="border-b border-[#e5e5ea]/50 hover:bg-[#0071e3]/5 cursor-pointer transition-colors group relative">
-                                                <td className="py-4 px-4 text-center font-semibold text-[#86868b]">#{idx + 1}</td>
-                                                <td className="py-4 px-4 font-semibold text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors">{item.name}</td>
-                                                <td className="py-4 px-4 text-right font-medium text-[#1d1d1f]">฿{item.sales.toLocaleString()}</td>
-                                                <td className="py-4 px-4 pr-10 relative">
-                                                    <div className="flex items-center justify-end gap-3">
-                                                        <span className="font-bold text-[#1d1d1f] w-8 text-right">{item.count}</span>
-                                                        <div className="w-24 h-1.5 bg-[#e5e5ea] rounded-full overflow-hidden flex-shrink-0">
-                                                            <div className="h-full bg-[#0071e3] rounded-full" style={{ width: `${pct}%` }}></div>
-                                                        </div>
-                                                        <ChevronRight className="w-4 h-4 text-[#d1d1d6] group-hover:text-[#0071e3] transition-colors absolute right-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 duration-200" />
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    }) : (
-                                        <tr><td colSpan="4" className="py-12 text-center text-[#86868b] font-medium"><Search className="w-8 h-8 opacity-20 mx-auto mb-2" />No records found</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-
-                    {detail && (
-                        <div className="flex flex-col mt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="bg-[#1d1d1f]/5 p-1.5 rounded-lg">
-                                    <MapPin className="w-4 h-4 text-[#1d1d1f]" />
-                                </div>
-                                <h4 className="text-sm font-bold text-[#1d1d1f]">Locations Breakdown</h4>
-                                <span className="text-xs font-semibold text-[#86868b] ml-1">for current view</span>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                                {Object.keys(detail.channels).length > 0 ? (
-                                    Object.entries(detail.channels).map(([ch, data]) => (
-                                        <div key={ch} className="bg-[#f5f5f7]/60 rounded-[16px] p-4 border border-black/[0.03] flex flex-col hover:bg-[#f5f5f7] transition-colors">
-                                            <div className="flex items-center justify-between mb-3 pb-2 border-b border-black/5">
-                                                <h4 className="text-sm font-bold text-[#1d1d1f]">{ch}</h4>
-                                                <span className="text-xs font-semibold text-[#86868b]">({data.count} Locations)</span>
-                                            </div>
-                                            <ul className="space-y-2.5 overflow-y-auto custom-scrollbar max-h-60 pr-2">
-                                                {data.locations.map((loc, idx) => (
-                                                    <li key={idx} className="flex items-start gap-2.5 text-sm font-medium text-[#1d1d1f]">
-                                                        <div className="mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-[#0071e3] shadow-sm"></div>
-                                                        <span className="leading-snug text-[#1d1d1f]/80">{loc}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-[#86868b]">
-                                        <MapPin className="w-10 h-10 mb-3 opacity-20" />
-                                        <span className="text-sm font-medium">No presence data available for selected product</span>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}
@@ -2650,8 +2380,10 @@
                             setTopCustomerDrillDown={setTopCustomerDrillDown} 
                         />
 
+                        {/* Product Presence Drill-down Widget repositioned here */}
                         <ProductPresenceWidget filteredData={filteredData} />
                         
+                        {/* New Sku Health Widget */}
                         <SkuHealthWidget filteredData={filteredData} />
 
                         <WhiteSpaceWidget 
