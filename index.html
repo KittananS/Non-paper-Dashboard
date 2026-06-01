@@ -1222,11 +1222,18 @@
             const currentLevelIdx = breadcrumbs.length;
             const currentLevelName = levelNames[currentLevelIdx] || 'Detail';
 
-            const { list, detail } = useMemo(() => {
+            const { list, detail, totalLocations } = useMemo(() => {
                 let data = base2026;
                 if (breadcrumbs.length > 0) data = data.filter(d => d.SubProductGroup === breadcrumbs[0]);
                 if (breadcrumbs.length > 1) data = data.filter(d => d.GroupSKU === breadcrumbs[1]);
                 if (breadcrumbs.length > 2) data = data.filter(d => d.ProductName === breadcrumbs[2]);
+
+                const uniqueLocs = new Set();
+                data.forEach(d => {
+                    const loc = isChainBasedChannel(d.Channel) ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
+                    if (loc !== 'Unknown') uniqueLocs.add(`${d.Channel}|${loc}`);
+                });
+                const totalLocations = uniqueLocs.size;
 
                 if (breadcrumbs.length < 3) {
                     let groupBy = 'SubProductGroup';
@@ -1250,19 +1257,16 @@
                         const term = search.toLowerCase();
                         arr = arr.filter(item => item.name.toLowerCase().includes(term));
                     }
-                    return { list: arr, detail: null };
+                    return { list: arr, detail: null, totalLocations };
                 } else {
                     const channelMap = {};
-                    let totalCount = 0;
                     data.forEach(d => {
                         const ch = d.Channel || 'Unknown';
                         const loc = isChainBasedChannel(d.Channel) ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
                         if (loc === 'Unknown') return;
                         
                         if (!channelMap[ch]) channelMap[ch] = new Set();
-                        const before = channelMap[ch].size;
                         channelMap[ch].add(loc);
-                        if (channelMap[ch].size > before) totalCount++;
                     });
 
                     const formatted = {};
@@ -1270,7 +1274,7 @@
                         const locs = Array.from(channelMap[ch]).sort();
                         formatted[ch] = { locations: locs, count: locs.length };
                     });
-                    return { list: null, detail: { channels: formatted, total: totalCount } };
+                    return { list: null, detail: { channels: formatted, total: totalLocations }, totalLocations };
                 }
             }, [base2026, breadcrumbs, search]);
 
@@ -1300,18 +1304,25 @@
                         )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-sm font-medium bg-[#f5f5f7]/80 p-1.5 rounded-[14px] mb-4 overflow-x-auto custom-scrollbar border border-black/5">
-                        <button onClick={() => {setBreadcrumbs([]); setSearch('');}} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap ${breadcrumbs.length === 0 ? 'bg-white text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,0.06)] font-bold' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#e8e8ed]'}`}>
-                            <LayoutList className="w-4 h-4" /> All Categories
-                        </button>
-                        {breadcrumbs.map((crumb, idx) => (
-                            <React.Fragment key={idx}>
-                                <ChevronRight className="w-4 h-4 text-[#d1d1d6] flex-shrink-0" />
-                                <button onClick={() => {setBreadcrumbs(breadcrumbs.slice(0, idx + 1)); setSearch('');}} className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap truncate max-w-[180px] ${breadcrumbs.length === idx + 1 ? 'bg-white text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,0.06)] font-bold' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#e8e8ed]'}`} title={crumb}>
-                                    {crumb}
-                                </button>
-                            </React.Fragment>
-                        ))}
+                    <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 mb-4">
+                        <div className="flex items-center gap-1.5 text-sm font-medium bg-[#f5f5f7]/80 p-1.5 rounded-[14px] overflow-x-auto custom-scrollbar border border-black/5 w-full xl:w-auto">
+                            <button onClick={() => {setBreadcrumbs([]); setSearch('');}} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap ${breadcrumbs.length === 0 ? 'bg-white text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,0.06)] font-bold' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#e8e8ed]'}`}>
+                                <LayoutList className="w-4 h-4" /> All Categories
+                            </button>
+                            {breadcrumbs.map((crumb, idx) => (
+                                <React.Fragment key={idx}>
+                                    <ChevronRight className="w-4 h-4 text-[#d1d1d6] flex-shrink-0" />
+                                    <button onClick={() => {setBreadcrumbs(breadcrumbs.slice(0, idx + 1)); setSearch('');}} className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap truncate max-w-[180px] ${breadcrumbs.length === idx + 1 ? 'bg-white text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,0.06)] font-bold' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#e8e8ed]'}`} title={crumb}>
+                                        {crumb}
+                                    </button>
+                                </React.Fragment>
+                            ))}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 bg-gradient-to-r from-[#34c759]/10 to-[#34c759]/5 text-[#28a745] px-4 py-2 rounded-[14px] text-sm font-bold tracking-wide border border-[#34c759]/20 shadow-sm shrink-0">
+                            <CheckCircle2 className="w-5 h-5" />
+                            Total Unique Presence: {totalLocations} Locations
+                        </div>
                     </div>
 
                     {list && (
@@ -1355,12 +1366,6 @@
 
                     {detail && (
                         <div className="flex flex-col mt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <div className="mb-4">
-                                <span className="bg-[#34c759]/10 text-[#34c759] px-3.5 py-2 rounded-xl text-sm font-bold tracking-wide border border-[#34c759]/20 flex items-center gap-2 w-max shadow-sm">
-                                    <CheckCircle2 className="w-5 h-5" />
-                                    Total Presence: {detail.total} Locations
-                                </span>
-                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                                 {Object.keys(detail.channels).length > 0 ? (
                                     Object.entries(detail.channels).map(([ch, data]) => (
