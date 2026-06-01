@@ -1089,7 +1089,7 @@
             </div>
         );
 
-        const TopCustomersWidget = ({ topCustomers, uniqueCustomersCount, customerSearch, setCustomerSearch, topCustomerSortMode, setTopCustomerSortMode, kpi, topCustomerDrillDown, setTopCustomerDrillDown }) => (
+        const CoverageGapWidget = ({ coverageGrid, coverageDrillChannel, setCoverageDrillChannel, coverageSearch, setCoverageSearch }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04]">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                     <div className="flex items-center gap-3">
@@ -1217,241 +1217,180 @@
             </div>
         );
 
-        const WhiteSpaceWidget = ({ filteredData, debouncedSearch, searchStr, setSearchStr }) => {
-            const [selectedGap, setSelectedGap] = useState(null);
-            const [isCopied, setIsCopied] = useState(false);
+        const SKUBlueprintWidget = ({ blueprintData, blueprintSKU, setBlueprintSKU }) => {
+            const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+            const [searchQuery, setSearchQuery] = useState('');
+            const dropdownRef = useRef(null);
 
-            const grid = useMemo(() => {
-                const base2026 = filteredData.filter(d => d.Year === '2026');
-                const subChannelSales = {};
-                const skuSales = {};
-                const subChannelCustomers = {}; 
-                const matrix = {}; 
-                
-                base2026.forEach(d => {
-                    const subCh = d.SubChannel || 'Unknown';
-                    const sku = d.GroupSKU || 'Unknown';
-                    const upperCh = d.Channel?.toUpperCase() || '';
-                    const isChain = ['MT', 'INTER COMPANY', 'ONLINE', 'BJC'].includes(upperCh);
-                    const customer = d.SoldToParty || 'Unknown';
-                    const val = d.NetPrice || 0;
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setIsDropdownOpen(false);
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
 
-                    if (!subChannelSales[subCh]) {
-                        subChannelSales[subCh] = 0;
-                        subChannelCustomers[subCh] = new Set();
-                    }
-                    subChannelSales[subCh] += val;
-                    if(customer && customer !== 'Unknown') subChannelCustomers[subCh].add(customer);
+            if (!blueprintData) return null;
 
-                    if (!skuSales[sku]) {
-                        skuSales[sku] = 0;
-                        matrix[sku] = {};
-                    }
-                    skuSales[sku] += val;
-                    
-                    if (!matrix[sku][subCh]) {
-                        matrix[sku][subCh] = new Set();
-                    }
-                    if(customer && customer !== 'Unknown') matrix[sku][subCh].add(customer);
-                });
-
-                const columns = Object.keys(subChannelSales)
-                    .filter(c => c !== 'Unknown')
-                    .sort((a, b) => subChannelSales[b] - subChannelSales[a])
-                    .slice(0, 12); 
-
-                let rows = Object.keys(skuSales)
-                    .filter(s => s !== 'Unknown')
-                    .sort((a, b) => skuSales[b] - skuSales[a]);
-
-                if (debouncedSearch.length >= 2) {
-                    const term = debouncedSearch.toLowerCase();
-                    rows = rows.filter(sku => sku.toLowerCase().includes(term));
-                }
-
-                return { columns, rows, subChannelCustomers, matrix, skuSales, subChannelSales };
-            }, [filteredData, debouncedSearch]);
-
-            const handleCellClick = (sku, subCh) => {
-                const totalSet = grid.subChannelCustomers[subCh] || new Set();
-                const boughtSet = grid.matrix[sku]?.[subCh] || new Set();
-                
-                const missed = [];
-                totalSet.forEach(cust => {
-                    if (!boughtSet.has(cust)) {
-                        missed.push(cust);
-                    }
-                });
-
-                if (missed.length > 0) {
-                    missed.sort((a, b) => a.localeCompare(b));
-                    setSelectedGap({ sku, subCh, missed });
-                }
-            };
-
-            const copyToClipboard = () => {
-                if (!selectedGap) return;
-                const text = selectedGap.missed.join('\n');
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                
-                setIsCopied(true);
-                setTimeout(() => setIsCopied(false), 2000);
-            };
+            const { targetSKU, availableSKUs, reachCount, reachGrowth, currentMonthStr, totalReach26, yoyReachGrowth, depData, heavyUsers, totalSales26 } = blueprintData;
+            
+            const filteredSKUs = availableSKUs.filter(sku => sku.toLowerCase().includes(searchQuery.toLowerCase()));
 
             return (
-                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04]">
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col lg:col-span-3">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="bg-[#ff2d55]/10 p-2 rounded-xl">
-                                <Crosshair className="w-6 h-6 text-[#ff2d55]" />
+                            <div className="bg-[#30b0c7]/10 p-2 rounded-xl">
+                                <Target className="w-6 h-6 text-[#30b0c7]" />
                             </div>
                             <div>
-                                <h3 className="text-base font-bold text-[#1d1d1f]">White Space & Distribution Gap Analysis</h3>
-                                <p className="text-xs text-[#86868b] font-medium">Click on highlighted cells to reveal actionable target customers (Blank Data).</p>
+                                <h3 className="text-base font-extrabold text-[#1d1d1f]">SKU Channel Blueprint</h3>
+                                <p className="text-xs text-[#86868b] font-medium">Deep Dive Analytics for Individual SKU</p>
                             </div>
                         </div>
-                        <div className="relative">
-                            <input 
-                                type="text" 
-                                placeholder="Search SKU..." 
-                                className="w-64 pl-9 pr-3 py-2.5 bg-[#f5f5f7] border-0 rounded-[12px] text-sm font-medium focus:ring-2 focus:ring-[#0071e3]/20 focus:outline-none transition-all placeholder:text-[#86868b]" 
-                                value={searchStr} 
-                                onChange={(e) => setSearchStr(e.target.value)} 
-                            />
-                            <Search className="w-4 h-4 text-[#86868b] absolute left-3 top-3" />
+                        
+                        <div className="relative w-full md:w-72 z-20" ref={dropdownRef}>
+                            <button 
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
+                                className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-[#f5f5f7] border-0 rounded-[12px] text-sm font-bold text-[#1d1d1f] hover:bg-[#e8e8ed] transition-colors focus:outline-none focus:ring-2 focus:ring-[#0071e3]/20"
+                            >
+                                <span className="truncate">{targetSKU || 'Select SKU...'}</span>
+                                <ChevronDown className={`w-4 h-4 text-[#86868b] flex-shrink-0 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {isDropdownOpen && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] max-h-72 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+                                    <div className="p-2 border-b border-black/5">
+                                        <div className="relative">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Search SKU..." 
+                                                className="w-full pl-8 pr-3 py-2 bg-[#f5f5f7] border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3]/20"
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                autoFocus
+                                            />
+                                            <Search className="w-3.5 h-3.5 text-[#86868b] absolute left-2.5 top-2.5" />
+                                        </div>
+                                    </div>
+                                    <div className="overflow-y-auto custom-scrollbar p-1">
+                                        {filteredSKUs.length > 0 ? filteredSKUs.map(sku => (
+                                            <button 
+                                                key={sku}
+                                                onClick={() => { setBlueprintSKU(sku); setIsDropdownOpen(false); setSearchQuery(''); }}
+                                                className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${sku === targetSKU ? 'bg-[#0071e3]/10 text-[#0071e3] font-bold' : 'text-[#1d1d1f] font-medium hover:bg-[#f5f5f7]'}`}
+                                            >
+                                                {sku}
+                                            </button>
+                                        )) : (
+                                            <div className="p-3 text-center text-sm text-[#86868b]">No SKUs found</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                    
-                    <div className="overflow-x-auto custom-scrollbar max-h-[600px] rounded-xl border border-black/5">
-                        <table className="w-full text-sm text-left border-collapse min-w-[800px]">
-                            <thead className="sticky top-0 bg-[#f5f5f7] z-10 shadow-[0_1px_0_#e5e5ea]">
-                                <tr>
-                                    <th className="py-4 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider w-1/4 min-w-[250px] shadow-[1px_0_0_#e5e5ea] z-20 sticky left-0 bg-[#f5f5f7]">
-                                        Hero SKU (Y-Axis)
-                                    </th>
-                                    {grid.columns.map(col => {
-                                        const totalCusts = grid.subChannelCustomers[col]?.size || 0;
-                                        return (
-                                            <th key={col} className="py-4 px-3 font-semibold text-center min-w-[120px]">
-                                                <div className="flex flex-col items-center">
-                                                    <span className="text-sm font-bold text-[#1d1d1f] mb-1">{col}</span>
-                                                    <div className="flex items-center gap-1 text-[10px] font-semibold text-[#86868b] bg-white border border-black/5 px-2 py-0.5 rounded-md shadow-[0_1px_2px_rgba(0,0,0,0.02)]" title="Total Active Customers in this Sub-Channel">
-                                                        <Users className="w-3 h-3 text-[#86868b]" /> Base: {totalCusts}
-                                                    </div>
-                                                </div>
-                                            </th>
-                                        );
-                                    })}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {grid.rows.map((sku, idx) => (
-                                    <tr key={sku} className={`border-b border-[#e5e5ea]/50 hover:bg-[#0071e3]/5 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f5f5f7]/30'}`}>
-                                        <td className="py-4 px-4 font-semibold text-[#1d1d1f] text-sm sticky left-0 z-10 shadow-[1px_0_0_#e5e5ea] bg-inherit truncate max-w-[250px]" title={sku}>
-                                            {sku}
-                                        </td>
-                                        {grid.columns.map(col => {
-                                            const total = grid.subChannelCustomers[col]?.size || 0;
-                                            const bought = grid.matrix[sku]?.[col]?.size || 0;
-                                            
-                                            if (total === 0) {
-                                                return <td key={col} className="py-3 px-3 text-center border-l border-[#e5e5ea]/30"><span className="text-[#d1d1d6] font-bold">-</span></td>;
-                                            }
-                                            
-                                            const pct = (bought / total) * 100;
-                                            const gap = total - bought;
-                                            
-                                            let colorClass = 'text-[#ff3b30] bg-[#ff3b30]/10'; // Red
-                                            let barClass = 'bg-[#ff3b30]';
-                                            if (pct === 100) { colorClass = 'text-[#34c759] bg-[#34c759]/10'; barClass = 'bg-[#34c759]'; }
-                                            else if (pct >= 50) { colorClass = 'text-[#ff9500] bg-[#ff9500]/10'; barClass = 'bg-[#ff9500]'; }
 
-                                            return (
-                                                <td key={col} className="p-2 text-center border-l border-[#e5e5ea]/30">
-                                                    <div 
-                                                        onClick={() => gap > 0 && handleCellClick(sku, col)}
-                                                        className={`flex flex-col gap-1.5 p-2 rounded-xl transition-all ${gap > 0 ? 'cursor-pointer hover:bg-black/5 active:scale-95 hover:shadow-sm' : ''}`}
-                                                        title={gap > 0 ? `Click to see ${gap} missing customers` : '100% Covered'}
-                                                    >
-                                                        <div className="flex justify-between items-center text-xs">
-                                                            <span className={`font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${colorClass}`}>
-                                                                {pct === 100 ? <Check className="w-3.5 h-3.5" /> : gap} {pct < 100 && 'Gap'}
-                                                            </span>
-                                                            <span className="text-[#86868b] font-semibold text-[10px] tracking-wide">{bought}/{total}</span>
-                                                        </div>
-                                                        <div className="w-full h-1.5 bg-[#e5e5ea] rounded-full overflow-hidden shadow-inner">
-                                                            <div className={`h-full rounded-full transition-all duration-500 ${barClass}`} style={{ width: `${pct}%` }}></div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+                        {/* 1. Active Reach */}
+                        <div className="flex flex-col border-b md:border-b-0 md:border-r border-black/5 pb-6 md:pb-0 md:pr-6">
+                            <div className="flex items-center gap-2 mb-2 group cursor-help relative w-max">
+                                <Users className="w-4 h-4 text-[#0071e3]" />
+                                <h4 className="text-sm font-bold text-[#86868b] uppercase tracking-wider">Active Reach</h4>
+                                <div className="absolute top-full left-0 mt-1 w-60 p-3 bg-slate-800 text-white text-xs leading-relaxed rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                                    <span className="font-bold text-[#32ade6]">Broad vs Niche Appeal:</span><br/>จำนวนลูกค้าที่สั่งซื้อในเดือนล่าสุด ({currentMonthStr}) เทียบกับเดือนก่อนหน้า
+                                </div>
+                            </div>
+                            
+                            <div className="mt-2 flex items-baseline gap-2">
+                                <span className="text-4xl font-extrabold text-[#1d1d1f] tracking-tight">{reachCount}</span>
+                                <span className="text-sm font-semibold text-[#86868b]">Customers</span>
+                            </div>
+                            <div className={`text-sm font-semibold mt-1 flex items-center gap-1 ${reachGrowth >= 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'}`}>
+                                {reachGrowth >= 0 ? '▲' : '▼'} {Math.abs(reachGrowth).toFixed(1)}% MoM
+                            </div>
+                            
+                            <div className="mt-auto pt-4 flex items-center justify-between text-xs font-medium text-[#86868b] border-t border-black/5 border-dashed">
+                                <span>Total 2026 Base: <span className="font-bold text-[#1d1d1f]">{totalReach26}</span></span>
+                                {yoyReachGrowth !== null && (
+                                    <span className={yoyReachGrowth >= 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'}>
+                                        {yoyReachGrowth >= 0 ? '+' : ''}{yoyReachGrowth.toFixed(1)}% YoY
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 2. Channel Dependency */}
+                        <div className="flex flex-col border-b md:border-b-0 md:border-r border-black/5 pb-6 md:pb-0 md:px-6">
+                            <div className="flex items-center gap-2 mb-4 group cursor-help relative w-max">
+                                <PieIcon className="w-4 h-4 text-[#ff9500]" />
+                                <h4 className="text-sm font-bold text-[#86868b] uppercase tracking-wider">Channel Dependency</h4>
+                                <div className="absolute top-full left-0 mt-1 w-60 p-3 bg-slate-800 text-white text-xs leading-relaxed rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                                    <span className="font-bold text-[#ff9500]">Concentration Risk:</span><br/>สัดส่วนยอดขายแตกตาม Sub-channel เพื่อประเมินความเสี่ยงหากช่องทางใดช่องทางหนึ่งมีปัญหา
+                                </div>
+                            </div>
+
+                            {/* Horizontal Stacked Bar */}
+                            <div className="w-full h-4 bg-[#f5f5f7] rounded-full overflow-hidden flex mb-4 shadow-inner">
+                                {depData.map((d, i) => (
+                                    d.pct > 0 && <div key={d.name} className="h-full hover:opacity-80 transition-opacity" style={{ width: `${d.pct}%`, backgroundColor: APPLE_PALETTE[i % APPLE_PALETTE.length] }} title={`${d.name}: ${d.pct.toFixed(1)}%`}></div>
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
+                            </div>
 
-                    {selectedGap && (
-                        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-                            <div className="bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
-                                <div className="p-5 border-b border-black/5 relative">
-                                    <div className="flex items-center gap-3 mb-1">
-                                        <div className="bg-[#ff2d55]/10 p-2 rounded-lg">
-                                            <Target className="w-5 h-5 text-[#ff2d55]" />
+                            <div className="space-y-2 overflow-y-auto custom-scrollbar max-h-24 pr-1">
+                                {depData.slice(0, 4).map((d, i) => (
+                                    <div key={d.name} className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-1.5 truncate pr-2">
+                                            <div className="w-2 h-2 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: APPLE_PALETTE[i % APPLE_PALETTE.length] }}></div>
+                                            <span className="font-semibold text-[#1d1d1f] truncate" title={d.name}>{d.name}</span>
                                         </div>
-                                        <div>
-                                            <h2 className="text-lg font-bold text-[#1d1d1f] tracking-tight">Actionable Insight</h2>
-                                            <p className="text-xs text-[#86868b] font-medium">Target List for Sales Team</p>
-                                        </div>
+                                        <span className="font-bold text-[#86868b]">{d.pct.toFixed(1)}%</span>
                                     </div>
-                                    <button onClick={() => {setSelectedGap(null); setIsCopied(false);}} className="text-[#86868b] hover:text-[#1d1d1f] absolute right-5 top-5 bg-[#e8e8ed] hover:bg-[#d1d1d6] p-1.5 rounded-full transition-colors">
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                
-                                <div className="px-6 py-4 bg-[#f5f5f7]/50 border-b border-black/5">
-                                    <div className="text-sm font-medium text-[#1d1d1f] mb-1">
-                                        SKU: <span className="font-bold text-[#0071e3]">{selectedGap.sku}</span>
+                                ))}
+                                {depData.length > 4 && (
+                                    <div className="text-[10px] text-[#86868b] font-medium italic pt-1 text-center">
+                                        + {depData.length - 4} other channels
                                     </div>
-                                    <div className="text-sm font-medium text-[#1d1d1f]">
-                                        Sub-Channel: <span className="font-bold">{selectedGap.subCh}</span>
-                                    </div>
-                                    <div className="mt-3 text-xs font-semibold text-[#ff3b30] bg-[#ff3b30]/10 px-3 py-2 rounded-lg inline-block">
-                                        Found {selectedGap.missed.length} active customers without purchase history for this SKU.
-                                    </div>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-                                    {selectedGap.missed.map((cust, idx) => (
-                                        <div key={idx} className="px-4 py-2.5 hover:bg-[#f5f5f7] rounded-xl text-sm font-medium text-[#1d1d1f] transition-colors flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-[#ff9500]"></div>
-                                            {cust}
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="p-5 bg-white border-t border-black/5">
-                                    <button 
-                                        onClick={copyToClipboard}
-                                        className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-[14px] text-base font-semibold shadow-md active:scale-95 transition-all ${isCopied ? 'bg-[#34c759] hover:bg-[#28a745] text-white' : 'bg-[#1d1d1f] hover:bg-black text-white'}`}
-                                    >
-                                        {isCopied ? <CheckCircle2 className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-                                        {isCopied ? 'Copied to Clipboard!' : `Copy ${selectedGap.missed.length} Customers`}
-                                    </button>
-                                </div>
+                                )}
                             </div>
                         </div>
-                    )}
+
+                        {/* 3. The Heavy Users */}
+                        <div className="flex flex-col md:pl-6">
+                            <div className="flex items-center gap-2 mb-3 group cursor-help relative w-max">
+                                <Medal className="w-4 h-4 text-[#ff2d55]" />
+                                <h4 className="text-sm font-bold text-[#86868b] uppercase tracking-wider">The "Heavy Users"</h4>
+                                <div className="absolute top-full right-0 md:left-0 mt-1 w-64 p-3 bg-slate-800 text-white text-xs leading-relaxed rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                                    <span className="font-bold text-[#ff2d55]">Top 3 Sold-To Party:</span><br/>ลูกค้ารายใหญ่ที่สุดที่อุ้มยอดขายของสินค้านี้ ใช้สำหรับจัด Trade Promo หรือ Sales Pitch ให้ตรงจุด
+                                </div>
+                            </div>
+
+                            <div className="space-y-3 flex-1 flex flex-col justify-center">
+                                {heavyUsers.map((user, i) => (
+                                    <div key={user.name} className="flex flex-col gap-1">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <div className="flex items-center gap-1.5 truncate pr-2 font-semibold text-[#1d1d1f]">
+                                                {i === 0 ? <Trophy className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" /> : <span className="text-[#86868b] w-3.5 text-center flex-shrink-0">#{i+1}</span>}
+                                                <span className="truncate" title={user.name}>{user.name}</span>
+                                            </div>
+                                            <span className="font-bold text-[#0071e3]">฿{(user.value/1000000).toFixed(2)}M</span>
+                                        </div>
+                                        <div className="w-full h-1 bg-[#f5f5f7] rounded-full overflow-hidden">
+                                            <div className="h-full bg-[#0071e3] rounded-full opacity-60" style={{ width: `${user.pct}%` }}></div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {heavyUsers.length === 0 && (
+                                    <div className="text-sm text-[#86868b] italic text-center py-4">No active buyers in 2026</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             );
         };
 
+        // --- Main Component ---
         function Dashboard() {
             const [salesData, setSalesData] = useState([]);
             const [budgetChannel, setBudgetChannel] = useState([]);
@@ -1485,6 +1424,8 @@
             
             const [topPerfDrillDown, setTopPerfDrillDown] = useState(null);
             const [topCustomerDrillDown, setTopCustomerDrillDown] = useState(null);
+            
+            const [blueprintSKU, setBlueprintSKU] = useState('');
             
             // Status for all groups
             const [filesStatus, setFilesStatus] = useState({
@@ -1908,78 +1849,78 @@
                 return unique.size;
             }, [filteredData]);
 
-            const npdData = useMemo(() => {
-                const productStats = {};
-                const monthMap = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
-                
-                salesData.forEach(d => {
-                    const m = d.Month ? d.Month.substring(0, 3) : null;
-                    if (!m || !d.ProductName) return;
-                    const mIdx = monthMap[m];
-                    if (mIdx === undefined) return;
-                    
-                    const absMonth = (parseInt(d.Year) - 2025) * 12 + mIdx;
-                    
-                    if (!productStats[d.ProductName]) {
-                        productStats[d.ProductName] = { firstAbsMonth: absMonth };
-                    } else {
-                        if (absMonth < productStats[d.ProductName].firstAbsMonth) {
-                            productStats[d.ProductName].firstAbsMonth = absMonth;
-                        }
-                    }
-                });
+            const blueprintData = useMemo(() => {
+                const base26 = salesData.filter(d => d.Year === '2026' && (selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup)));
+                const base25 = salesData.filter(d => d.Year === '2025' && (selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup)));
 
-                let maxAbsMonth = 0;
-                salesData.forEach(d => {
-                    if (d.Year === '2026') {
-                        const m = d.Month ? d.Month.substring(0, 3) : null;
-                        if (m && monthMap[m] !== undefined) {
-                            const absMonth = 12 + monthMap[m];
-                            if (absMonth > maxAbsMonth) maxAbsMonth = absMonth;
-                        }
-                    }
+                // Extract unique SKUs for the dropdown
+                const skuSales = {};
+                base26.forEach(d => {
+                    const sku = d.GroupSKU;
+                    if (sku) skuSales[sku] = (skuSales[sku] || 0) + d.NetPrice;
                 });
                 
-                if (maxAbsMonth === 0) maxAbsMonth = 16; 
-                const thresholdMonth = maxAbsMonth - 11; 
+                const availableSKUs = Object.keys(skuSales).sort((a,b) => skuSales[b] - skuSales[a]);
+                if (availableSKUs.length === 0) return null;
+                
+                const targetSKU = blueprintSKU && availableSKUs.includes(blueprintSKU) ? blueprintSKU : availableSKUs[0];
+                const skuData26 = base26.filter(d => d.GroupSKU === targetSKU);
+                const skuData25 = base25.filter(d => d.GroupSKU === targetSKU);
 
-                const npdProducts = new Set();
-                Object.entries(productStats).forEach(([pName, stats]) => {
-                    if (stats.firstAbsMonth >= thresholdMonth) {
-                        npdProducts.add(pName);
-                    }
+                // 1. Active Reach (Customers count MoM)
+                const monthMap = { 'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12 };
+                let maxM = 0;
+                skuData26.forEach(d => {
+                    const mStr = d.Month ? d.Month.substring(0,3) : null;
+                    if (mStr && monthMap[mStr] > maxM) maxM = monthMap[mStr];
                 });
+                
+                const currentMonthStr = Object.keys(monthMap).find(k => monthMap[k] === maxM) || 'N/A';
+                const prevMonthStr = Object.keys(monthMap).find(k => monthMap[k] === maxM - 1);
 
-                let totalNPDSales26 = 0;
-                const npdList = {};
+                const currCustomers = new Set(skuData26.filter(d => d.Month && d.Month.startsWith(currentMonthStr)).map(d => d.SoldToParty));
+                const prevCustomers = new Set(skuData26.filter(d => d.Month && d.Month.startsWith(prevMonthStr)).map(d => d.SoldToParty));
+                
+                const reachCount = currCustomers.size;
+                const reachGrowth = prevCustomers.size > 0 ? ((currCustomers.size - prevCustomers.size) / prevCustomers.size) * 100 : (currCustomers.size > 0 ? 100 : 0);
+                
+                const totalReach26 = new Set(skuData26.map(d => d.SoldToParty)).size;
+                const totalReach25 = new Set(skuData25.map(d => d.SoldToParty)).size;
+                const yoyReachGrowth = totalReach25 > 0 ? ((totalReach26 - totalReach25) / totalReach25) * 100 : null;
 
-                filteredData.filter(d => d.Year === '2026').forEach(d => {
-                    if (npdProducts.has(d.ProductName)) {
-                        totalNPDSales26 += d.NetPrice;
-                        if (!npdList[d.ProductName]) {
-                            npdList[d.ProductName] = { name: d.ProductName, sku: d.GroupSKU, sales26: 0, channels: {} };
-                        }
-                        npdList[d.ProductName].sales26 += d.NetPrice;
-                        const ch = d.Channel || 'Unknown';
-                        npdList[d.ProductName].channels[ch] = (npdList[d.ProductName].channels[ch] || 0) + d.NetPrice;
-                    }
+                // 2. Channel Dependency
+                let totalSales26 = 0;
+                const channelSales = {};
+                skuData26.forEach(d => {
+                    const sc = d.SubChannel || d.Channel || 'Unknown';
+                    channelSales[sc] = (channelSales[sc] || 0) + d.NetPrice;
+                    totalSales26 += d.NetPrice;
                 });
+                
+                const depData = Object.entries(channelSales)
+                    .map(([name, val]) => ({ name, value: val, pct: totalSales26 > 0 ? (val / totalSales26) * 100 : 0 }))
+                    .sort((a, b) => b.value - a.value);
 
-                const topNPDs = Object.values(npdList)
-                    .sort((a, b) => b.sales26 - a.sales26)
-                    .map(item => {
-                        const topChannels = getParetoTopItems(item.channels, 3);
-                        return { ...item, topChannels };
-                    });
+                // 3. Heavy Users
+                const userSales = {};
+                skuData26.forEach(d => {
+                    const u = d.SoldToParty || 'Unknown';
+                    userSales[u] = (userSales[u] || 0) + d.NetPrice;
+                });
+                
+                const heavyUsers = Object.entries(userSales)
+                    .map(([name, val]) => ({ name, value: val, pct: totalSales26 > 0 ? (val/totalSales26)*100 : 0 }))
+                    .sort((a,b) => b.value - a.value)
+                    .slice(0, 3);
 
-                return {
-                    totalNPDSales26,
-                    topNPDs,
-                    vitalityIndex: kpi.s26 > 0 ? (totalNPDSales26 / kpi.s26) * 100 : 0
+                return { 
+                    targetSKU, availableSKUs, 
+                    reachCount, reachGrowth, currentMonthStr, totalReach26, yoyReachGrowth, 
+                    depData, heavyUsers, totalSales26 
                 };
-            }, [salesData, filteredData, kpi.s26]);
+            }, [salesData, selectedGroups, blueprintSKU]);
 
-            return (
+            const coverageGrid = useMemo(() => {
                 <div ref={dashboardRef} className="min-h-screen pb-10 w-full relative">
                     <header className="bg-white/85 backdrop-blur-xl border-b border-black/5 sticky top-0 z-30 shadow-[0_1px_10px_rgba(0,0,0,0.02)]">
                         <div className="w-full px-6 py-3.5 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 min-h-[4rem]">
@@ -2071,15 +2012,22 @@
                             setTopCustomerDrillDown={setTopCustomerDrillDown} 
                         />
 
-                        <WhiteSpaceWidget 
-                            filteredData={filteredData} 
-                            searchStr={whiteSpaceSearch} 
-                            setSearchStr={setWhiteSpaceSearch} 
-                            debouncedSearch={debouncedWhiteSpaceSearch} 
+                        <SKUBlueprintWidget 
+                            blueprintData={blueprintData} 
+                            blueprintSKU={blueprintSKU} 
+                            setBlueprintSKU={setBlueprintSKU} 
+                        />
+
+                        <CoverageGapWidget 
+                            coverageGrid={coverageGrid} 
+                            coverageDrillChannel={coverageDrillChannel} 
+                            setCoverageDrillChannel={setCoverageDrillChannel} 
+                            coverageSearch={coverageSearch} 
+                            setCoverageSearch={setCoverageSearch} 
                         />
 
                         <footer className="w-full text-center pt-8 pb-4 text-[#86868b] font-medium text-sm">
-                            Developed by NPD Team - Version 1.2
+                            Developed by NPD Team - Version 1.3
                         </footer>
                     </main>
 
