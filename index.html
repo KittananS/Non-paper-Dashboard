@@ -1411,50 +1411,47 @@
             const debouncedHealthSearch = useDebounce(healthSearch, 300);
 
             const returnData = useMemo(() => {
-                const data26 = filteredData.filter(d => d.Year === '2026');
-                let grossSales = 0;
-                let totalReturns = 0;
+                let grossSalesTotal = 0; 
+                let totalReturns26 = 0;
                 const skuMap = {};
 
-                data26.forEach(d => {
+                filteredData.forEach(d => {
                     const val = d.NetPrice || 0;
                     const sku = d.GroupSKU || 'Unknown';
                     const name = d.ProductName || 'Unknown';
-                    // Combined key to prevent duplicate mapping/overwriting due to missing GroupSKUs
                     const uniqueKey = `${sku}::${name}`;
                     
                     const rawChannel = d.Channel || 'Unknown';
                     const isChain = isChainBasedChannel(rawChannel);
-                    // Append SubChannel for MT/Online etc. to drill down
                     const channelKey = isChain ? `${rawChannel} (${d.SubChannel || 'Unknown'})` : rawChannel;
 
                     if (!skuMap[uniqueKey]) {
-                        skuMap[uniqueKey] = { sku, name, gross: 0, returns: 0, channels: {} };
+                        skuMap[uniqueKey] = { sku, name, grossTotal: 0, returns26: 0, channels: {} };
                     }
 
                     if (val > 0) {
-                        grossSales += val;
-                        skuMap[uniqueKey].gross += val;
-                    } else if (val < 0) {
+                        grossSalesTotal += val;
+                        skuMap[uniqueKey].grossTotal += val;
+                    } else if (val < 0 && d.Year === '2026') {
                         const absVal = Math.abs(val);
-                        totalReturns += absVal;
-                        skuMap[uniqueKey].returns += absVal;
+                        totalReturns26 += absVal;
+                        skuMap[uniqueKey].returns26 += absVal;
                         skuMap[uniqueKey].channels[channelKey] = (skuMap[uniqueKey].channels[channelKey] || 0) + absVal;
                     }
                 });
 
-                const overallRate = grossSales > 0 ? (totalReturns / grossSales) * 100 : 0;
+                const overallRate = grossSalesTotal > 0 ? (totalReturns26 / grossSalesTotal) * 100 : 0;
                 
                 const topReturns = Object.values(skuMap)
-                    .filter(data => data.returns > 0)
+                    .filter(data => data.returns26 > 0)
                     .map(data => {
-                        const rate = data.gross > 0 ? (data.returns / data.gross) * 100 : 100;
+                        const rate = data.grossTotal > 0 ? (data.returns26 / data.grossTotal) * 100 : 100;
                         const topChannel = Object.entries(data.channels).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
                         return { 
                             key: `${data.sku}::${data.name}`,
                             sku: data.sku, 
                             name: data.name, 
-                            returns: data.returns, 
+                            returns: data.returns26, 
                             rate, 
                             topChannel,
                             channels: data.channels 
@@ -1462,7 +1459,7 @@
                     })
                     .sort((a, b) => b.returns - a.returns);
 
-                return { totalReturns, overallRate, topReturns };
+                return { totalReturns: totalReturns26, overallRate, topReturns };
             }, [filteredData]);
 
             const filteredReturnList = useMemo(() => {
@@ -1504,7 +1501,7 @@
                                 </div>
                                 <div className="w-px h-8 bg-black/10"></div>
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider">Overall Rate</span>
+                                    <span className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider" title="Returns 2026 vs Lifetime Gross">Lifetime Rate</span>
                                     <span className={`text-sm font-bold ${returnData.overallRate > 3 ? 'text-[#ff3b30]' : 'text-[#34c759]'}`}>
                                         {returnData.overallRate.toFixed(2)}%
                                     </span>
@@ -1537,7 +1534,7 @@
                                     <th className="py-3 px-4 w-16 text-center bg-[#f5f5f7]">Rank</th>
                                     <th className="py-3 px-4 bg-[#f5f5f7]">Product Name</th>
                                     <th className="py-3 px-4 text-right w-32 bg-[#f5f5f7]">Return Value</th>
-                                    <th className="py-3 px-4 text-right w-24 bg-[#f5f5f7]">Return Rate</th>
+                                    <th className="py-3 px-4 text-right w-24 bg-[#f5f5f7]" title="Returns 2026 vs Lifetime Gross">Lifetime Rate</th>
                                 </tr>
                             </thead>
                             <tbody>
