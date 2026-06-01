@@ -1406,12 +1406,12 @@
             
             // Search States
             const [topPerfSearch, setTopPerfSearch] = useState('');
-            const [whiteSpaceSearch, setWhiteSpaceSearch] = useState('');
+            const [coverageSearch, setCoverageSearch] = useState('');
             const [customerSearch, setCustomerSearch] = useState('');
 
             // Debounce
             const debouncedTopPerfSearch = useDebounce(topPerfSearch, 300);
-            const debouncedWhiteSpaceSearch = useDebounce(whiteSpaceSearch, 300);
+            const debouncedCoverageSearch = useDebounce(coverageSearch, 300);
             const debouncedCustomerSearch = useDebounce(customerSearch, 300);
             
             // Sort States
@@ -1424,6 +1424,7 @@
             
             const [topPerfDrillDown, setTopPerfDrillDown] = useState(null);
             const [topCustomerDrillDown, setTopCustomerDrillDown] = useState(null);
+            const [coverageDrillChannel, setCoverageDrillChannel] = useState(null);
             
             const [blueprintSKU, setBlueprintSKU] = useState('');
             
@@ -1921,6 +1922,110 @@
             }, [salesData, selectedGroups, blueprintSKU]);
 
             const coverageGrid = useMemo(() => {
+                const selectedMonthIndex = filterMonth === 'All' ? 11 : monthsList.indexOf(filterMonth);
+                const base2026 = salesData.filter(d => {
+                    const matchYear = d.Year === '2026';
+                    const matchGroup = selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup);
+                    let matchMonth = true;
+                    if (filterMonth !== 'All' && d.Month) {
+                        const recordMonthIndex = monthsList.findIndex(m => d.Month.startsWith(m));
+                        matchMonth = recordMonthIndex !== -1 && recordMonthIndex <= selectedMonthIndex;
+                    }
+                    return matchYear && matchGroup && matchMonth;
+                });
+                
+                const rowsBase = filterSubProduct !== 'All' ? base2026.filter(d => d.SubProductGroup === filterSubProduct) : base2026;
+                const skuStats = {};
+                rowsBase.forEach(d => { if (d.GroupSKU) skuStats[d.GroupSKU] = (skuStats[d.GroupSKU] || 0) + d.NetPrice; });
+                let sortedRows = Object.keys(skuStats).sort((a, b) => skuStats[b] - skuStats[a]);
+                
+                if (debouncedCoverageSearch && debouncedCoverageSearch.length >= 2) {
+                    const term = debouncedCoverageSearch.toLowerCase();
+                    const skuChannels = {};
+                    base2026.forEach(d => {
+                        const k = d.GroupSKU; if(!skuChannels[k]) skuChannels[k] = new Set();
+                        skuChannels[k].add(d.Channel?.toLowerCase() || ''); skuChannels[k].add(d.SubChannel?.toLowerCase() || '');
+                    });
+                    sortedRows = sortedRows.filter(sku => {
+                        if (sku.toLowerCase().includes(term)) return true;
+                        const chans = skuChannels[sku]; if (!chans) return false;
+                        for (let c of chans) if (c.includes(term)) return true; return false;
+                    });
+                }
+                
+                const colStats = {};
+                if (coverageDrillChannel) {
+                    const drillBase = base2026.filter(d => d.Channel === coverageDrillChannel);
+                    drillBase.forEach(d => { if (d.SubChannel) colStats[d.SubChannel] = (colStats[d.SubChannel] || 0) + d.NetPrice; });
+                } else {
+                    base2026.forEach(d => { if (d.Channel) colStats[d.Channel] = (colStats[d.Channel] || 0) + d.NetPrice; });
+                }
+                
+                const columns = Object.keys(colStats).sort((a, b) => colStats[b] - colStats[a]);
+                
+                const matrix = {}; 
+                const columnTotals = {}; 
+                const rowTotals = {};
+                
+                sortedRows.forEach(r => { matrix[r] = {}; rowTotals[r] = 0; });
+                columns.forEach(c => { columnTotals[c] = { sales: 0, count: 0 }; });
+                
+                const colUniqueItemsForHeader = {}; 
+                const colSalesForHeader = {};
+                columns.forEach(c => { colUniqueItemsForHeader[c] = new Set(); colSalesForHeader[c] = 0; });
+                
+                const allowedSKUs = new Set(sortedRows); 
+                const cellUniqueItems = {};
+                
+                base2026.forEach(d => {
+                    const sku = d.GroupSKU; 
+                    let col = coverageDrillChannel ? (d.Channel === coverageDrillChannel ? d.SubChannel : '') : d.Channel;
+                    if (!col || !columns.includes(col)) return;
+                    
+                    if (allowedSKUs.has(sku)) { 
+                        colSalesForHeader[col] += d.NetPrice; 
+                        if (!coverageDrillChannel) { 
+                            if (isChainBasedChannel(col)) colUniqueItemsForHeader[col].add(d.SubChannel); 
+                            else colUniqueItemsForHeader[col].add(d.SoldToParty); 
+                        } 
+                    }
+                    
+                    if (!sku || !allowedSKUs.has(sku)) return;
+                    
+                    if (!cellUniqueItems[sku]) cellUniqueItems[sku] = {};
+                    if (!cellUniqueItems[sku][col]) { 
+                        cellUniqueItems[sku][col] = new Set(); 
+                        matrix[sku][col] = { sales: 0, count: 0 }; 
+                    }
+                    
+                    matrix[sku][col].sales += d.NetPrice;
+                    const uniqueKey = (coverageDrillChannel || isChainBasedChannel(col)) ? (coverageDrillChannel ? d.SoldToParty : d.SubChannel) : d.SoldToParty;
+                    if (uniqueKey) cellUniqueItems[sku][col].add(uniqueKey);
+                });
+                
+                sortedRows.forEach(sku => { 
+                    columns.forEach(col => { 
+                        if (cellUniqueItems[sku]?.[col]) { 
+                            const count = coverageDrillChannel ? (matrix[sku][col].sales > 0 ? 1 : 0) : cellUniqueItems[sku][col].size; 
+                            matrix[sku][col].count = count; 
+                            rowTotals[sku] += count; 
+                        } else {
+                            matrix[sku][col] = { sales: 0, count: 0 }; 
+                        }
+                    }); 
+                });
+                
+                columns.forEach(col => { 
+                    columnTotals[col] = { 
+                        sales: colSalesForHeader[col], 
+                        count: coverageDrillChannel ? sortedRows.filter(s => matrix[s][col] && matrix[s][col].sales > 0).length : colUniqueItemsForHeader[col].size 
+                    }; 
+                });
+                
+                return { rows: sortedRows, columns, matrix, columnTotals, rowTotals };
+            }, [salesData, selectedGroups, filterSubProduct, filterMonth, coverageDrillChannel, debouncedCoverageSearch]);
+
+            return (
                 <div ref={dashboardRef} className="min-h-screen pb-10 w-full relative">
                     <header className="bg-white/85 backdrop-blur-xl border-b border-black/5 sticky top-0 z-30 shadow-[0_1px_10px_rgba(0,0,0,0.02)]">
                         <div className="w-full px-6 py-3.5 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 min-h-[4rem]">
