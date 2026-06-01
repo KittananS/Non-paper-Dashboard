@@ -1419,34 +1419,47 @@
                 data26.forEach(d => {
                     const val = d.NetPrice || 0;
                     const sku = d.GroupSKU || 'Unknown';
-                    const name = d.ProductName || sku;
-                    const channel = d.Channel || 'Unknown';
+                    const name = d.ProductName || 'Unknown';
+                    // Combined key to prevent duplicate mapping/overwriting due to missing GroupSKUs
+                    const uniqueKey = `${sku}::${name}`;
+                    
+                    const rawChannel = d.Channel || 'Unknown';
+                    const isChain = isChainBasedChannel(rawChannel);
+                    // Append SubChannel for MT/Online etc. to drill down
+                    const channelKey = isChain ? `${rawChannel} (${d.SubChannel || 'Unknown'})` : rawChannel;
 
-                    if (!skuMap[sku]) {
-                        skuMap[sku] = { name, gross: 0, returns: 0, channels: {} };
+                    if (!skuMap[uniqueKey]) {
+                        skuMap[uniqueKey] = { sku, name, gross: 0, returns: 0, channels: {} };
                     }
 
                     if (val > 0) {
                         grossSales += val;
-                        skuMap[sku].gross += val;
+                        skuMap[uniqueKey].gross += val;
                     } else if (val < 0) {
                         const absVal = Math.abs(val);
                         totalReturns += absVal;
-                        skuMap[sku].returns += absVal;
-                        skuMap[sku].channels[channel] = (skuMap[sku].channels[channel] || 0) + absVal;
+                        skuMap[uniqueKey].returns += absVal;
+                        skuMap[uniqueKey].channels[channelKey] = (skuMap[uniqueKey].channels[channelKey] || 0) + absVal;
                     }
                 });
 
                 const overallRate = grossSales > 0 ? (totalReturns / grossSales) * 100 : 0;
-                const topReturns = Object.entries(skuMap)
-                    .filter(([_, data]) => data.returns > 0)
-                    .map(([sku, data]) => ({ 
-                        sku, 
-                        name: data.name, 
-                        returns: data.returns, 
-                        rate: data.gross > 0 ? (data.returns / data.gross) * 100 : 100, 
-                        channels: data.channels 
-                    }))
+                
+                const topReturns = Object.values(skuMap)
+                    .filter(data => data.returns > 0)
+                    .map(data => {
+                        const rate = data.gross > 0 ? (data.returns / data.gross) * 100 : 100;
+                        const topChannel = Object.entries(data.channels).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+                        return { 
+                            key: `${data.sku}::${data.name}`,
+                            sku: data.sku, 
+                            name: data.name, 
+                            returns: data.returns, 
+                            rate, 
+                            topChannel,
+                            channels: data.channels 
+                        };
+                    })
                     .sort((a, b) => b.returns - a.returns);
 
                 return { totalReturns, overallRate, topReturns };
@@ -1470,7 +1483,7 @@
                             </div>
                             <div>
                                 <h3 className="text-base font-bold text-[#1d1d1f]">SKU Health & Return Diagnostics (2026)</h3>
-                                <p className="text-xs text-[#86868b] font-medium">Monitoring product returns and top affected channels.</p>
+                                <p className="text-xs text-[#86868b] font-medium">Click a SKU to view channel breakdown.</p>
                             </div>
                         </div>
                         <div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full xl:w-auto">
@@ -1529,7 +1542,7 @@
                             </thead>
                             <tbody>
                                 {filteredReturnList.length > 0 ? filteredReturnList.map((item, idx) => (
-                                    <tr key={item.sku} onClick={() => setSelectedSku(item)} className={`cursor-pointer border-b border-[#e5e5ea]/50 hover:bg-[#ff3b30]/5 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f5f5f7]/30'}`}>
+                                    <tr key={item.key} onClick={() => setSelectedSku(item)} className={`cursor-pointer border-b border-[#e5e5ea]/50 hover:bg-[#ff3b30]/5 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f5f5f7]/30'}`}>
                                         <td className="py-3.5 px-4 text-center font-bold text-[#86868b]">#{idx + 1}</td>
                                         <td className="py-3.5 px-4">
                                             <div className="font-semibold text-[#1d1d1f] truncate max-w-[280px]" title={item.name}>{item.name}</div>
