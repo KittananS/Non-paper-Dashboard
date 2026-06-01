@@ -106,7 +106,7 @@
             Upload, TrendingUp, Target, Users, DollarSign, LayoutDashboard, Activity,
             PieChart: PieIcon, X, Search, ChevronDown, Calendar, Layers, ShoppingBag, 
             Trophy, Medal, Store, ArrowLeft, Grid3X3, AlertCircle, MapPin, Lightbulb, Sparkles, ArrowRightCircle, Package, Check,
-            RefreshCw, Database, CheckCircle2, XCircle, Info, ArrowDown, Eye, EyeOff, Filter, Copy, Crosshair
+            RefreshCw, Database, CheckCircle2, XCircle, Info, ArrowDown, Eye, EyeOff, Filter, Copy, Crosshair, ChevronRight, LayoutList
         } = LucideProxy;
 
         // --- Hooks ---
@@ -1206,6 +1206,192 @@
             </div>
         );
 
+        const ProductPresenceWidget = ({ filteredData }) => {
+            const [breadcrumbs, setBreadcrumbs] = useState([]);
+            const [search, setSearch] = useState('');
+
+            const base2026 = useMemo(() => filteredData.filter(d => d.Year === '2026'), [filteredData]);
+
+            // Reset when global data changes significantly
+            useEffect(() => {
+                setBreadcrumbs([]);
+                setSearch('');
+            }, [filteredData]);
+
+            const levelNames = ['Sub-Product Group', 'Group SKU', 'Product Name'];
+            const currentLevelIdx = breadcrumbs.length;
+            const currentLevelName = levelNames[currentLevelIdx] || 'Detail';
+
+            const { list, detail } = useMemo(() => {
+                let data = base2026;
+                if (breadcrumbs.length > 0) data = data.filter(d => d.SubProductGroup === breadcrumbs[0]);
+                if (breadcrumbs.length > 1) data = data.filter(d => d.GroupSKU === breadcrumbs[1]);
+                if (breadcrumbs.length > 2) data = data.filter(d => d.ProductName === breadcrumbs[2]);
+
+                if (breadcrumbs.length < 3) {
+                    let groupBy = 'SubProductGroup';
+                    if (breadcrumbs.length === 1) groupBy = 'GroupSKU';
+                    if (breadcrumbs.length === 2) groupBy = 'ProductName';
+
+                    const map = {};
+                    data.forEach(d => {
+                        const key = d[groupBy] || 'Unknown';
+                        if (!map[key]) map[key] = { name: key, sales: 0, locations: new Set() };
+                        map[key].sales += (d.NetPrice || 0);
+
+                        const loc = isChainBasedChannel(d.Channel) ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
+                        if (loc !== 'Unknown') map[key].locations.add(`${d.Channel}|${loc}`);
+                    });
+
+                    let arr = Object.values(map).map(v => ({ ...v, count: v.locations.size }));
+                    arr.sort((a, b) => b.sales - a.sales);
+
+                    if (search) {
+                        const term = search.toLowerCase();
+                        arr = arr.filter(item => item.name.toLowerCase().includes(term));
+                    }
+                    return { list: arr, detail: null };
+                } else {
+                    const channelMap = {};
+                    let totalCount = 0;
+                    data.forEach(d => {
+                        const ch = d.Channel || 'Unknown';
+                        const loc = isChainBasedChannel(d.Channel) ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
+                        if (loc === 'Unknown') return;
+                        
+                        if (!channelMap[ch]) channelMap[ch] = new Set();
+                        const before = channelMap[ch].size;
+                        channelMap[ch].add(loc);
+                        if (channelMap[ch].size > before) totalCount++;
+                    });
+
+                    const formatted = {};
+                    Object.keys(channelMap).sort().forEach(ch => {
+                        const locs = Array.from(channelMap[ch]).sort();
+                        formatted[ch] = { locations: locs, count: locs.length };
+                    });
+                    return { list: null, detail: { channels: formatted, total: totalCount } };
+                }
+            }, [base2026, breadcrumbs, search]);
+
+            return (
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-[#0071e3]/10 p-2 rounded-xl">
+                                <MapPin className="w-6 h-6 text-[#0071e3]" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-[#1d1d1f]">Product Presence Summary (2026)</h3>
+                                <p className="text-xs text-[#86868b] font-medium">Drill-down to see distribution spread across channels.</p>
+                            </div>
+                        </div>
+                        {breadcrumbs.length < 3 && (
+                            <div className="relative w-full md:w-64">
+                                <input 
+                                    type="text" 
+                                    placeholder={`Search ${currentLevelName}...`} 
+                                    className="w-full pl-9 pr-3 py-2 bg-[#f5f5f7] border border-transparent focus:border-[#0071e3]/30 focus:bg-white focus:ring-4 focus:ring-[#0071e3]/10 rounded-[12px] text-sm font-medium transition-all placeholder:text-[#86868b] outline-none"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                />
+                                <Search className="w-4 h-4 text-[#86868b] absolute left-3 top-2.5" />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-sm font-medium bg-[#f5f5f7]/80 p-1.5 rounded-[14px] mb-4 overflow-x-auto custom-scrollbar border border-black/5">
+                        <button onClick={() => {setBreadcrumbs([]); setSearch('');}} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap ${breadcrumbs.length === 0 ? 'bg-white text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,0.06)] font-bold' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#e8e8ed]'}`}>
+                            <LayoutList className="w-4 h-4" /> All Categories
+                        </button>
+                        {breadcrumbs.map((crumb, idx) => (
+                            <React.Fragment key={idx}>
+                                <ChevronRight className="w-4 h-4 text-[#d1d1d6] flex-shrink-0" />
+                                <button onClick={() => {setBreadcrumbs(breadcrumbs.slice(0, idx + 1)); setSearch('');}} className={`px-3 py-1.5 rounded-xl transition-all whitespace-nowrap truncate max-w-[180px] ${breadcrumbs.length === idx + 1 ? 'bg-white text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,0.06)] font-bold' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#e8e8ed]'}`} title={crumb}>
+                                    {crumb}
+                                </button>
+                            </React.Fragment>
+                        ))}
+                    </div>
+
+                    {list && (
+                        <div className="overflow-x-auto custom-scrollbar border border-black/5 rounded-xl max-h-[380px] bg-white">
+                            <table className="w-full text-sm text-left border-collapse min-w-[600px]">
+                                <thead className="sticky top-0 bg-[#f5f5f7]/95 backdrop-blur z-10 shadow-[0_1px_0_#e5e5ea]">
+                                    <tr>
+                                        <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider w-16 text-center">Rank</th>
+                                        <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider">{currentLevelName}</th>
+                                        <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider text-right w-40">Sales 2026</th>
+                                        <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider text-right w-56">Active Locations</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {list.length > 0 ? list.map((item, idx) => {
+                                        const maxCount = Math.max(...list.map(i => i.count));
+                                        const pct = maxCount > 0 ? (item.count / maxCount) * 100 : 0;
+                                        return (
+                                            <tr key={item.name} onClick={() => { setBreadcrumbs([...breadcrumbs, item.name]); setSearch(''); }} className="border-b border-[#e5e5ea]/50 hover:bg-[#0071e3]/5 cursor-pointer transition-colors group relative">
+                                                <td className="py-4 px-4 text-center font-semibold text-[#86868b]">#{idx + 1}</td>
+                                                <td className="py-4 px-4 font-semibold text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors">{item.name}</td>
+                                                <td className="py-4 px-4 text-right font-medium text-[#1d1d1f]">฿{item.sales.toLocaleString()}</td>
+                                                <td className="py-4 px-4 pr-10 relative">
+                                                    <div className="flex items-center justify-end gap-3">
+                                                        <span className="font-bold text-[#1d1d1f] w-8 text-right">{item.count}</span>
+                                                        <div className="w-24 h-1.5 bg-[#e5e5ea] rounded-full overflow-hidden flex-shrink-0">
+                                                            <div className="h-full bg-[#0071e3] rounded-full" style={{ width: `${pct}%` }}></div>
+                                                        </div>
+                                                        <ChevronRight className="w-4 h-4 text-[#d1d1d6] group-hover:text-[#0071e3] transition-colors absolute right-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 duration-200" />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    }) : (
+                                        <tr><td colSpan="4" className="py-12 text-center text-[#86868b] font-medium"><Search className="w-8 h-8 opacity-20 mx-auto mb-2" />No records found</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {detail && (
+                        <div className="flex flex-col mt-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <div className="mb-4">
+                                <span className="bg-[#34c759]/10 text-[#34c759] px-3.5 py-2 rounded-xl text-sm font-bold tracking-wide border border-[#34c759]/20 flex items-center gap-2 w-max shadow-sm">
+                                    <CheckCircle2 className="w-5 h-5" />
+                                    Total Presence: {detail.total} Locations
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                                {Object.keys(detail.channels).length > 0 ? (
+                                    Object.entries(detail.channels).map(([ch, data]) => (
+                                        <div key={ch} className="bg-[#f5f5f7]/60 rounded-[16px] p-4 border border-black/[0.03] flex flex-col hover:bg-[#f5f5f7] transition-colors">
+                                            <div className="flex items-center justify-between mb-3 pb-2 border-b border-black/5">
+                                                <h4 className="text-sm font-bold text-[#1d1d1f]">{ch}</h4>
+                                                <span className="text-xs font-semibold text-[#86868b]">({data.count} Locations)</span>
+                                            </div>
+                                            <ul className="space-y-2.5 overflow-y-auto custom-scrollbar max-h-60 pr-2">
+                                                {data.locations.map((loc, idx) => (
+                                                    <li key={idx} className="flex items-start gap-2.5 text-sm font-medium text-[#1d1d1f]">
+                                                        <div className="mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-[#0071e3] shadow-sm"></div>
+                                                        <span className="leading-snug text-[#1d1d1f]/80">{loc}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-[#86868b]">
+                                        <MapPin className="w-10 h-10 mb-3 opacity-20" />
+                                        <span className="text-sm font-medium">No presence data available for selected product</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
         const WhiteSpaceWidget = ({ filteredData, debouncedSearch, searchStr, setSearchStr }) => {
             const [selectedGap, setSelectedGap] = useState(null);
             const [isCopied, setIsCopied] = useState(false);
@@ -1437,191 +1623,6 @@
                             </div>
                         </div>
                     )}
-                </div>
-            );
-        };
-
-        const SkuPresenceWidget = ({ filteredData }) => {
-            const [selectedProduct, setSelectedProduct] = useState(null);
-            const [searchTerm, setSearchTerm] = useState('');
-            const [isOpen, setIsOpen] = useState(false);
-            const dropdownRef = useRef(null);
-
-            const base2026 = useMemo(() => filteredData.filter(d => d.Year === '2026'), [filteredData]);
-            
-            // 1. Map available products, accumulate sales, and sort by Top Rank Sales
-            const availableProducts = useMemo(() => {
-                const productMap = {};
-                base2026.forEach(d => {
-                    const pName = d.ProductName;
-                    if (!pName || pName === 'Unknown') return;
-                    if (!productMap[pName]) {
-                        productMap[pName] = { name: pName, sku: d.GroupSKU || 'Unknown', sales: 0 };
-                    }
-                    productMap[pName].sales += (d.NetPrice || 0);
-                });
-                return Object.values(productMap).sort((a, b) => b.sales - a.sales);
-            }, [base2026]);
-
-            // 2. Auto-Default to Top 1 whenever global filters change (base2026 changes)
-            useEffect(() => {
-                if (availableProducts.length > 0) {
-                    setSelectedProduct(availableProducts[0]);
-                    setSearchTerm(availableProducts[0].name);
-                } else {
-                    setSelectedProduct(null);
-                    setSearchTerm('');
-                }
-                // eslint-disable-next-line react-hooks/exhaustive-deps
-            }, [base2026]); 
-
-            // Handle clicking outside to close combobox
-            useEffect(() => {
-                const handleClickOutside = (event) => {
-                    if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                        setIsOpen(false);
-                        setSearchTerm(selectedProduct ? selectedProduct.name : ''); // Revert search term
-                    }
-                };
-                document.addEventListener('mousedown', handleClickOutside);
-                return () => document.removeEventListener('mousedown', handleClickOutside);
-            }, [selectedProduct]);
-
-            // Filter logic for searching both Product Name and SKU
-            const filteredProducts = useMemo(() => {
-                if (!searchTerm) return availableProducts;
-                const term = searchTerm.toLowerCase();
-                return availableProducts.filter(p => 
-                    p.name.toLowerCase().includes(term) || 
-                    p.sku.toLowerCase().includes(term)
-                );
-            }, [availableProducts, searchTerm]);
-
-            // Data Transformation Logic for Locations & Counts based on Selected Product
-            const presenceData = useMemo(() => {
-                if (!selectedProduct) return { channels: {}, total: 0 };
-                
-                const prodData = base2026.filter(d => d.ProductName === selectedProduct.name);
-                const channelMap = {};
-                let uniqueLocations = new Set();
-
-                prodData.forEach(d => {
-                    const ch = d.Channel || 'Unknown';
-                    const loc = d.SoldToParty || 'Unknown';
-                    if (loc === 'Unknown') return;
-                    
-                    if (!channelMap[ch]) channelMap[ch] = new Set();
-                    channelMap[ch].add(loc);
-                    uniqueLocations.add(`${ch}|${loc}`);
-                });
-
-                const formatted = {};
-                Object.keys(channelMap).sort().forEach(ch => {
-                    const locs = Array.from(channelMap[ch]).sort();
-                    formatted[ch] = { locations: locs, count: locs.length };
-                });
-
-                return { channels: formatted, total: uniqueLocations.size };
-            }, [base2026, selectedProduct]);
-
-            return (
-                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04]">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-[#0071e3]/10 p-2 rounded-xl">
-                                <MapPin className="w-6 h-6 text-[#0071e3]" />
-                            </div>
-                            <div className="flex flex-col md:flex-row md:items-center gap-2">
-                                <h3 className="text-base font-bold text-[#1d1d1f]">Product Presence (2026)</h3>
-                                <span className="bg-[#f5f5f7] text-[#86868b] px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wide border border-black/5 flex items-center gap-1.5 w-max">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#34c759]"></span>
-                                    Total: {presenceData.total} Locations
-                                </span>
-                            </div>
-                        </div>
-                        
-                        {/* Searchable Combobox */}
-                        <div className="relative w-full md:w-96 z-20" ref={dropdownRef}>
-                            <div className="relative">
-                                <input 
-                                    type="text" 
-                                    className="w-full pl-10 pr-8 py-2.5 bg-[#f5f5f7] hover:bg-[#e8e8ed] border border-transparent focus:border-[#0071e3]/30 focus:bg-white focus:ring-4 focus:ring-[#0071e3]/10 rounded-[12px] text-sm font-semibold text-[#1d1d1f] transition-all placeholder:text-[#86868b] outline-none"
-                                    placeholder="Search Product Name or SKU..."
-                                    value={isOpen ? searchTerm : (selectedProduct?.name || '')}
-                                    onChange={(e) => {
-                                        setSearchTerm(e.target.value);
-                                        if(!isOpen) setIsOpen(true);
-                                    }}
-                                    onFocus={() => {
-                                        setIsOpen(true);
-                                        setSearchTerm('');
-                                    }}
-                                />
-                                <Search className="w-4 h-4 text-[#86868b] absolute left-3.5 top-3.5" />
-                                <ChevronDown className={`w-4 h-4 text-[#86868b] absolute right-3.5 top-3.5 transition-transform ${isOpen ? 'rotate-180' : ''} pointer-events-none`} />
-                            </div>
-                            {isOpen && (
-                                <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white/95 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-[0_12px_40px_rgba(0,0,0,0.12)] max-h-72 overflow-y-auto custom-scrollbar py-2 animate-in fade-in zoom-in-95 duration-100">
-                                    {filteredProducts.length > 0 ? filteredProducts.map((p, idx) => (
-                                        <button 
-                                            key={p.name}
-                                            className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between border-b border-black/[0.02] last:border-0 ${p.name === selectedProduct?.name ? 'bg-[#0071e3]/10 text-[#0071e3]' : 'text-[#1d1d1f] hover:bg-[#f5f5f7]'}`}
-                                            onClick={() => {
-                                                setSelectedProduct(p);
-                                                setSearchTerm(p.name);
-                                                setIsOpen(false);
-                                            }}
-                                        >
-                                            <div className="flex flex-col pr-4 overflow-hidden">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`truncate ${p.name === selectedProduct?.name ? 'font-bold' : 'font-medium'}`}>{p.name}</span>
-                                                    {idx === 0 && searchTerm === '' && <span className="bg-[#ff9500]/20 text-[#ff9500] px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider flex-shrink-0">Top 1</span>}
-                                                </div>
-                                                <div className="text-[11px] text-[#86868b] mt-0.5 font-medium flex items-center gap-1.5 truncate">
-                                                    <span>{p.sku}</span>
-                                                    <span className="w-1 h-1 rounded-full bg-[#e5e5ea]"></span>
-                                                    <span className="text-[#34c759] font-semibold">฿{p.sales.toLocaleString()}</span>
-                                                </div>
-                                            </div>
-                                            {p.name === selectedProduct?.name && <Check className="w-4 h-4 flex-shrink-0" />}
-                                        </button>
-                                    )) : (
-                                        <div className="px-4 py-6 text-sm text-[#86868b] text-center italic font-medium flex flex-col items-center gap-2">
-                                            <Package className="w-6 h-6 opacity-30" />
-                                            No products found
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Checklist Body */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                        {Object.keys(presenceData.channels).length > 0 ? (
-                            Object.entries(presenceData.channels).map(([ch, data]) => (
-                                <div key={ch} className="bg-[#f5f5f7]/60 rounded-[16px] p-4 border border-black/[0.03] flex flex-col">
-                                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-black/5">
-                                        <h4 className="text-sm font-bold text-[#1d1d1f]">{ch}</h4>
-                                        <span className="text-xs font-semibold text-[#86868b]">({data.count} Locations)</span>
-                                    </div>
-                                    <ul className="space-y-2.5 overflow-y-auto custom-scrollbar max-h-60 pr-2">
-                                        {data.locations.map((loc, idx) => (
-                                            <li key={idx} className="flex items-start gap-2.5 text-sm font-medium text-[#1d1d1f]">
-                                                <div className="mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-[#0071e3]"></div>
-                                                <span className="leading-snug text-[#1d1d1f]/80">{loc}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="col-span-full py-12 flex flex-col items-center justify-center text-[#86868b]">
-                                <MapPin className="w-10 h-10 mb-3 opacity-20" />
-                                <span className="text-sm font-medium">No presence data available for selected product</span>
-                            </div>
-                        )}
-                    </div>
                 </div>
             );
         };
@@ -2245,15 +2246,15 @@
                             setTopCustomerDrillDown={setTopCustomerDrillDown} 
                         />
 
+                        {/* Product Presence Drill-down Widget repositioned here */}
+                        <ProductPresenceWidget filteredData={filteredData} />
+
                         <WhiteSpaceWidget 
                             filteredData={filteredData} 
                             searchStr={whiteSpaceSearch} 
                             setSearchStr={setWhiteSpaceSearch} 
                             debouncedSearch={debouncedWhiteSpaceSearch} 
                         />
-                        
-                        {/* New SKU Presence Widget */}
-                        <SkuPresenceWidget filteredData={filteredData} />
 
                         <footer className="w-full text-center pt-8 pb-4 text-[#86868b] font-medium text-sm">
                             Developed by NPD Team - Version 1.2
