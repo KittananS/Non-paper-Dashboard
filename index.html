@@ -157,11 +157,22 @@
             'DACARE': 'text-[#0071e3] bg-[#0071e3]/10',
             'DATISSUE': 'text-[#34c759] bg-[#34c759]/10',
             'DAOS': 'text-[#ff9500] bg-[#ff9500]/10',
-            'DABATTERY': 'text-[#ff3b30] bg-[#ff3b30]/10',
+            'DABATTERY': 'text-[#d49b00] bg-[#ffcc00]/20',
             'DASP': 'text-[#30b0c7] bg-[#30b0c7]/10',
             'DANB': 'text-[#5e5ce6] bg-[#5e5ce6]/10',
             'QUALITY': 'text-[#32ade6] bg-[#32ade6]/10',
             'DALIFESTYLE': 'text-[#af52de] bg-[#af52de]/10',
+        };
+
+        const GROUP_HEX = {
+            'DACARE': '#0071e3',
+            'DATISSUE': '#34c759',
+            'DAOS': '#ff9500',
+            'DABATTERY': '#ffcc00',
+            'DASP': '#30b0c7',
+            'DANB': '#5e5ce6',
+            'QUALITY': '#32ade6',
+            'DALIFESTYLE': '#af52de',
         };
 
         const DATA_SOURCES = {
@@ -627,7 +638,11 @@
 
                 const colors = {};
                 keysToUse.forEach((k, idx) => {
-                    colors[k] = APPLE_PALETTE[idx % APPLE_PALETTE.length];
+                    if (GROUP_HEX[k]) {
+                        colors[k] = GROUP_HEX[k];
+                    } else {
+                        colors[k] = APPLE_PALETTE[idx % APPLE_PALETTE.length];
+                    }
                     if (k === 'Others') colors[k] = '#e5e5ea';
                 });
 
