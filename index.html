@@ -390,7 +390,7 @@
         };
 
         const PortfolioSummaryWidget = ({ selectedGroups, toggleGroup }) => (
-            <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col items-center justify-center h-full relative overflow-hidden group">
+            <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col items-center justify-center h-full relative overflow-hidden group animate-in fade-in zoom-in-95 duration-500">
                 <div className="absolute inset-0 bg-gradient-to-br from-[#0071e3]/5 to-transparent pointer-events-none"></div>
                 <div className="relative z-10 w-full flex flex-col h-full justify-center">
                     {!selectedGroups.includes('ALL') && selectedGroups.length === 1 && (
@@ -411,7 +411,7 @@
         );
 
         const KPIYTDWidget = ({ kpi }) => (
-            <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-shadow">
+            <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-shadow animate-in fade-in zoom-in-95 duration-500 delay-75">
                 <div className="flex justify-between items-start mb-2">
                     <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">YTD Actual 2026</span>
                     <div className="bg-[#0071e3]/10 p-2 rounded-full"><DollarSign className="w-4 h-4 text-[#0071e3]" /></div>
@@ -426,7 +426,7 @@
         );
 
         const KPITargetWidget = ({ kpi }) => (
-            <div className={`bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] ${kpi.target26 === null ? 'opacity-60 grayscale' : ''}`}>
+            <div className={`bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] animate-in fade-in zoom-in-95 duration-500 delay-100 ${kpi.target26 === null ? 'opacity-60 grayscale' : ''}`}>
                 <div className="flex justify-between items-start mb-1">
                     <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">Target 2026</span>
                     <div className="bg-[#af52de]/10 p-2 rounded-full"><Target className="w-4 h-4 text-[#af52de]" /></div>
@@ -450,7 +450,7 @@
         );
 
         const KPIForecastWidget = ({ kpi, showForecast, setShowForecast }) => (
-            <div className={`bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] ${kpi.forecast26 === null ? 'opacity-60 grayscale' : ''}`}>
+            <div className={`bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] animate-in fade-in zoom-in-95 duration-500 delay-150 ${kpi.forecast26 === null ? 'opacity-60 grayscale' : ''}`}>
                 <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-1.5 group cursor-help relative">
                         <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">Forecast 2026</span>
@@ -499,7 +499,7 @@
         );
 
         const KPIPlanWidget = ({ kpi }) => (
-            <div className={`bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] ${kpi.plan27 === null ? 'opacity-60 grayscale' : ''}`}>
+            <div className={`bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] animate-in fade-in zoom-in-95 duration-500 delay-200 ${kpi.plan27 === null ? 'opacity-60 grayscale' : ''}`}>
                 <div className="flex justify-between items-start mb-2">
                     <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">Plan 2027</span>
                     <div className="bg-[#34c759]/10 p-2 rounded-full"><Target className="w-4 h-4 text-[#34c759]" /></div>
@@ -1434,10 +1434,12 @@
                     const val = d.NetPrice || 0;
                     const sku = d.GroupSKU || 'Unknown';
                     const name = d.ProductName || 'Unknown';
+                    // Combined key to prevent duplicate mapping/overwriting due to missing GroupSKUs
                     const uniqueKey = `${sku}::${name}`;
                     
                     const rawChannel = d.Channel || 'Unknown';
                     const isChain = isChainBasedChannel(rawChannel);
+                    // Append SubChannel for MT/Online etc. to drill down
                     const channelKey = isChain ? `${rawChannel} (${d.SubChannel || 'Unknown'})` : rawChannel;
 
                     if (!skuMap[uniqueKey]) {
@@ -1529,13 +1531,13 @@
                         <div className="mb-6 p-4 bg-[#f5f5f7] rounded-xl border border-black/5 animate-in fade-in duration-200">
                             <div className="flex justify-between items-center mb-4">
                                 <h4 className="font-bold text-sm">Channel Breakdown: <span className="text-[#0071e3]">{selectedSku.name}</span></h4>
-                                <button onClick={() => setSelectedSku(null)} className="text-xs text-[#86868b] hover:text-[#1d1d1f]">Close View</button>
+                                <button onClick={() => setSelectedSku(null)} className="text-xs text-[#86868b] hover:text-[#1d1d1f] flex items-center gap-1"><X className="w-3 h-3" />Close View</button>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 {Object.entries(selectedSku.channels || {}).map(([ch, val]) => (
                                     <div key={ch} className="bg-white p-3 rounded-lg border border-black/5 shadow-sm">
                                         <div className="text-[10px] uppercase text-[#86868b] font-bold">{ch}</div>
-                                        <div className="text-sm font-bold">฿{val.toLocaleString()}</div>
+                                        <div className="text-sm font-bold text-[#ff3b30]">฿{val.toLocaleString()}</div>
                                     </div>
                                 ))}
                             </div>
@@ -1554,7 +1556,7 @@
                             </thead>
                             <tbody>
                                 {filteredReturnList.length > 0 ? filteredReturnList.map((item, idx) => (
-                                    <tr key={item.key} onClick={() => setSelectedSku(item)} className={`cursor-pointer border-b border-[#e5e5ea]/50 hover:bg-[#ff3b30]/5 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f5f5f7]/30'}`}>
+                                    <tr key={item.key} onClick={() => setSelectedSku(item)} className={`cursor-pointer border-b border-[#e5e5ea]/50 hover:bg-[#ff3b30]/5 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f5f5f7]/30'} ${selectedSku?.key === item.key ? 'bg-[#ff3b30]/10' : ''}`}>
                                         <td className="py-3.5 px-4 text-center font-bold text-[#86868b]">#{idx + 1}</td>
                                         <td className="py-3.5 px-4">
                                             <div className="font-semibold text-[#1d1d1f] truncate max-w-[280px]" title={item.name}>{item.name}</div>
@@ -1820,6 +1822,14 @@
         };
 
         function Dashboard() {
+            const [activeTab, setActiveTab] = useState('Overview');
+            const tabs = [
+                { id: 'Overview', label: 'Executive Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
+                { id: 'Core', label: 'Core Portfolio & Health', icon: <Package className="w-4 h-4" /> },
+                { id: 'Innovation', label: 'Innovation & NPD', icon: <Sparkles className="w-4 h-4" /> },
+                { id: 'Distribution', label: 'Distribution & Expansion', icon: <MapPin className="w-4 h-4" /> }
+            ];
+
             const [salesData, setSalesData] = useState([]);
             const [budgetChannel, setBudgetChannel] = useState([]);
             const [budgetProduct, setBudgetProduct] = useState([]);
@@ -2383,68 +2393,95 @@
                                 )}
                             </div>
                         </div>
+                        {/* Sub-Navigation Tabs */}
+                        <div className="bg-[#f5f5f7] px-6 py-2 border-t border-black/5 flex overflow-x-auto custom-scrollbar shadow-inner relative z-30">
+                            <div className="flex bg-[#e3e3e8] p-1 rounded-xl w-max gap-1">
+                                {tabs.map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-[10px] transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,0.1)]' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-black/5'}`}
+                                    >
+                                        {tab.icon}
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </header>
 
-                    <main className="w-full px-6 py-8 space-y-8 max-w-[1920px] mx-auto">
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-                            <PortfolioSummaryWidget selectedGroups={selectedGroups} toggleGroup={toggleGroup} />
-                            <KPIYTDWidget kpi={kpi} />
-                            <KPITargetWidget kpi={kpi} />
-                            <KPIForecastWidget kpi={kpi} showForecast={showForecast} setShowForecast={setShowForecast} />
-                            <KPIPlanWidget kpi={kpi} />
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <TrendChartWidget trendChartData={trendChartData} selectedGroups={selectedGroups} show2025Trend={show2025Trend} setShow2025Trend={setShow2025Trend} yAxisTicks={yAxisTicks} />
-                            <ChannelMixWidget channelMix={channelMix} kpi={kpi} />
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <PortfolioMixWidget filteredData={filteredData} monthsList={monthsList} />
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <NPDVitalityWidget npdData={npdData} kpi={kpi} />
-                            <TopNPDWidget npdData={npdData} />
-                            <NPDTrajectoryWidget salesData={salesData} npdData={npdData} />
-                        </div>
-
-                        <TopPerformersWidget 
-                            topPerformers={topPerformers} 
-                            topPerfDrillDown={topPerfDrillDown} 
-                            setTopPerfDrillDown={setTopPerfDrillDown} 
-                            topPerfSearch={topPerfSearch} 
-                            setTopPerfSearch={setTopPerfSearch} 
-                            topPerfSortMode={topPerfSortMode} 
-                            setTopPerfSortMode={setTopPerfSortMode} 
-                            kpi={kpi} 
-                        />
+                    <main className="w-full px-6 py-8 max-w-[1920px] mx-auto overflow-hidden">
                         
-                        <TopCustomersWidget 
-                            topCustomers={topCustomers} 
-                            uniqueCustomersCount={uniqueCustomersCount} 
-                            customerSearch={customerSearch} 
-                            setCustomerSearch={setCustomerSearch} 
-                            topCustomerSortMode={topCustomerSortMode} 
-                            setTopCustomerSortMode={setTopCustomerSortMode} 
-                            kpi={kpi} 
-                            topCustomerDrillDown={topCustomerDrillDown} 
-                            setTopCustomerDrillDown={setTopCustomerDrillDown} 
-                        />
+                        {activeTab === 'Overview' && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+                                    <PortfolioSummaryWidget selectedGroups={selectedGroups} toggleGroup={toggleGroup} />
+                                    <KPIYTDWidget kpi={kpi} />
+                                    <KPITargetWidget kpi={kpi} />
+                                    <KPIForecastWidget kpi={kpi} showForecast={showForecast} setShowForecast={setShowForecast} />
+                                    <KPIPlanWidget kpi={kpi} />
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <TrendChartWidget trendChartData={trendChartData} selectedGroups={selectedGroups} show2025Trend={show2025Trend} setShow2025Trend={setShow2025Trend} yAxisTicks={yAxisTicks} />
+                                    <ChannelMixWidget channelMix={channelMix} kpi={kpi} />
+                                </div>
+                            </div>
+                        )}
 
-                        <ProductPresenceWidget filteredData={filteredData} />
-                        
-                        <SkuHealthWidget filteredData={filteredData} />
+                        {activeTab === 'Core' && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
+                                <div className="grid grid-cols-1 gap-6">
+                                    <PortfolioMixWidget filteredData={filteredData} monthsList={monthsList} />
+                                </div>
+                                <TopPerformersWidget 
+                                    topPerformers={topPerformers} 
+                                    topPerfDrillDown={topPerfDrillDown} 
+                                    setTopPerfDrillDown={setTopPerfDrillDown} 
+                                    topPerfSearch={topPerfSearch} 
+                                    setTopPerfSearch={setTopPerfSearch} 
+                                    topPerfSortMode={topPerfSortMode} 
+                                    setTopPerfSortMode={setTopPerfSortMode} 
+                                    kpi={kpi} 
+                                />
+                                <SkuHealthWidget filteredData={filteredData} />
+                            </div>
+                        )}
 
-                        <WhiteSpaceWidget 
-                            filteredData={filteredData} 
-                            searchStr={whiteSpaceSearch} 
-                            setSearchStr={setWhiteSpaceSearch} 
-                            debouncedSearch={debouncedWhiteSpaceSearch} 
-                        />
+                        {activeTab === 'Innovation' && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <NPDVitalityWidget npdData={npdData} kpi={kpi} />
+                                    <TopNPDWidget npdData={npdData} />
+                                    <NPDTrajectoryWidget salesData={salesData} npdData={npdData} />
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'Distribution' && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
+                                <TopCustomersWidget 
+                                    topCustomers={topCustomers} 
+                                    uniqueCustomersCount={uniqueCustomersCount} 
+                                    customerSearch={customerSearch} 
+                                    setCustomerSearch={setCustomerSearch} 
+                                    topCustomerSortMode={topCustomerSortMode} 
+                                    setTopCustomerSortMode={setTopCustomerSortMode} 
+                                    kpi={kpi} 
+                                    topCustomerDrillDown={topCustomerDrillDown} 
+                                    setTopCustomerDrillDown={setTopCustomerDrillDown} 
+                                />
+                                <ProductPresenceWidget filteredData={filteredData} />
+                                <WhiteSpaceWidget 
+                                    filteredData={filteredData} 
+                                    searchStr={whiteSpaceSearch} 
+                                    setSearchStr={setWhiteSpaceSearch} 
+                                    debouncedSearch={debouncedWhiteSpaceSearch} 
+                                />
+                            </div>
+                        )}
 
                         <footer className="w-full text-center pt-8 pb-4 text-[#86868b] font-medium text-sm">
-                            Developed by NPD Team - Version 1.2
+                            Developed by NPD Team - Version 1.3
                         </footer>
                     </main>
 
