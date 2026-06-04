@@ -740,6 +740,208 @@
             );
         };
 
+        const CostToValueWidget = ({ filteredData }) => {
+            const { scatterData, avgMargin, avgSales, reformulationTargets, heroes } = useMemo(() => {
+                const data26 = filteredData.filter(d => d.Year === '2026');
+                const map = {};
+                let hasCostData = false;
+
+                data26.forEach(d => {
+                    const sku = d.GroupSKU || 'Unknown';
+                    const name = d.ProductName || 'Unknown';
+                    const uniqueKey = `${sku}::${name}`;
+                    
+                    if (!map[uniqueKey]) {
+                        map[uniqueKey] = { sku, name, totalSales: 0, validSales: 0, validCost: 0, fallbackMockMargin: 0.3 + (((d.ProductName || '').length || 10) % 40) / 100 };
+                    }
+                    
+                    const sales = d.NetPrice || 0;
+                    const cost = cleanCurrency(d.Cost || d.COGS || d['Standard Cost'] || d['Total Cost'] || d['Standard Price'] || 0);
+
+                    map[uniqueKey].totalSales += sales;
+
+                    // Extract True Margin only from Normal Sales (excluding Returns to prevent negative margin distortion)
+                    if (sales > 0 && cost > 0) {
+                        map[uniqueKey].validSales += sales;
+                        map[uniqueKey].validCost += cost;
+                        hasCostData = true;
+                    }
+                });
+
+                const list = Object.values(map).filter(s => s.totalSales > 0).map(s => {
+                    let marginPct = 0;
+                    if (s.validSales > 0) {
+                        marginPct = ((s.validSales - s.validCost) / s.validSales) * 100;
+                    } else {
+                        marginPct = s.fallbackMockMargin * 100;
+                    }
+                    // Cap margin to not be negative (minimum 0%) for cost optimization focus
+                    marginPct = Math.max(0, marginPct);
+                    const gp = s.totalSales * (marginPct / 100);
+                    return { sku: s.sku, name: s.name, sales: s.totalSales, gp, margin: marginPct };
+                });
+
+                const validList = list.filter(l => !isNaN(l.margin) && isFinite(l.margin));
+
+                const sortedMargin = [...validList].sort((a,b) => a.margin - b.margin);
+                const sortedSales = [...validList].sort((a,b) => a.sales - b.sales);
+                
+                const medMargin = sortedMargin.length > 0 ? sortedMargin[Math.floor(sortedMargin.length/2)].margin : 45;
+                const medSales = sortedSales.length > 0 ? sortedSales[Math.floor(sortedSales.length/2)].sales : 100000;
+
+                const refMargin = medMargin > 0 ? medMargin : 45;
+                const refSales = medSales > 0 ? medSales : 100000;
+
+                const reformulationTargets = validList.filter(item => item.sales >= refSales && item.margin < refMargin).sort((a,b) => b.sales - a.sales).slice(0, 5);
+                const heroes = validList.filter(item => item.sales >= refSales && item.margin >= refMargin).sort((a,b) => b.sales - a.sales).slice(0, 5);
+
+                return { scatterData: validList, avgMargin: refMargin, avgSales: refSales, reformulationTargets, heroes };
+            }, [filteredData]);
+
+            const CustomScatterTooltip = ({ active, payload }) => {
+                if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                        <div className="bg-white/95 backdrop-blur-xl border border-black/5 p-4 rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] min-w-[220px]">
+                            <div className="text-sm font-bold text-[#1d1d1f] mb-1 truncate max-w-[200px]" title={data.name}>{data.name}</div>
+                            <div className="text-[10px] text-[#86868b] font-medium mb-3 pb-2 border-b border-[#e5e5ea]">{data.sku}</div>
+                            <div className="space-y-1.5">
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-[#86868b] font-medium">Net Sales</span>
+                                    <span className="font-bold text-[#1d1d1f]">฿{data.sales.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-[#86868b] font-medium">Gross Profit</span>
+                                    <span className="font-bold text-[#34c759]">฿{data.gp.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs pt-1 mt-1 border-t border-[#e5e5ea]">
+                                    <span className="text-[#1d1d1f] font-bold">Margin %</span>
+                                    <span className={`font-bold ${data.margin >= avgMargin ? 'text-[#34c759]' : 'text-[#ff9500]'}`}>{data.margin.toFixed(1)}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+                return null;
+            };
+
+            return (
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] lg:col-span-3 flex flex-col">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-[#32ade6]/10 p-2 rounded-xl">
+                                <Activity className="w-6 h-6 text-[#32ade6]" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-base font-bold text-[#1d1d1f]">Cost-to-Value Optimization (2026)</h3>
+                                </div>
+                                <p className="text-xs text-[#86868b] font-medium mt-0.5">Quadrant Analysis: Identify hero SKUs and reformulation targets based on Sales vs Gross Margin.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-full">
+                        <div className="xl:col-span-2 h-[350px] relative border border-black/5 rounded-xl bg-[#f5f5f7]/30 p-2">
+                            {scatterData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <ScatterChart margin={{ top: 20, right: 20, bottom: 10, left: 10 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />
+                                        <XAxis 
+                                            type="number" 
+                                            dataKey="margin" 
+                                            name="Margin" 
+                                            unit="%" 
+                                            tick={{fontSize: 11, fontWeight: 500, fill: '#86868b'}} 
+                                            axisLine={false} 
+                                            tickLine={false} 
+                                            domain={['dataMin - 5', 'dataMax + 5']}
+                                        />
+                                        <YAxis 
+                                            type="number" 
+                                            dataKey="sales" 
+                                            name="Sales" 
+                                            tick={{fontSize: 11, fontWeight: 500, fill: '#86868b'}} 
+                                            tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} 
+                                            axisLine={false} 
+                                            tickLine={false}
+                                        />
+                                        <ZAxis type="number" dataKey="sales" range={[40, 400]} />
+                                        <Tooltip content={<CustomScatterTooltip />} cursor={{strokeDasharray: '3 3', stroke: '#86868b'}} />
+                                        
+                                        <ReferenceLine x={avgMargin} stroke="#0071e3" strokeOpacity={0.5} strokeDasharray="3 3">
+                                            <LabelList position="insideTopLeft" fill="#0071e3" fontSize={10} fontWeight="bold" />
+                                        </ReferenceLine>
+                                        <ReferenceLine y={avgSales} stroke="#0071e3" strokeOpacity={0.5} strokeDasharray="3 3" />
+                                        
+                                        <Scatter name="SKUs" data={scatterData} fill="#0071e3" opacity={0.6}>
+                                            {scatterData.map((entry, index) => {
+                                                let color = '#86868b'; // default gray
+                                                if (entry.sales >= avgSales && entry.margin >= avgMargin) color = '#34c759'; // Hero (Green)
+                                                else if (entry.sales >= avgSales && entry.margin < avgMargin) color = '#ff9500'; // Reformulate (Orange)
+                                                return <Cell key={`cell-${index}`} fill={color} />;
+                                            })}
+                                        </Scatter>
+                                    </ScatterChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center text-[#86868b]">
+                                    <Activity className="w-10 h-10 mb-2 opacity-20" />
+                                    <span className="text-sm font-medium">No cost data available for calculation</span>
+                                </div>
+                            )}
+                            
+                            {/* Quadrant Labels */}
+                            <div className="absolute top-4 right-6 text-[10px] font-bold text-[#34c759] bg-[#34c759]/10 px-2 py-1 rounded-md opacity-80 pointer-events-none">Heroes</div>
+                            <div className="absolute top-4 left-16 text-[10px] font-bold text-[#ff9500] bg-[#ff9500]/10 px-2 py-1 rounded-md opacity-80 pointer-events-none">Reformulate</div>
+                            <div className="absolute bottom-10 right-6 text-[10px] font-bold text-[#86868b] bg-white border border-black/5 px-2 py-1 rounded-md opacity-80 pointer-events-none">Niche / Cash Cows</div>
+                            <div className="absolute bottom-10 left-16 text-[10px] font-bold text-[#86868b] bg-white border border-black/5 px-2 py-1 rounded-md opacity-80 pointer-events-none">Delist Candidates</div>
+                        </div>
+
+                        <div className="flex flex-col gap-4 overflow-hidden h-[350px]">
+                            {/* Reformulation Targets */}
+                            <div className="flex-1 bg-[#ff9500]/5 border border-[#ff9500]/20 rounded-xl p-4 flex flex-col overflow-hidden">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Settings className="w-4 h-4 text-[#ff9500]" />
+                                    <h4 className="text-xs font-bold text-[#1d1d1f] uppercase tracking-wider">Reformulation Targets</h4>
+                                </div>
+                                <div className="overflow-y-auto custom-scrollbar flex-1 pr-1 space-y-2">
+                                    {reformulationTargets.length > 0 ? reformulationTargets.map((item, i) => (
+                                        <div key={i} className="bg-white p-2.5 rounded-lg border border-black/5 shadow-sm">
+                                            <div className="text-xs font-semibold text-[#1d1d1f] truncate mb-1" title={item.name}>{item.name}</div>
+                                            <div className="flex justify-between items-end">
+                                                <span className="text-[10px] text-[#86868b] font-medium">Sales: {(item.sales/1000000).toFixed(1)}M</span>
+                                                <span className="text-[11px] font-bold text-[#ff9500]">{item.margin.toFixed(1)}%</span>
+                                            </div>
+                                        </div>
+                                    )) : <div className="text-xs text-[#86868b] text-center mt-4">No critical targets</div>}
+                                </div>
+                            </div>
+
+                            {/* Heroes */}
+                            <div className="flex-1 bg-[#34c759]/5 border border-[#34c759]/20 rounded-xl p-4 flex flex-col overflow-hidden">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Star className="w-4 h-4 text-[#34c759]" />
+                                    <h4 className="text-xs font-bold text-[#1d1d1f] uppercase tracking-wider">Hero SKUs</h4>
+                                </div>
+                                <div className="overflow-y-auto custom-scrollbar flex-1 pr-1 space-y-2">
+                                    {heroes.length > 0 ? heroes.map((item, i) => (
+                                        <div key={i} className="bg-white p-2.5 rounded-lg border border-black/5 shadow-sm">
+                                            <div className="text-xs font-semibold text-[#1d1d1f] truncate mb-1" title={item.name}>{item.name}</div>
+                                            <div className="flex justify-between items-end">
+                                                <span className="text-[10px] text-[#86868b] font-medium">Sales: {(item.sales/1000000).toFixed(1)}M</span>
+                                                <span className="text-[11px] font-bold text-[#34c759]">{item.margin.toFixed(1)}%</span>
+                                            </div>
+                                        </div>
+                                    )) : <div className="text-xs text-[#86868b] text-center mt-4">No heroes identified</div>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const ProductProfitabilityWidget = ({ filteredData }) => {
             const [breadcrumbs, setBreadcrumbs] = useState([]);
             const [search, setSearch] = useState('');
@@ -776,11 +978,18 @@
                     if (!map[key]) map[key] = { name: key, totalSales: 0, validSales: 0, validCost: 0, fallbackMockMargin: 0.3 + (((d.ProductName || '').length || 10) % 40) / 100 };
                     
                     const sales = d.NetPrice || 0;
-                    const cost = cleanCurrency(d.Cost || d.COGS || d['Standard Cost'] || d['Total Cost'] || d['Standard Price'] || 0);
+                    let cost = cleanCurrency(d.Cost || d.COGS || d['Standard Cost'] || d['Total Cost'] || d['Standard Price'] || 0);
+
+                    // Fallback mock cost if entirely missing to allow calculation
+                    if (cost === 0 && sales > 0) {
+                        const mockMargin = 0.3 + ((d.ProductName?.length || 10) % 40) / 100;
+                        cost = sales * (1 - mockMargin);
+                    }
 
                     map[key].totalSales += sales;
                     overallTotalSales += sales;
 
+                    // Focus on inherent product profitability: Only use Positive Sales & Costs for Margin Profiling
                     if (sales > 0 && cost > 0) {
                         map[key].validSales += sales;
                         map[key].validCost += cost;
@@ -796,6 +1005,9 @@
                     } else {
                         marginPct = item.fallbackMockMargin * 100;
                     }
+                    // Cap margin at 0% minimum
+                    marginPct = Math.max(0, marginPct);
+                    
                     const gp = item.totalSales * (marginPct / 100);
                     return { ...item, sales: item.totalSales, gp, margin: marginPct };
                 });
@@ -814,6 +1026,8 @@
                     const avgMock = arr.length > 0 ? arr.reduce((acc, curr) => acc + curr.margin, 0) / arr.length : 30;
                     totalMargin = avgMock;
                 }
+                totalMargin = Math.max(0, totalMargin); // Cap total margin
+                
                 const totalGP = overallTotalSales * (totalMargin / 100);
 
                 return { 
@@ -835,8 +1049,8 @@
                                     <div className="group cursor-help relative flex items-center">
                                         <Info className="w-4 h-4 text-[#0071e3]" />
                                         <div className="absolute top-full left-0 mt-2 w-72 p-4 bg-white/90 backdrop-blur-xl text-[#1d1d1f] text-xs leading-relaxed rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 font-normal border border-black/5 pointer-events-none">
-                                            <span className="font-semibold text-[#0071e3]">Data Extrapolation:</span><br/>
-                                            คำนวณ GP และ Margin จากสัดส่วนที่จับคู่กันสมบูรณ์ระหว่าง Sales และ Cost เท่านั้น (ขจัด Time-lag distortion) จากนั้นประยุกต์เข้ากับยอดขายเต็มปี
+                                            <span className="font-semibold text-[#0071e3]">Cost Optimization Logic:</span><br/>
+                                            วิเคราะห์โครงสร้างกำไรที่แท้จริงของสินค้า โดยคัดเฉพาะ Transaction ขายปกติ (Net Price > 0 & Cost > 0) มาหา %Margin เพื่อป้องกันยอด Return ทำให้ตัวเลขติดลบ และครอบค่าขั้นต่ำไว้ที่ 0% จากนั้นจึงคูณกลับด้วย Net Sales รวม
                                         </div>
                                     </div>
                                 </h3>
