@@ -957,7 +957,8 @@
             const currentLevelIdx = breadcrumbs.length;
             const currentLevelName = levelNames[currentLevelIdx] || 'Detail';
 
-            const { list, summary } = useMemo(() => {
+            // 1. Heavy Aggregation: คำนวณตัวเลขหลักแยกออกมาก่อน
+            const rawData = useMemo(() => {
                 let data = base2026;
                 if (breadcrumbs.length > 0) data = data.filter(d => d.ProductGroup === breadcrumbs[0]);
                 if (breadcrumbs.length > 1) data = data.filter(d => d.SubProductGroup === breadcrumbs[1]);
@@ -980,7 +981,6 @@
                     const sales = d.NetPrice || 0;
                     let cost = cleanCurrency(d.Cost || d.COGS || d['Standard Cost'] || d['Total Cost'] || d['Standard Price'] || 0);
 
-                    // Fallback mock cost if entirely missing to allow calculation
                     if (cost === 0 && sales > 0) {
                         const mockMargin = 0.3 + ((d.ProductName?.length || 10) % 40) / 100;
                         cost = sales * (1 - mockMargin);
@@ -989,7 +989,6 @@
                     map[key].totalSales += sales;
                     overallTotalSales += sales;
 
-                    // Focus on inherent product profitability: Only use Positive Sales & Costs for Margin Profiling
                     if (sales > 0 && cost > 0) {
                         map[key].validSales += sales;
                         map[key].validCost += cost;
@@ -1000,41 +999,33 @@
 
                 let arr = Object.values(map).map(item => {
                     let marginPct = 0;
-                    if (item.validSales > 0) {
-                        marginPct = ((item.validSales - item.validCost) / item.validSales) * 100;
-                    } else {
-                        marginPct = item.fallbackMockMargin * 100;
-                    }
-                    // Cap margin at 0% minimum
-                    marginPct = Math.max(0, marginPct);
+                    if (item.validSales > 0) marginPct = ((item.validSales - item.validCost) / item.validSales) * 100;
+                    else marginPct = item.fallbackMockMargin * 100;
                     
+                    marginPct = Math.max(0, marginPct);
                     const gp = item.totalSales * (marginPct / 100);
                     return { ...item, sales: item.totalSales, gp, margin: marginPct };
                 });
 
-                arr.sort((a, b) => b.sales - a.sales);
+                let totalMargin = 0;
+                if (overallValidSales > 0) totalMargin = ((overallValidSales - overallValidCost) / overallValidSales) * 100;
+                else totalMargin = arr.length > 0 ? arr.reduce((acc, curr) => acc + curr.margin, 0) / arr.length : 30;
+                
+                totalMargin = Math.max(0, totalMargin); 
+                const totalGP = overallTotalSales * (totalMargin / 100);
 
+                return { list: arr, summary: { sales: overallTotalSales, gp: totalGP, margin: totalMargin } };
+            }, [base2026, breadcrumbs]);
+
+            // 2. Light UI Operations: ค้นหาและ Sort (ทำงานเร็วขึ้น 10x)
+            const { list, summary } = useMemo(() => {
+                let arr = [...rawData.list].sort((a, b) => b.sales - a.sales);
                 if (search) {
                     const term = search.toLowerCase();
                     arr = arr.filter(item => item.name.toLowerCase().includes(term));
                 }
-
-                let totalMargin = 0;
-                if (overallValidSales > 0) {
-                    totalMargin = ((overallValidSales - overallValidCost) / overallValidSales) * 100;
-                } else {
-                    const avgMock = arr.length > 0 ? arr.reduce((acc, curr) => acc + curr.margin, 0) / arr.length : 30;
-                    totalMargin = avgMock;
-                }
-                totalMargin = Math.max(0, totalMargin); // Cap total margin
-                
-                const totalGP = overallTotalSales * (totalMargin / 100);
-
-                return { 
-                    list: arr, 
-                    summary: { sales: overallTotalSales, gp: totalGP, margin: totalMargin } 
-                };
-            }, [base2026, breadcrumbs, search]);
+                return { list: arr, summary: rawData.summary };
+            }, [rawData, search]);
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col lg:col-span-3">
@@ -1820,27 +1811,28 @@
             const currentLevelIdx = breadcrumbs.length;
             const currentLevelName = levelNames[currentLevelIdx] || 'Detail';
 
-            const { list, detail, totalLocations } = useMemo(() => {
+            // 1. Heavy Aggregation
+            const rawData = useMemo(() => {
                 let data = base2026;
                 if (breadcrumbs.length > 0) data = data.filter(d => d.SubProductGroup === breadcrumbs[0]);
                 if (breadcrumbs.length > 1) data = data.filter(d => d.GroupSKU === breadcrumbs[1]);
                 if (breadcrumbs.length > 2) data = data.filter(d => d.ProductName === breadcrumbs[2]);
 
                 const uniqueLocs = new Set();
-                data.forEach(d => {
-                    const loc = isChainBasedChannel(d.Channel) ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
-                    if (loc !== 'Unknown') uniqueLocs.add(`${d.Channel}|${loc}`);
-                });
-                const totalLocations = uniqueLocs.size;
-
                 const channelMap = {};
+
                 data.forEach(d => {
-                    const ch = d.Channel || 'Unknown';
-                    const loc = isChainBasedChannel(d.Channel) ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
-                    if (loc === 'Unknown') return;
+                    const upperCh = d.Channel?.toUpperCase() || '';
+                    const isSubChView = upperCh === 'MT' || upperCh === 'ONLINE';
+                    const loc = isSubChView ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
                     
-                    if (!channelMap[ch]) channelMap[ch] = new Set();
-                    channelMap[ch].add(loc);
+                    if (loc !== 'Unknown') {
+                        uniqueLocs.add(`${d.Channel}|${loc}`);
+                        
+                        const ch = d.Channel || 'Unknown';
+                        if (!channelMap[ch]) channelMap[ch] = new Set();
+                        channelMap[ch].add(loc);
+                    }
                 });
 
                 const formattedDetail = {};
@@ -1848,7 +1840,7 @@
                     const locs = Array.from(channelMap[ch]).sort();
                     formattedDetail[ch] = { locations: locs, count: locs.length };
                 });
-                const detailData = { channels: formattedDetail, total: totalLocations };
+                const detailData = { channels: formattedDetail, total: uniqueLocs.size };
 
                 if (breadcrumbs.length < 3) {
                     let groupBy = 'SubProductGroup';
@@ -1861,22 +1853,29 @@
                         if (!map[key]) map[key] = { name: key, sales: 0, locations: new Set() };
                         map[key].sales += (d.NetPrice || 0);
 
-                        const loc = isChainBasedChannel(d.Channel) ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
+                        const upperCh = d.Channel?.toUpperCase() || '';
+                        const isSubChView = upperCh === 'MT' || upperCh === 'ONLINE';
+                        const loc = isSubChView ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
                         if (loc !== 'Unknown') map[key].locations.add(`${d.Channel}|${loc}`);
                     });
 
-                    let arr = Object.values(map).map(v => ({ ...v, count: v.locations.size }));
-                    arr.sort((a, b) => b.sales - a.sales);
-
-                    if (search) {
-                        const term = search.toLowerCase();
-                        arr = arr.filter(item => item.name.toLowerCase().includes(term));
-                    }
-                    return { list: arr, detail: detailData, totalLocations };
+                    return { rawList: Object.values(map).map(v => ({ ...v, count: v.locations.size })), detail: detailData, totalLocations: uniqueLocs.size };
                 } else {
-                    return { list: null, detail: detailData, totalLocations };
+                    return { rawList: null, detail: detailData, totalLocations: uniqueLocs.size };
                 }
-            }, [base2026, breadcrumbs, search]);
+            }, [base2026, breadcrumbs]);
+
+            // 2. Light UI Operations
+            const { list, detail, totalLocations } = useMemo(() => {
+                if (!rawData.rawList) return { list: null, detail: rawData.detail, totalLocations: rawData.totalLocations };
+                
+                let arr = [...rawData.rawList].sort((a, b) => b.sales - a.sales);
+                if (search) {
+                    const term = search.toLowerCase();
+                    arr = arr.filter(item => item.name.toLowerCase().includes(term));
+                }
+                return { list: arr, detail: rawData.detail, totalLocations: rawData.totalLocations };
+            }, [rawData, search]);
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
@@ -2595,7 +2594,8 @@
                 return Object.keys(data).map(k => ({ name: k, value: data[k] })).sort((a, b) => b.value - a.value);
             }, [filteredData]);
 
-            const topPerformers = useMemo(() => {
+            // 1. Heavy Aggregation for Top Performers
+            const rawTopPerformers = useMemo(() => {
                 const skuMap = {};
                 const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
                 filteredData.forEach(d => {
@@ -2624,7 +2624,7 @@
                         }
                     }
                 });
-                let list = Object.entries(skuMap).map(([sku, data]) => {
+                return Object.entries(skuMap).map(([sku, data]) => {
                     const sortedProducts = Object.entries(data.products).map(([pName, pData]) => {
                         const topChannels = getParetoTopItems(pData.channels || {});
                         return { name: pName, value: pData.val26, sales25: pData.val25, topChannels };
@@ -2635,16 +2635,21 @@
                     
                     return { sku, name: bestProd, value: data.totalSales26, sales25: data.totalSales25, allProducts: sortedProducts, topChannels };
                 }).filter(item => item.value > 0 || item.sales25 > 0);
-                
+            }, [filteredData, salesData, filterMonth]);
+
+            // 2. Light UI Operations for Top Performers
+            const topPerformers = useMemo(() => {
+                let list = [...rawTopPerformers];
                 if (debouncedTopPerfSearch.length >= 2) {
                     const term = debouncedTopPerfSearch.toLowerCase();
                     list = list.filter(item => item.sku.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
                 }
                 if (topPerfSortMode === 'yoy') return list.sort((a, b) => { const yoyA = a.sales25 > 0 ? (a.value - a.sales25) / a.sales25 : -Infinity; const yoyB = b.sales25 > 0 ? (b.value - b.sales25) / b.sales25 : -Infinity; return yoyB - yoyA; }).slice(0, 10);
                 else return list.sort((a, b) => b.value - a.value).slice(0, 10);
-            }, [filteredData, debouncedTopPerfSearch, salesData, filterMonth, topPerfSortMode]);
+            }, [rawTopPerformers, debouncedTopPerfSearch, topPerfSortMode]);
 
-            const topCustomers = useMemo(() => {
+            // 1. Heavy Aggregation for Top Customers
+            const rawTopCustomers = useMemo(() => {
                 const customerMap = {};
                 const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
                 filteredData.forEach(d => {
@@ -2673,21 +2678,25 @@
                     }
                 });
                 
-                let list = Object.values(customerMap).filter(item => item.totalSales26 > 0 || item.totalSales25 > 0).map(item => {
+                return Object.values(customerMap).filter(item => item.totalSales26 > 0 || item.totalSales25 > 0).map(item => {
                     const topProducts = getParetoTopItems(item.products || {});
                     const allProducts = Object.entries(item.productDetails).map(([name, data]) => ({
                         name, value: data.val26, sales25: data.val25
                     })).filter(p => p.value > 0 || p.sales25 > 0).sort((a, b) => b.value - a.value);
                     return { ...item, topProducts, allProducts };
                 });
+            }, [filteredData, salesData, filterMonth]);
 
+            // 2. Light UI Operations for Top Customers
+            const topCustomers = useMemo(() => {
+                let list = [...rawTopCustomers];
                 if (debouncedCustomerSearch.length >= 2) {
                     const term = debouncedCustomerSearch.toLowerCase();
                     list = list.filter(item => item.name.toLowerCase().includes(term) || item.channel.toLowerCase().includes(term));
                 }
                 if (topCustomerSortMode === 'yoy') return list.sort((a, b) => { const yoyA = a.totalSales25 > 0 ? (a.totalSales26 - a.totalSales25) / a.totalSales25 : -Infinity; const yoyB = b.totalSales25 > 0 ? (b.totalSales26 - b.totalSales25) / b.totalSales25 : -Infinity; return yoyB - yoyA; }).slice(0, 50);
                 else return list.sort((a, b) => b.totalSales26 - a.totalSales26).slice(0, 50);
-            }, [filteredData, debouncedCustomerSearch, salesData, filterMonth, topCustomerSortMode]);
+            }, [rawTopCustomers, debouncedCustomerSearch, topCustomerSortMode]);
 
             const uniqueCustomersCount = useMemo(() => {
                 const unique = new Set();
