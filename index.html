@@ -535,6 +535,214 @@
             );
         };
 
+        // --- 5. Sub-Category Deep Dive Widget ---
+        const SubProductAnalysisWidget = ({ filteredData, salesData, monthsList }) => {
+            const [drillDownPath, setDrillDownPath] = useState(null); // null = SubProduct view, string = SKU view
+            const [activeSub, setActiveSub] = useState(null);
+            const [activeSku, setActiveSku] = useState(null);
+
+            const valid2026Months = useMemo(() => new Set((salesData || []).filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0])), [salesData]);
+
+            // Generate List based on drillDown state
+            const currentList = useMemo(() => {
+                const map = {};
+                (filteredData || []).forEach(d => {
+                    if (drillDownPath && d.SubProductGroup !== drillDownPath) return;
+
+                    const key = drillDownPath ? (d.GroupSKU || 'Unknown') : (d.SubProductGroup || 'Unknown');
+                    
+                    if (!map[key]) {
+                        map[key] = { 
+                            name: key, 
+                            group: d.ProductGroup || 'Unknown', 
+                            s26: 0, 
+                            s25: 0 
+                        };
+                    }
+                    if (d.Year === '2026') {
+                        map[key].s26 += (d.NetPrice || 0);
+                    } else if (d.Year === '2025' && valid2026Months.has(d.Month?.split('-')[0])) {
+                        map[key].s25 += (d.NetPrice || 0);
+                    }
+                });
+                return Object.values(map).map(item => ({
+                    ...item,
+                    yoy: item.s25 > 0 ? ((item.s26 - item.s25) / item.s25) * 100 : null
+                })).sort((a, b) => b.s26 - a.s26);
+            }, [filteredData, valid2026Months, drillDownPath]);
+
+            // Handle Auto-select
+            useEffect(() => {
+                if ((currentList || []).length > 0) {
+                    if (drillDownPath) {
+                        if (!activeSku || !currentList.find(i => i.name === activeSku)) setActiveSku(currentList[0].name);
+                    } else {
+                        if (!activeSub || !currentList.find(i => i.name === activeSub)) setActiveSub(currentList[0].name);
+                    }
+                } else {
+                    if (drillDownPath) setActiveSku(null);
+                    else setActiveSub(null);
+                }
+            }, [currentList, drillDownPath]);
+
+            // Chart Data
+            const activeName = drillDownPath ? activeSku : activeSub;
+            
+            const chartData = useMemo(() => {
+                if (!activeName) return [];
+                const isSkuView = !!drillDownPath;
+                
+                const base25 = (filteredData || []).filter(d => 
+                    d.Year === '2025' && 
+                    (isSkuView ? (d.GroupSKU || 'Unknown') === activeName : (d.SubProductGroup || 'Unknown') === activeName)
+                );
+                const base26 = (filteredData || []).filter(d => 
+                    d.Year === '2026' && 
+                    (isSkuView ? (d.GroupSKU || 'Unknown') === activeName : (d.SubProductGroup || 'Unknown') === activeName)
+                );
+                
+                return (monthsList || []).map(m => {
+                    const val25 = base25.filter(d => d.Month && d.Month.startsWith(m)).reduce((s, r) => s + (r.NetPrice || 0), 0);
+                    const val26 = base26.filter(d => d.Month && d.Month.startsWith(m)).reduce((s, r) => s + (r.NetPrice || 0), 0);
+                    return { name: m, sales25: val25 === 0 ? null : val25, sales26: val26 === 0 ? null : val26 };
+                });
+            }, [filteredData, activeName, drillDownPath, monthsList]);
+
+            const yAxisTicks = useMemo(() => {
+                const maxVal = (chartData || []).reduce((max, d) => Math.max(max, d.sales25 || 0, d.sales26 || 0), 0);
+                if (maxVal === 0) return [0, 1000000];
+                const targetMax = maxVal * 1.15;
+                const roughStep = targetMax / 4; 
+                const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep || 1)));
+                const normalized = roughStep / magnitude;
+                const niceNorm = normalized <= 1 ? 1 : (normalized <= 2 ? 2 : (normalized <= 2.5 ? 2.5 : (normalized <= 5 ? 5 : 10)));
+                const step = niceNorm * magnitude;
+                const maxTick = Math.ceil(targetMax / step) * step;
+                const ticks = [];
+                for (let current = 0; current <= maxTick + (step * 0.1); current += step) ticks.push(current);
+                return ticks;
+            }, [chartData]);
+
+            return (
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
+                    <div className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-[#30b0c7]/10 p-2 rounded-xl">
+                                <Layers className="w-5 h-5 text-[#30b0c7]" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-[#1d1d1f]">Sub-Category Deep Dive</h3>
+                                <p className="text-xs text-[#86868b] font-medium mt-0.5">Select a group to view trends or drill down</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[320px]">
+                        {/* Left: Scrollable List with Drill-down */}
+                        <div className="flex flex-col h-full bg-[#f5f5f7]/50 rounded-xl border border-black/5 overflow-hidden">
+                            {/* Header / Breadcrumb */}
+                            <div className="p-3 bg-white border-b border-black/5 flex items-center shadow-sm">
+                                {drillDownPath ? (
+                                    <button 
+                                        onClick={() => setDrillDownPath(null)}
+                                        className="flex items-center gap-1.5 text-[#0071e3] text-xs font-bold hover:text-[#0077ED] transition-colors"
+                                    >
+                                        <ArrowLeft className="w-3.5 h-3.5" /> Back to Sub-Products
+                                    </button>
+                                ) : (
+                                    <span className="text-[#86868b] text-xs font-bold uppercase tracking-wider pl-1">Sub-Product List</span>
+                                )}
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-2 flex flex-col gap-2">
+                                {(currentList || []).map((item, idx) => {
+                                    const isActive = drillDownPath ? (item.name === activeSku) : (item.name === activeSub);
+                                    return (
+                                        <div 
+                                            key={item.name} 
+                                            onClick={() => drillDownPath ? setActiveSku(item.name) : setActiveSub(item.name)}
+                                            className={`p-3 rounded-xl border cursor-pointer transition-all ${isActive ? 'bg-[#30b0c7]/10 border-[#30b0c7]/30 shadow-sm' : 'bg-white border-black/5 hover:bg-[#e8e8ed]'}`}
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex flex-col gap-1.5 w-full pr-2">
+                                                    <span className={`text-sm font-bold leading-tight line-clamp-2 ${isActive ? 'text-[#30b0c7]' : 'text-[#1d1d1f]'}`} title={item.name}>{item.name}</span>
+                                                    <span className={`w-max text-[9px] px-1.5 py-0.5 rounded uppercase font-extrabold tracking-wider ${GROUP_COLORS[item.group] || 'bg-gray-100 text-gray-500'}`}>{item.group}</span>
+                                                </div>
+                                                <span className="text-[10px] font-semibold text-[#86868b] shrink-0 mt-0.5">#{idx + 1}</span>
+                                            </div>
+                                            <div className="flex justify-between items-end border-t border-black/5 pt-2">
+                                                <span className="text-xs font-semibold text-[#1d1d1f]">฿{((item.s26 || 0)/1000000).toFixed(2)}M</span>
+                                                <div className="flex items-center gap-2">
+                                                    {item.yoy !== null ? (
+                                                        <span className={`text-[11px] font-bold ${item.yoy >= 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'}`}>
+                                                            {item.yoy >= 0 ? '▲' : '▼'} {Math.abs(item.yoy).toFixed(1)}%
+                                                        </span>
+                                                    ) : <span className="text-[11px] font-medium text-[#86868b]">N/A</span>}
+                                                    {!drillDownPath && isActive && (
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setDrillDownPath(item.name); }}
+                                                            className="ml-1 flex items-center gap-1 bg-[#30b0c7] text-white text-[10px] px-2 py-1 rounded-md hover:bg-[#2898ac] transition-colors shadow-sm active:scale-95"
+                                                        >
+                                                            SKUs <ChevronRight className="w-3 h-3" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {(currentList || []).length === 0 && (
+                                    <div className="h-full flex flex-col items-center justify-center text-[#86868b] opacity-50 py-10">
+                                        <ShoppingBag className="w-8 h-8 mb-2" />
+                                        <span className="text-xs font-medium">No items found</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Right: Area Chart */}
+                        <div className="lg:col-span-2 h-full bg-[#f5f5f7]/30 border border-black/5 rounded-xl p-4 flex flex-col">
+                            <div className="flex justify-between items-center mb-4">
+                                <div>
+                                    <h4 className="text-sm font-bold text-[#1d1d1f] truncate max-w-[300px] xl:max-w-[400px]">{activeName || 'Select an item'}</h4>
+                                    <p className="text-[10px] text-[#86868b] font-medium">{drillDownPath ? 'SKU Trend Comparison' : 'Sub-Product Trend Comparison'}</p>
+                                </div>
+                                <div className="flex items-center gap-3 text-[10px] font-bold text-[#86868b] uppercase tracking-wider">
+                                    <div className="flex items-center gap-1"><div className="w-3 h-1 rounded-sm bg-[#30b0c7]"></div> 2026</div>
+                                    <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded-full border-b-2 border-dashed border-[#86868b]"></div> 2025</div>
+                                </div>
+                            </div>
+                            <div className="flex-1 min-h-[200px]">
+                                {(chartData || []).some(d => d.sales25 > 0 || d.sales26 > 0) ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ComposedChart data={chartData} margin={{ top: 15, right: 0, left: -20, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="colorDeepDive" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#30b0c7" stopOpacity={0.4}/>
+                                                    <stop offset="95%" stopColor="#30b0c7" stopOpacity={0}/>
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
+                                            <XAxis dataKey="name" tick={{fontSize: 11, fontWeight: 500, fill: '#86868b'}} axisLine={false} tickLine={false} />
+                                            <YAxis domain={[0, yAxisTicks[yAxisTicks.length - 1] || 'auto']} ticks={yAxisTicks} tick={{fontSize: 11, fontWeight: 500, fill: '#86868b'}} tickFormatter={(v) => `${((v || 0)/1000000).toFixed(1)}M`} axisLine={false} tickLine={false} />
+                                            <Tooltip cursor={{fill: '#f5f5f7', strokeWidth: 1, stroke: '#e5e5ea', strokeDasharray: '3 3'}} contentStyle={{borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 14px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: '500', backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)'}} formatter={(v) => `฿${((v || 0)/1000000).toFixed(2)}M`} />
+                                            
+                                            <Area type="monotone" dataKey="sales26" name="2026 Sales" stroke="#30b0c7" strokeWidth={3} fillOpacity={1} fill="url(#colorDeepDive)" dot={{r: 4, fill: '#30b0c7'}} activeDot={{r: 6, strokeWidth: 0}}>
+                                                <LabelList dataKey="sales26" position="top" content={renderCustomLabel} />
+                                            </Area>
+                                            <Line type="monotone" dataKey="sales25" name="2025 Sales" stroke="#86868b" strokeWidth={2} strokeDasharray="5 5" dot={{r: 4, fill: '#86868b'}} activeDot={{r: 6, strokeWidth: 0}} />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="h-full flex items-center justify-center text-[#86868b] font-medium text-sm">No trend data available</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const PortfolioSummaryWidget = ({ selectedGroups, toggleGroup }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col items-center justify-center h-full relative overflow-hidden group animate-in fade-in zoom-in-95 duration-500">
                 <div className="absolute inset-0 bg-gradient-to-br from-[#0071e3]/5 to-transparent pointer-events-none"></div>
@@ -2375,6 +2583,9 @@
                                     <SafeWidget><ChannelMixWidget channelMix={channelMix} kpi={kpi} /></SafeWidget>
                                 </div>
                                 
+                                {/* New Deep-Dive Widget */}
+                                <SafeWidget><SubProductAnalysisWidget filteredData={filteredData} salesData={salesData} monthsList={monthsList} /></SafeWidget>
+
                                 {/* ย้าย Executive Summary มาด้านล่าง พร้อมระบบ Tap to view */}
                                 <SafeWidget><ExecutiveSummaryWidget kpi={kpi} /></SafeWidget>
                             </div>
