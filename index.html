@@ -1884,12 +1884,22 @@
                                 <p className="text-xs text-[#86868b] font-medium mt-0.5">Total Active Locations: <span className="font-bold text-[#1d1d1f]">{totalLocations || 0}</span></p>
                             </div>
                         </div>
-                        {breadcrumbs.length < 3 && (
-                            <div className="relative w-full md:w-64">
-                                <input type="text" placeholder={`Search ${currentLevelName}...`} className="w-full pl-9 pr-3 py-2.5 bg-[#f5f5f7] rounded-[12px] text-sm outline-none" value={search} onChange={(e) => setSearch(e.target.value)} />
-                                <Search className="w-4 h-4 text-[#86868b] absolute left-3 top-3" />
-                            </div>
-                        )}
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            {breadcrumbs.length > 0 && (
+                                <button 
+                                    onClick={() => { setBreadcrumbs(breadcrumbs.slice(0, -1)); setSearch(''); }} 
+                                    className="flex items-center gap-1.5 text-sm text-[#0071e3] bg-[#f5f5f7] hover:bg-[#e8e8ed] px-4 py-2 rounded-full font-medium transition-colors shrink-0"
+                                >
+                                    <ArrowLeft className="w-4 h-4" /> Back
+                                </button>
+                            )}
+                            {breadcrumbs.length < 3 && (
+                                <div className="relative w-full md:w-64">
+                                    <input type="text" placeholder={`Search ${currentLevelName}...`} className="w-full pl-9 pr-3 py-2.5 bg-[#f5f5f7] rounded-[12px] text-sm outline-none" value={search} onChange={(e) => setSearch(e.target.value)} />
+                                    <Search className="w-4 h-4 text-[#86868b] absolute left-3 top-3" />
+                                </div>
+                            )}
+                        </div>
                     </div>
                     {list && (
                         <div className="overflow-x-auto custom-scrollbar border border-black/5 rounded-xl max-h-[380px] mb-6">
@@ -2070,7 +2080,7 @@
                     {/* --- 1. Target List Modal UI --- */}
                     {selectedGap && (
                         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={(e) => {if(e.target === e.currentTarget) setSelectedGap(null);}}>
-                            <div className="bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden border border-white/20 flex flex-col max-h-[80vh]">
+                            <div className="bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 flex flex-col max-h-[85vh]">
                                 <div className="p-5 border-b border-black/5 flex justify-between items-start bg-[#f5f5f7]/50">
                                     <div>
                                         <h3 className="text-[10px] font-bold text-[#ff2d55] uppercase tracking-wider mb-1">Actionable Insight</h3>
@@ -2079,25 +2089,28 @@
                                     </div>
                                     <button onClick={() => setSelectedGap(null)} className="text-[#86868b] hover:text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] p-1.5 rounded-full transition-colors"><X className="w-4 h-4" /></button>
                                 </div>
-                                <div className="p-4 overflow-y-auto custom-scrollbar flex-1 bg-white">
-                                    <div className="text-xs font-bold text-[#1d1d1f] mb-3 flex items-center gap-2">
-                                        <Users className="w-4 h-4 text-[#86868b]" /> {selectedGap.missed.length} Missed Customers
+                                <div className="p-5 overflow-y-auto custom-scrollbar flex-1 bg-white flex flex-col gap-5">
+                                    {/* Target List Section */}
+                                    <div>
+                                        <div className="text-xs font-bold text-[#1d1d1f] mb-3 flex items-center gap-2">
+                                            <Users className="w-4 h-4 text-[#86868b]" /> {selectedGap.missed.length} Missed Customers
+                                        </div>
+                                        <ul className="space-y-2 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
+                                            {selectedGap.missed.map((cust, i) => (
+                                                <li key={i} className="text-sm text-[#1d1d1f] flex items-center gap-2 p-2.5 bg-[#f5f5f7] hover:bg-[#e8e8ed] transition-colors rounded-lg border border-black/5">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-[#ff2d55] flex-shrink-0"></div>
+                                                    <span className="truncate font-medium">{cust}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
                                     </div>
-                                    <ul className="space-y-2">
-                                        {selectedGap.missed.map((cust, i) => (
-                                            <li key={i} className="text-sm text-[#1d1d1f] flex items-center gap-2 p-2 bg-[#f5f5f7] rounded-lg border border-black/5">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-[#ff2d55] flex-shrink-0"></div>
-                                                <span className="truncate">{cust}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
                                 </div>
-                                <div className="p-4 bg-white border-t border-black/5">
+                                <div className="p-4 bg-white border-t border-black/5 flex gap-3">
                                     <button 
                                         onClick={handleCopy}
-                                        className={`w-full py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${isCopied ? 'bg-[#34c759] text-white shadow-[0_0_10px_rgba(52,199,89,0.3)]' : 'bg-[#1d1d1f] hover:bg-black text-white shadow-md hover:shadow-lg'}`}
+                                        className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${isCopied ? 'bg-[#34c759] text-white shadow-[0_0_10px_rgba(52,199,89,0.3)]' : 'bg-[#1d1d1f] hover:bg-black text-white shadow-md hover:shadow-lg'}`}
                                     >
-                                        {isCopied ? <><Check className="w-4 h-4" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy to Clipboard</>}
+                                        {isCopied ? <><Check className="w-4 h-4" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy Target List</>}
                                     </button>
                                 </div>
                             </div>
