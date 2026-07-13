@@ -873,6 +873,80 @@
             </div>
         );
 
+        const TrendInsightAnnotation = (props) => {
+            const { x, y, value, index, data } = props;
+            if (value === 0 || value === undefined || value === null) return null;
+            
+            const pointData = data[index];
+            const cx = (props.width && !isNaN(props.width)) ? x + props.width / 2 : x;
+            const cy = !isNaN(y) ? y - 10 : y;
+
+            if (isNaN(cx) || isNaN(cy)) return null;
+
+            const valInM = Number(value) / 1000000;
+            const formatted = valInM < 1 ? `${(valInM || 0).toFixed(2)}M` : `${(valInM || 0).toFixed(1)}M`;
+            
+            if (!pointData || !pointData.isLatest || !pointData.insights) {
+                return <text x={cx} y={cy} fill="#86868b" textAnchor="middle" fontSize={10} fontWeight={600}>{formatted}</text>;
+            }
+
+            const { insights } = pointData;
+            const isRightHalf = index > 5;
+            const boxWidth = 200;
+            const boxHeight = 190;
+            const xOffset = isRightHalf ? -boxWidth - 15 : 15;
+            const yOffset = -boxHeight / 2 + 10;
+
+            return (
+                <g className="animate-in fade-in zoom-in duration-500 delay-500 fill-mode-both">
+                    <text x={cx} y={cy - 5} fill="#0071e3" textAnchor="middle" fontSize={12} fontWeight={800}>{formatted}</text>
+                    <circle cx={cx} cy={cy + 10} r={5} fill="#fff" stroke="#0071e3" strokeWidth={2.5} />
+                    <circle cx={cx} cy={cy + 10} r={12} fill="#0071e3" opacity={0.3} className="animate-ping" style={{ transformOrigin: `${cx}px ${cy + 10}px`, animationDuration: '3s' }} />
+                    
+                    <foreignObject x={cx + xOffset} y={cy + yOffset} width={boxWidth} height={boxHeight + 20} className="overflow-visible pointer-events-none">
+                        <div className="bg-white/95 backdrop-blur-xl border border-[#0071e3]/30 shadow-[0_8px_30px_rgba(0,113,227,0.2)] rounded-[14px] p-3.5 h-[190px] flex flex-col relative">
+                            <div className="absolute top-1/2 -mt-1.5 w-3 h-3 bg-white transform rotate-45 border-[#0071e3]/30" 
+                                style={{ 
+                                    left: isRightHalf ? '100%' : '0', 
+                                    marginLeft: isRightHalf ? '-6px' : '-6px',
+                                    borderRightWidth: isRightHalf ? '1px' : '0',
+                                    borderTopWidth: isRightHalf ? '1px' : '0',
+                                    borderLeftWidth: !isRightHalf ? '1px' : '0',
+                                    borderBottomWidth: !isRightHalf ? '1px' : '0',
+                                }}>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 border-b border-black/5 pb-2 mb-2 shrink-0">
+                                <div className="bg-[#0071e3]/10 p-1 rounded-full"><Sparkles className="w-3.5 h-3.5 text-[#0071e3]" /></div>
+                                <span className="text-xs font-extrabold text-[#1d1d1f] tracking-tight">{insights.month} Highlights</span>
+                            </div>
+
+                            <div className="flex-1 overflow-hidden flex flex-col gap-2 justify-center">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[10px] font-extrabold text-[#86868b] uppercase tracking-wider">Top 3 Products</span>
+                                    {insights.topProducts.slice(0,3).map((p, i) => (
+                                        <div key={i} className="flex justify-between items-center text-[11px]">
+                                            <span className="truncate max-w-[100px] font-semibold text-[#1d1d1f]" title={p[0]}>{p[0]}</span>
+                                            <span className="font-bold text-[#34c759]">฿{(p[1]/1000000).toFixed(1)}M</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[10px] font-extrabold text-[#86868b] uppercase tracking-wider">Top 3 Channels</span>
+                                    {insights.topChannels.slice(0,3).map((c, i) => (
+                                        <div key={i} className="flex justify-between items-center text-[11px]">
+                                            <span className="truncate max-w-[100px] font-semibold text-[#1d1d1f]" title={c[0]}>{c[0]}</span>
+                                            <span className="font-bold text-[#0071e3]">฿{(c[1]/1000000).toFixed(1)}M</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </foreignObject>
+                </g>
+            );
+        };
+
         const TrendChartWidget = ({ trendChartData, selectedGroups, show2025Trend, setShow2025Trend, yAxisTicks }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] lg:col-span-2">
                 <div className="flex justify-between items-center mb-6">
@@ -880,16 +954,21 @@
                         <TrendingUp className="w-5 h-5 text-[#0071e3]" /> 
                         Sales Trend 2025 vs 2026 (Total)
                     </h3>
-                    <button 
-                        onClick={() => setShow2025Trend(!show2025Trend)}
-                        className={`text-xs font-semibold px-4 py-1.5 rounded-full transition-colors ${show2025Trend ? 'bg-[#f5f5f7] text-[#1d1d1f] hover:bg-[#e8e8ed]' : 'bg-white text-[#86868b] border border-black/5 hover:bg-[#f5f5f7]'}`}
-                    >
-                        {show2025Trend ? 'Hide 2025' : 'Show 2025'}
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#86868b] uppercase tracking-wider">
+                            <div className="w-4 h-0.5 border-b-2 border-dashed border-[#ff9500]"></div> Projection
+                        </div>
+                        <button 
+                            onClick={() => setShow2025Trend(!show2025Trend)}
+                            className={`text-xs font-semibold px-4 py-1.5 rounded-full transition-colors ${show2025Trend ? 'bg-[#f5f5f7] text-[#1d1d1f] hover:bg-[#e8e8ed]' : 'bg-white text-[#86868b] border border-black/5 hover:bg-[#f5f5f7]'}`}
+                        >
+                            {show2025Trend ? 'Hide 2025' : 'Show 2025'}
+                        </button>
+                    </div>
                 </div>
                 <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={trendChartData || []} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                        <ComposedChart data={trendChartData || []} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="color26" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#0071e3" stopOpacity={0.3}/>
@@ -899,13 +978,16 @@
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
                             <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 500, fill: '#86868b'}} axisLine={false} tickLine={false} />
                             <YAxis domain={[0, yAxisTicks[yAxisTicks.length - 1] || 'auto']} ticks={yAxisTicks} tick={{fontSize: 12, fontWeight: 500, fill: '#86868b'}} tickFormatter={(v) => `${((v || 0)/1000000).toFixed(0)}M`} axisLine={false} tickLine={false} />
-                            <Tooltip cursor={{fill: '#f5f5f7', strokeWidth: 1, stroke: '#e5e5ea', strokeDasharray: '3 3'}} contentStyle={{borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 14px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: '500', backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)'}} formatter={(v) => `฿${((v || 0)/1000000).toFixed(2)}M`} />
+                            <Tooltip cursor={{fill: '#f5f5f7', strokeWidth: 1, stroke: '#e5e5ea', strokeDasharray: '3 3'}} contentStyle={{borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 14px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: '500', backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)'}} formatter={(v, name) => [`฿${((v || 0)/1000000).toFixed(2)}M`, name === 'proj26' ? '2026 Projection' : (name === 'sales26' ? '2026 Actual' : '2025 Actual')]} />
                             <Legend wrapperStyle={{fontSize: '12px', fontWeight: '500', color: '#86868b'}} />
                             
                             {show2025Trend && <Line type="monotone" dataKey="sales25" name="2025 Actual" stroke="#86868b" strokeWidth={2} strokeDasharray="5 5" dot={{r: 4, fill: '#86868b'}} activeDot={{r: 6, strokeWidth: 0}} />}
-                            <Area type="monotone" dataKey="sales26" name="2026 Actual/Proj." stroke="#0071e3" strokeWidth={3} fillOpacity={1} fill="url(#color26)" dot={{r: 4, fill: '#0071e3'}} activeDot={{r: 6, strokeWidth: 0}}>
-                                <LabelList dataKey="sales26" position="top" content={renderCustomLabel} />
+                            
+                            <Area type="monotone" dataKey="sales26" name="2026 Actual" stroke="#0071e3" strokeWidth={3} fillOpacity={1} fill="url(#color26)" dot={{r: 4, fill: '#0071e3'}} activeDot={{r: 6, strokeWidth: 0}}>
+                                <LabelList dataKey="sales26" position="top" content={(props) => <TrendInsightAnnotation {...props} data={trendChartData} />} />
                             </Area>
+
+                            <Line type="monotone" dataKey="proj26" name="2026 Projection" stroke="#ff9500" strokeWidth={2.5} strokeDasharray="6 4" dot={{r: 3, fill: '#ff9500'}} activeDot={{r: 5, strokeWidth: 0}} />
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>
@@ -1009,7 +1091,7 @@
                     return (
                         <div className="bg-white/95 backdrop-blur-xl border border-black/5 p-4 rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] min-w-[240px]">
                             <div className="text-sm font-bold text-[#1d1d1f] mb-1">{label} 2026</div>
-                            <div className="text-xs text-[#86868b] font-medium mb-3 pb-2 border-b border-[#e5e5ea]">Total Sales: ฿{(total / 1000000).toFixed(2)}M</div>
+                            <div className="text-xs text-[#86868b] font-medium mb-3 pb-2 border-b border-[#e5e5ea]">{total > 0 ? `Total Sales: ฿${(total / 1000000).toFixed(2)}M` : 'No Sales'}</div>
                             <div className="space-y-2.5">
                                 {[...payload].sort((a,b) => (b.payload[`${b.dataKey}_abs`] || 0) - (a.payload[`${a.dataKey}_abs`] || 0)).map((entry, index) => {
                                     const absVal = entry.payload[`${entry.dataKey}_abs`] || 0;
@@ -2386,15 +2468,87 @@
             const trendChartData = useMemo(() => {
                 const base2025 = filteredData.filter(d => d.Year === '2025');
                 const base2026 = filteredData.filter(d => d.Year === '2026');
-                return monthsList.map(m => {
-                    const val2025 = base2025.filter(d => d.Month && d.Month.startsWith(m)).reduce((s, r) => s + (r.NetPrice || 0), 0);
-                    const val2026 = base2026.filter(d => d.Month && d.Month.startsWith(m)).reduce((s, r) => s + (r.NetPrice || 0), 0);
-                    return { name: m, sales25: val2025 === 0 ? null : val2025, sales26: val2026 === 0 ? null : val2026 };
+                
+                // 1. Find the latest month with valid 2026 data
+                let latestMonthIdx = -1;
+                const monthlyData26 = monthsList.map((m, idx) => {
+                    const dataForMonth = base2026.filter(d => d.Month && d.Month.startsWith(m));
+                    const val = dataForMonth.reduce((s, r) => s + (r.NetPrice || 0), 0);
+                    if (val > 0) latestMonthIdx = idx;
+                    return { name: m, val, data: dataForMonth };
+                });
+
+                // 2. Generate insights for the latest month
+                let latestMonthInsights = null;
+                if (latestMonthIdx >= 0) {
+                    const latestData = monthlyData26[latestMonthIdx].data;
+                    const prodMap = {};
+                    const chMap = {};
+                    latestData.forEach(d => {
+                        const p = d.ProductName || 'Unknown';
+                        const c = isChainBasedChannel(d.Channel) ? (d.SubChannel || d.Channel || 'Unknown') : (d.Channel || 'Unknown');
+                        prodMap[p] = (prodMap[p] || 0) + (d.NetPrice || 0);
+                        chMap[c] = (chMap[c] || 0) + (d.NetPrice || 0);
+                    });
+                    
+                    const topProds = Object.entries(prodMap).sort((a,b)=>b[1]-a[1]).slice(0,3);
+                    const topChs = Object.entries(chMap).sort((a,b)=>b[1]-a[1]).slice(0,3);
+                    
+                    latestMonthInsights = {
+                        month: monthsList[latestMonthIdx],
+                        topProducts: topProds,
+                        topChannels: topChs,
+                        sales: monthlyData26[latestMonthIdx].val
+                    };
+                }
+
+                // 3. Setup Projection Logic
+                const fy25Total = base2025.reduce((s, r) => s + (r.NetPrice || 0), 0);
+                const validMonthsCount = latestMonthIdx + 1;
+                const ytd26 = monthlyData26.slice(0, validMonthsCount).reduce((s, m) => s + m.val, 0);
+                
+                let isSeasonality = false;
+                let ytd25 = 0;
+                const monthly25Sales = monthsList.map(m => {
+                    return base2025.filter(d => d.Month && d.Month.startsWith(m)).reduce((s, r) => s + (r.NetPrice || 0), 0);
+                });
+                
+                ytd25 = monthly25Sales.slice(0, validMonthsCount).reduce((s, v) => s + v, 0);
+                if (ytd25 > 0 && fy25Total > 0) isSeasonality = true;
+
+                const runRate = validMonthsCount > 0 ? (ytd26 / validMonthsCount) : 0;
+
+                // 4. Map into chart data format
+                return monthsList.map((m, idx) => {
+                    const sales25 = monthly25Sales[idx] === 0 ? null : monthly25Sales[idx];
+                    let sales26 = null;
+                    let proj26 = null;
+
+                    if (idx <= latestMonthIdx) {
+                        sales26 = monthlyData26[idx].val === 0 ? null : monthlyData26[idx].val;
+                        // Bridge the projection line so it connects seamlessly
+                        if (idx === latestMonthIdx) proj26 = sales26;
+                    } else {
+                        if (isSeasonality && ytd25 > 0) {
+                            proj26 = (ytd26 / ytd25) * (monthly25Sales[idx] || 0);
+                        } else {
+                            proj26 = runRate;
+                        }
+                    }
+
+                    return { 
+                        name: m, 
+                        sales25, 
+                        sales26, 
+                        proj26,
+                        isLatest: idx === latestMonthIdx,
+                        insights: idx === latestMonthIdx ? latestMonthInsights : null
+                    };
                 });
             }, [filteredData, monthsList]);
 
             const yAxisTicks = useMemo(() => {
-                const maxVal = (trendChartData || []).reduce((max, d) => Math.max(max, d.sales25 || 0, d.sales26 || 0), 0);
+                const maxVal = (trendChartData || []).reduce((max, d) => Math.max(max, d.sales25 || 0, d.sales26 || 0, d.proj26 || 0), 0);
                 if (maxVal === 0) return [0, 5000000];
                 const targetMax = maxVal * 1.15;
                 const roughStep = targetMax / 4; 
