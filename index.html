@@ -1947,63 +1947,175 @@
         );
 
         const NPDTrajectoryWidget = ({ salesData, npdData }) => {
-            const { chartData, lines } = useMemo(() => {
-                if (!npdData?.topNPDs?.length) return { chartData: [], lines: [] };
+            const [viewMode, setViewMode] = useState('monthly'); // 'monthly' or 'cumulative'
+
+            const { chartData, lines, insights } = useMemo(() => {
+                if (!npdData?.topNPDs?.length) return { chartData: [], lines: [], insights: null };
                 const topNPDNames = npdData.topNPDs.slice(0, 5).map(n => n.name);
                 const monthMap = { 'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12 };
                 const firstMonths = {};
+
+                // 1. Find absolute launch month for normalization
                 (salesData || []).forEach(d => {
                     if (topNPDNames.includes(d.ProductName)) {
                         const mStr = d.Month ? d.Month.substring(0, 3) : null;
                         if (mStr && monthMap[mStr]) {
                             const absMonth = parseInt(d.Year) * 12 + monthMap[mStr];
-                            if (!firstMonths[d.ProductName] || absMonth < firstMonths[d.ProductName]) firstMonths[d.ProductName] = absMonth;
-                        }
-                    }
-                });
-                const chartData = Array.from({ length: 12 }, (_, i) => ({ name: `M${i + 1}` }));
-                topNPDNames.forEach(name => { chartData.forEach(row => row[name] = null); });
-                const hasData = {};
-                topNPDNames.forEach(n => hasData[n] = new Set());
-                (salesData || []).forEach(d => {
-                    if (topNPDNames.includes(d.ProductName)) {
-                        const mStr = d.Month ? d.Month.substring(0, 3) : null;
-                        if (mStr && monthMap[mStr]) {
-                            const absMonth = parseInt(d.Year) * 12 + monthMap[mStr];
-                            const relM = absMonth - firstMonths[d.ProductName] + 1;
-                            if (relM >= 1 && relM <= 12) {
-                                if (chartData[relM - 1][d.ProductName] === null) chartData[relM - 1][d.ProductName] = 0;
-                                chartData[relM - 1][d.ProductName] += d.NetPrice || 0;
-                                hasData[d.ProductName].add(relM);
+                            if (!firstMonths[d.ProductName] || absMonth < firstMonths[d.ProductName]) {
+                                firstMonths[d.ProductName] = absMonth;
                             }
                         }
                     }
                 });
-                topNPDNames.forEach(name => {
-                    const maxRel = Math.max(...Array.from(hasData[name] || [0]));
-                    for (let i = 1; i <= maxRel; i++) if (chartData[i - 1][name] === null) chartData[i - 1][name] = 0;
+
+                // 2. Initialize raw monthly data (M1-M12)
+                const rawMonthly = {};
+                topNPDNames.forEach(name => { rawMonthly[name] = new Array(12).fill(null); });
+
+                (salesData || []).forEach(d => {
+                    if (topNPDNames.includes(d.ProductName)) {
+                        const mStr = d.Month ? d.Month.substring(0, 3) : null;
+                        if (mStr && monthMap[mStr]) {
+                            const absMonth = parseInt(d.Year) * 12 + monthMap[mStr];
+                            const relM = absMonth - firstMonths[d.ProductName];
+                            if (relM >= 0 && relM < 12) {
+                                if (rawMonthly[d.ProductName][relM] === null) rawMonthly[d.ProductName][relM] = 0;
+                                rawMonthly[d.ProductName][relM] += d.NetPrice || 0;
+                            }
+                        }
+                    }
                 });
-                return { chartData, lines: topNPDNames };
-            }, [salesData, npdData]);
+
+                // Fill zero for active months (prevent disconnected lines)
+                topNPDNames.forEach(name => {
+                    let lastActiveIndex = -1;
+                    for(let i=11; i>=0; i--) { if(rawMonthly[name][i] !== null) { lastActiveIndex = i; break; } }
+                    for(let i=0; i<=lastActiveIndex; i++) {
+                        if(rawMonthly[name][i] === null) rawMonthly[name][i] = 0;
+                    }
+                });
+
+                // 3. Build Chart Data (Monthly vs Cumulative)
+                const cData = Array.from({ length: 12 }, (_, i) => ({ name: `M${i + 1}` }));
+                
+                topNPDNames.forEach(name => {
+                    let runningTotal = 0;
+                    for (let i = 0; i < 12; i++) {
+                        if (rawMonthly[name][i] !== null) {
+                            runningTotal += rawMonthly[name][i];
+                            cData[i][name] = viewMode === 'cumulative' ? runningTotal : rawMonthly[name][i];
+                        } else {
+                            cData[i][name] = null;
+                        }
+                    }
+                });
+
+                // 4. Calculate Business Insights
+                let fastestStarter = { name: '-', val: 0 };
+                let topSustainer = { name: '-', val: -Infinity, m1: 0, m3: 0 }; 
+
+                topNPDNames.forEach(name => {
+                    const m1 = rawMonthly[name][0] || 0;
+                    if (m1 > fastestStarter.val) fastestStarter = { name, val: m1 };
+                    
+                    const m3 = rawMonthly[name][2];
+                    if (m1 > 0 && m3 !== null) {
+                        const growth = ((m3 - m1) / m1) * 100;
+                        if (growth > topSustainer.val) topSustainer = { name, val: growth, m1, m3 };
+                    }
+                });
+
+                return { 
+                    chartData: cData, 
+                    lines: topNPDNames, 
+                    insights: { fastestStarter, topSustainer } 
+                };
+            }, [salesData, npdData, viewMode]);
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] lg:col-span-3 flex flex-col">
-                    <h3 className="text-base font-extrabold text-[#1d1d1f] mb-6 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-[#af52de]" /> NPD Launch Trajectory</h3>
-                    <div className="h-[280px] w-full">
-                        {(chartData || []).length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
-                                    <XAxis dataKey="name" tick={{fontSize: 12, fill: '#86868b'}} axisLine={false} tickLine={false} />
-                                    <YAxis tick={{fontSize: 12, fill: '#86868b'}} tickFormatter={(v) => `${((v||0)/1000000).toFixed(1)}M`} axisLine={false} tickLine={false} />
-                                    <Tooltip cursor={{stroke: '#e5e5ea', strokeDasharray: '5 5'}} />
-                                    <Legend wrapperStyle={{fontSize: '11px', color: '#86868b', paddingTop: '10px'}} />
-                                    {(lines || []).map((lineName, idx) => (
-                                        <Line key={lineName} type="monotone" dataKey={lineName} stroke={APPLE_PALETTE[idx % APPLE_PALETTE.length]} strokeWidth={3} dot={{r: 4}} connectNulls={false} />
-                                    ))}
-                                </LineChart>
-                            </ResponsiveContainer>
-                        ) : <div className="h-full flex flex-col items-center justify-center text-[#86868b] font-medium">No trajectory data</div>}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div className="flex items-center gap-2 group cursor-help relative">
+                            <TrendingUp className="w-5 h-5 text-[#af52de]" />
+                            <h3 className="text-base font-extrabold text-[#1d1d1f]">NPD Launch Trajectory (M1-M12)</h3>
+                            <Info className="w-4 h-4 text-[#86868b]" />
+                            <div className="absolute top-full left-0 mt-2 w-72 p-4 bg-white/95 backdrop-blur-xl text-[#1d1d1f] text-xs leading-relaxed rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-black/5 pointer-events-none">
+                                <span className="font-bold text-[#af52de]">Normalization:</span> กราฟนี้จับสินค้าใหม่ทุกตัวมาเริ่มต้นที่เดือนที่ 1 (M1) พร้อมกัน เพื่อเปรียบเทียบความแรงของการเปิดตัว และอัตราการรักษายอดขายในเดือนถัดๆ ไป
+                            </div>
+                        </div>
+                        <div className="flex bg-[#e3e3e8] p-1 rounded-xl shrink-0">
+                            <button onClick={() => setViewMode('monthly')} className={`px-4 py-1.5 text-xs font-semibold rounded-[8px] transition-all ${viewMode === 'monthly' ? 'bg-white text-[#1d1d1f] shadow-[0_1px_4px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`}>Monthly Sales</button>
+                            <button onClick={() => setViewMode('cumulative')} className={`px-4 py-1.5 text-xs font-semibold rounded-[8px] transition-all ${viewMode === 'cumulative' ? 'bg-white text-[#1d1d1f] shadow-[0_1px_4px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`}>Cumulative</button>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col xl:flex-row gap-6 h-full">
+                        {/* Left: Chart Area */}
+                        <div className="flex-1 min-h-[250px] xl:min-h-[280px]">
+                            {(chartData || []).length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
+                                        <XAxis dataKey="name" tick={{fontSize: 12, fill: '#86868b', fontWeight: 500}} axisLine={false} tickLine={false} />
+                                        <YAxis tick={{fontSize: 12, fill: '#86868b', fontWeight: 500}} tickFormatter={(v) => `${((v||0)/1000000).toFixed(1)}M`} axisLine={false} tickLine={false} />
+                                        <Tooltip 
+                                            cursor={{stroke: '#e5e5ea', strokeDasharray: '5 5'}} 
+                                            contentStyle={{borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 14px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: '500', backgroundColor: 'rgba(255,255,255,0.95)'}}
+                                            formatter={(v) => `฿${((v||0)/1000000).toFixed(2)}M`}
+                                        />
+                                        <Legend wrapperStyle={{fontSize: '11px', color: '#86868b', paddingTop: '10px', fontWeight: '500'}} />
+                                        {(lines || []).map((lineName, idx) => (
+                                            <Line key={lineName} type="monotone" dataKey={lineName} stroke={APPLE_PALETTE[idx % APPLE_PALETTE.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6, strokeWidth: 0}} connectNulls={false} />
+                                        ))}
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : <div className="h-full flex flex-col items-center justify-center text-[#86868b] font-medium">No trajectory data</div>}
+                        </div>
+
+                        {/* Right: Insights Panel */}
+                        {insights && (
+                            <div className="flex-shrink-0 w-full xl:w-[280px] bg-[#f5f5f7]/60 rounded-xl p-4 border border-black/5 flex flex-col gap-3.5">
+                                <h4 className="text-xs font-bold text-[#86868b] uppercase tracking-wider mb-1">Trajectory Insights</h4>
+                                
+                                <div className="bg-white p-3.5 rounded-xl border border-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.02)] relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-8 h-8 bg-gradient-to-bl from-[#ff9500]/10 to-transparent rounded-bl-full"></div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Trophy className="w-4 h-4 text-[#ff9500]" />
+                                        <span className="text-[10px] font-bold text-[#86868b] uppercase">Fastest Start (M1)</span>
+                                    </div>
+                                    {insights.fastestStarter.val > 0 ? (
+                                        <>
+                                            <div className="text-sm font-bold text-[#1d1d1f] truncate leading-tight" title={insights.fastestStarter.name}>{insights.fastestStarter.name}</div>
+                                            <div className="text-base font-bold text-[#ff9500] mt-1">฿{(insights.fastestStarter.val/1000000).toFixed(2)}M</div>
+                                        </>
+                                    ) : <div className="text-sm text-[#86868b]">N/A</div>}
+                                </div>
+
+                                <div className="bg-white p-3.5 rounded-xl border border-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.02)] relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-8 h-8 bg-gradient-to-bl from-[#34c759]/10 to-transparent rounded-bl-full"></div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <TrendingUp className="w-4 h-4 text-[#34c759]" />
+                                        <span className="text-[10px] font-bold text-[#86868b] uppercase">Best Momentum (M3 vs M1)</span>
+                                    </div>
+                                    {insights.topSustainer.val > -Infinity ? (
+                                        <>
+                                            <div className="text-sm font-bold text-[#1d1d1f] truncate leading-tight" title={insights.topSustainer.name}>{insights.topSustainer.name}</div>
+                                            <div className="flex items-end gap-2 mt-1">
+                                                <div className={`text-base font-bold ${insights.topSustainer.val >= 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'}`}>
+                                                    {insights.topSustainer.val >= 0 ? '▲' : '▼'} {Math.abs(insights.topSustainer.val).toFixed(1)}%
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="text-xs text-[#86868b] mt-1">Need at least 3 months of data</div>
+                                    )}
+                                </div>
+
+                                <p className="text-[10px] text-[#86868b] mt-auto font-medium leading-relaxed">
+                                    *<span className="font-bold text-[#1d1d1f]">Monthly Sales</span> helps identify run-rate drop-offs after launch. <span className="font-bold text-[#1d1d1f]">Cumulative</span> tracks progress towards Year 1 Business Case.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             );
