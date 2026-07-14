@@ -106,7 +106,7 @@
             PieChart: PieIcon, X, Search, ChevronDown, Calendar, Layers, ShoppingBag, 
             Trophy, Medal, Store, ArrowLeft, Grid3X3, AlertCircle, MapPin, Lightbulb, Sparkles, ArrowRightCircle, Package, Check,
             RefreshCw, Database, CheckCircle2, XCircle, Info, ArrowDown, Eye, EyeOff, Filter, Copy, Crosshair, ChevronRight, LayoutList,
-            Star, Settings, TrendingDown, ArrowUpRight, BarChart3, Banknote, AlertTriangle
+            Star, Settings, TrendingDown, ArrowUpRight, BarChart3, Banknote, AlertTriangle, UserPlus, UserCheck
         } = LucideProxy;
 
         // --- Error Boundary (Prevent White Screen) ---
@@ -530,6 +530,161 @@
                                 </p>
                             </div>
                         </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const NewAcquisitionWidget = ({ filteredData }) => {
+            const [filterType, setFilterType] = useState('All');
+
+            const { summary, list } = useMemo(() => {
+                const customerMap = {};
+                // Map text month to index for gap calculation
+                const monthMap = { 'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12 };
+
+                (filteredData || []).forEach(d => {
+                    const customerName = ['MT', 'ONLINE'].includes(d.Channel?.toUpperCase() || '') ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
+                    if (!customerName || customerName === 'Unknown') return;
+                    
+                    const key = `${customerName}|${d.Channel || 'Unknown'}`;
+                    if (!customerMap[key]) {
+                        customerMap[key] = { name: customerName, channel: d.Channel, sales26: 0, months25: [], months26: [], products: {}, subGroups: {} };
+                    }
+                    
+                    const mStr = d.Month ? d.Month.substring(0, 3) : null;
+                    const mIdx = mStr ? monthMap[mStr] : null;
+
+                    if (d.Year === '2025' && mIdx) customerMap[key].months25.push(mIdx);
+                    if (d.Year === '2026' && mIdx) {
+                        customerMap[key].months26.push(mIdx);
+                        customerMap[key].sales26 += (d.NetPrice || 0);
+                        
+                        const pName = d.ProductName || 'Unknown';
+                        const sgName = d.SubProductGroup || 'Unknown';
+                        customerMap[key].products[pName] = (customerMap[key].products[pName] || 0) + (d.NetPrice || 0);
+                        customerMap[key].subGroups[sgName] = (customerMap[key].subGroups[sgName] || 0) + (d.NetPrice || 0);
+                    }
+                });
+
+                const acquiredList = [];
+                let newCount = 0, newSales = 0, reactCount = 0, reactSales = 0;
+
+                Object.values(customerMap).forEach(c => {
+                    if (c.sales26 <= 0) return; // Only focus on 2026 active customers
+                    
+                    let type = null;
+                    if (c.months25.length === 0) {
+                        type = 'Pure New';
+                    } else {
+                        const max25 = Math.max(...c.months25);
+                        const min26 = Math.min(...c.months26);
+                        // Calculate gap in months across the year change
+                        const gap = (min26 + 12) - max25;
+                        
+                        // Condition for Reactivated: Gap >= 6 months
+                        if (gap >= 6) type = 'Reactivated';
+                    }
+
+                    if (type) {
+                        if (type === 'Pure New') { newCount++; newSales += c.sales26; }
+                        else { reactCount++; reactSales += c.sales26; }
+
+                        const topProduct = Object.entries(c.products).sort((a,b)=>b[1]-a[1])[0]?.[0] || '-';
+                        const topSubGroup = Object.entries(c.subGroups).sort((a,b)=>b[1]-a[1])[0]?.[0] || '-';
+
+                        acquiredList.push({ ...c, type, topProduct, topSubGroup });
+                    }
+                });
+
+                return { 
+                    summary: { newCount, newSales, reactCount, reactSales }, 
+                    list: acquiredList.sort((a, b) => b.sales26 - a.sales26) 
+                };
+            }, [filteredData]);
+
+            const displayList = useMemo(() => {
+                if (filterType === 'All') return list;
+                return (list || []).filter(item => item.type === filterType);
+            }, [list, filterType]);
+
+            return (
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
+                    <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-[#32ade6]/10 p-2 rounded-xl">
+                                <UserPlus className="w-5 h-5 text-[#32ade6]" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2 group cursor-help relative w-max">
+                                    <h3 className="text-base font-bold text-[#1d1d1f]">New Acquisition (2026)</h3>
+                                    <Info className="w-4 h-4 text-[#86868b]" />
+                                    <div className="absolute top-full left-0 mt-2 w-72 p-4 bg-white/95 backdrop-blur-xl text-[#1d1d1f] text-xs leading-relaxed rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-black/5 pointer-events-none">
+                                        <span className="font-bold text-[#34c759]">Pure New:</span> ลูกค้าที่ไม่มียอดขายเลยในปี 2025 แต่เริ่มมียอดในปี 2026<br/><br/>
+                                        <span className="font-bold text-[#ff9500]">Reactivated:</span> ลูกค้าที่เคยซื้อในปี 2025 แต่ทิ้งช่วงการสั่งซื้อไปนาน <span className="underline">ตั้งแต่ 6 เดือนขึ้นไป</span> แล้วกลับมาสั่งซื้อใหม่ในปี 2026
+                                    </div>
+                                </div>
+                                <p className="text-xs text-[#86868b] font-medium mt-0.5">Tracking Pure New & Reactivated Customers</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                            <button 
+                                onClick={() => setFilterType('All')}
+                                className={`px-4 py-2 rounded-xl border flex items-center justify-center text-xs font-bold transition-all ${filterType === 'All' ? 'bg-[#1d1d1f] text-white border-transparent shadow-md' : 'bg-[#f5f5f7] text-[#86868b] border-black/5 hover:bg-[#e8e8ed]'}`}
+                            >
+                                All
+                            </button>
+                            <button 
+                                onClick={() => setFilterType('Pure New')}
+                                className={`px-4 py-2 rounded-xl flex flex-col min-w-[120px] border transition-all text-left ${filterType === 'Pure New' ? 'bg-[#34c759]/10 border-[#34c759]/30 shadow-sm' : 'bg-[#f5f5f7] border-black/5 hover:bg-[#e8e8ed]'}`}
+                            >
+                                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1 ${filterType === 'Pure New' ? 'text-[#34c759]' : 'text-[#86868b]'}`}><UserPlus className="w-3 h-3"/> Pure New ({summary.newCount})</span>
+                                <span className={`text-sm font-bold ${filterType === 'Pure New' ? 'text-[#34c759]' : 'text-[#1d1d1f]'}`}>฿{(summary.newSales/1000000).toFixed(2)}M</span>
+                            </button>
+                            <button 
+                                onClick={() => setFilterType('Reactivated')}
+                                className={`px-4 py-2 rounded-xl flex flex-col min-w-[120px] border transition-all text-left ${filterType === 'Reactivated' ? 'bg-[#ff9500]/10 border-[#ff9500]/30 shadow-sm' : 'bg-[#f5f5f7] border-black/5 hover:bg-[#e8e8ed]'}`}
+                            >
+                                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1 ${filterType === 'Reactivated' ? 'text-[#ff9500]' : 'text-[#86868b]'}`}><UserCheck className="w-3 h-3"/> Reactivated ({summary.reactCount})</span>
+                                <span className={`text-sm font-bold ${filterType === 'Reactivated' ? 'text-[#ff9500]' : 'text-[#1d1d1f]'}`}>฿{(summary.reactSales/1000000).toFixed(2)}M</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto custom-scrollbar border border-black/5 rounded-xl max-h-[350px] bg-white">
+                        <table className="w-full text-sm text-left border-collapse min-w-[850px]">
+                            <thead className="sticky top-0 bg-[#f5f5f7]/95 backdrop-blur z-10 shadow-[0_1px_0_#e5e5ea]">
+                                <tr>
+                                    <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider w-16 text-center">No.</th>
+                                    <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider">Customer / Channel</th>
+                                    <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider text-center w-28">Type</th>
+                                    <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider">Top Sub-Product</th>
+                                    <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider">Top Product</th>
+                                    <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider text-right w-32">Sales 2026 (฿)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(displayList || []).length > 0 ? displayList.map((item, idx) => (
+                                    <tr key={item.name+item.channel} className="border-b border-[#e5e5ea]/50 hover:bg-[#f5f5f7] transition-colors">
+                                        <td className="py-3 px-4 text-center font-semibold text-[#86868b]">#{idx + 1}</td>
+                                        <td className="py-3 px-4">
+                                            <div className="font-semibold text-[#1d1d1f] truncate max-w-[200px]" title={item.name}>{item.name}</div>
+                                            <div className="text-[10px] text-[#86868b] font-medium">{item.channel}</div>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${item.type === 'Pure New' ? 'bg-[#34c759]/10 text-[#34c759]' : 'bg-[#ff9500]/10 text-[#ff9500]'}`}>
+                                                {item.type}
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-[#1d1d1f] font-medium truncate max-w-[150px]" title={item.topSubGroup}>{item.topSubGroup}</td>
+                                        <td className="py-3 px-4 text-[#86868b] text-xs truncate max-w-[200px]" title={item.topProduct}>{item.topProduct}</td>
+                                        <td className="py-3 px-4 text-right font-bold text-[#0071e3]">{(item.sales26 || 0).toLocaleString(undefined, {maximumFractionDigits:0})}</td>
+                                    </tr>
+                                )) : (
+                                    <tr><td colSpan="6" className="py-10 text-center text-[#86868b] font-medium">No new acquisitions found in this period.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             );
@@ -2802,6 +2957,9 @@
                                 
                                 {/* New Deep-Dive Widget */}
                                 <SafeWidget><SubProductAnalysisWidget filteredData={filteredData} salesData={salesData} monthsList={monthsList} /></SafeWidget>
+
+                                {/* New Acquisition Widget */}
+                                <SafeWidget><NewAcquisitionWidget filteredData={filteredData} /></SafeWidget>
 
                                 {/* ย้าย Executive Summary มาด้านล่าง พร้อมระบบ Tap to view */}
                                 <SafeWidget><ExecutiveSummaryWidget kpi={kpi} /></SafeWidget>
