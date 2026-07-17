@@ -165,9 +165,50 @@
 
             // 2. จัดรูปแบบชื่อลูกค้าและช่องทาง ให้เป็น Title Case (ตัวพิมพ์ใหญ่คำแรก)
             if (type === 'channel' || type === 'customer') {
-                return str.toLowerCase().replace(/(?:^|\s|-|\/)\S/g, function(match) {
+                let formatted = str.toLowerCase().replace(/(?:^|\s|-|\/)\S/g, function(match) {
                     return match.toUpperCase();
                 });
+
+                // ปรับแก้ตัวพิมพ์ใหญ่สำหรับตัวย่อ (Acronyms) หรือชื่อแบรนด์เฉพาะในตลาด
+                const brandOverrides = {
+                    'ofm': 'OFM',
+                    'b2s': 'B2S',
+                    'cj': 'CJ',
+                    'cp': 'CP',
+                    'cp all': 'CP ALL',
+                    'diy': 'DIY',
+                    'mr.diy': 'MR.DIY',
+                    'mr. diy': 'MR.DIY',
+                    'mr.d.i.y.': 'MR.D.I.Y.',
+                    'se-ed': 'SE-ED',
+                    'ctr': 'CTR',
+                    'ptt': 'PTT',
+                    'pt': 'PT',
+                    'fn': 'FN',
+                    'aeon': 'AEON',
+                    'ikea': 'IKEA',
+                    'spar': 'SPAR',
+                    'jc': 'JC',
+                    'gms': 'GMS',
+                    'homepro': 'HomePro',
+                    'familymart': 'FamilyMart',
+                    'maxvalu': 'MaxValu',
+                    'watson': 'Watsons',
+                    'watsons': 'Watsons',
+                    'kingpower': 'King Power',
+                    'tiktok': 'TikTok',
+                    'shopee': 'Shopee',
+                    'lazada': 'Lazada'
+                };
+
+                Object.keys(brandOverrides).forEach(key => {
+                    // ปรับปรุง Regex ให้รองรับสัญลักษณ์พิเศษเช่น . หรือ - ไว้ท้ายคำได้อย่างแม่นยำ
+                    const safeKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                    const regex = new RegExp(`\\b${safeKey}(?!\\w)`, 'gi');
+                    formatted = formatted.replace(regex, brandOverrides[key]);
+                });
+
+                return formatted;
             }
             
             // 3. จัดรูปแบบ Product และ SKU ให้เป็นตัวพิมพ์ใหญ่ทั้งหมด เพื่อให้ Grouping สมบูรณ์ 100%
