@@ -2629,26 +2629,32 @@
 
                 let finalSales = [], finalBudgetChannel = [], finalBudgetProduct = [];
 
-                const groupPromises = Object.entries(DATA_SOURCES).map(async ([groupName, sources]) => {
-                    const groupSales = [], groupBudgetChannel = [], groupBudgetProduct = [];
+                // 1. Group unique URLs to prevent redundant fetching and looping (Optimization)
+                const urlTasks = { s25: {}, s26: {}, bCh: {}, bPr: {} };
+                Object.entries(DATA_SOURCES).forEach(([groupName, sources]) => {
+                    if (sources.s25) { urlTasks.s25[sources.s25] = urlTasks.s25[sources.s25] || []; urlTasks.s25[sources.s25].push(groupName); }
+                    if (sources.s26) { urlTasks.s26[sources.s26] = urlTasks.s26[sources.s26] || []; urlTasks.s26[sources.s26].push(groupName); }
+                    if (sources.bCh) { urlTasks.bCh[sources.bCh] = urlTasks.bCh[sources.bCh] || []; urlTasks.bCh[sources.bCh].push(groupName); }
+                    if (sources.bPr) { urlTasks.bPr[sources.bPr] = urlTasks.bPr[sources.bPr] || []; urlTasks.bPr[sources.bPr].push(groupName); }
+                });
 
-                    setFilesStatus(prev => ({ ...prev, [groupName]: { s25: 'loading', s26: 'loading', bCh: 'loading', bPr: 'loading' } }));
-
+                // 2. Process each unique URL exactly once (Single-Pass Process)
+                const fetchAndProcess = async (url, targetGroups, type) => {
                     try {
-                        const [s25Raw, s26Raw, bChRaw, bPrRaw] = await Promise.all([
-                            fetchCSV(sources.s25).catch(() => null),
-                            fetchCSV(sources.s26).catch(() => null),
-                            fetchCSV(sources.bCh).catch(() => null),
-                            fetchCSV(sources.bPr).catch(() => null)
-                        ]);
+                        const rawData = await fetchCSV(url);
+                        if (!rawData) throw new Error('Empty Data');
 
-                        if (s25Raw) {
-                            for (let i=0; i<s25Raw.length; i++) {
-                                const row = s25Raw[i];
-                                const rawGrp = row['Product Group'] || row['ProductGroup'];
-                                if (rawGrp && rawGrp.toUpperCase().trim() !== groupName) continue; 
+                        for (let i = 0; i < rawData.length; i++) {
+                            const row = rawData[i];
+                            const rawGrp = row['Product Group'] || row['ProductGroup'];
+                            const groupName = rawGrp ? rawGrp.toUpperCase().trim() : '';
+
+                            // Process only if the row belongs to one of the groups that needs this URL
+                            if (!targetGroups.includes(groupName)) continue; 
+
+                            if (type === 's25' || type === 's26') {
                                 if (row['Product Name'] && row['Month']) {
-                                    groupSales.push({
+                                    finalSales.push({
                                         Month: row['Month'], ProductGroup: groupName, 
                                         Channel: normalizeText(row['Channel'], 'channel'), 
                                         SubChannel: normalizeText(row['Sub-channel'] || row['Sub-Channel'], 'channel'),
@@ -2659,45 +2665,13 @@
                                         GroupSKU: normalizeText(row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'], 'sku'),
                                         NetPrice: cleanCurrency(row['Net Price']), 
                                         Cost: cleanCurrency(row['Cost'] || row['COGS'] || row['Standard Cost'] || row['Total Cost'] || row['Standard Price'] || 0),
-                                        Year: '2025'
+                                        Year: type === 's25' ? '2025' : '2026'
                                     });
                                 }
-                            }
-                            setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s25: 'success' } }));
-                        } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s25: 'error' } }));
-
-                        if (s26Raw) {
-                            for (let i=0; i<s26Raw.length; i++) {
-                                const row = s26Raw[i];
-                                const rawGrp = row['Product Group'] || row['ProductGroup'];
-                                if (rawGrp && rawGrp.toUpperCase().trim() !== groupName) continue;
-                                if (row['Product Name'] && row['Month']) {
-                                    groupSales.push({
-                                        Month: row['Month'], ProductGroup: groupName, 
-                                        Channel: normalizeText(row['Channel'], 'channel'), 
-                                        SubChannel: normalizeText(row['Sub-channel'] || row['Sub-Channel'], 'channel'),
-                                        SoldToParty: normalizeText(row['Sold-to party'] || row['Sold-To Party'], 'customer'), 
-                                        MaterialNumber: row['Material Number'], 
-                                        ProductName: normalizeText(row['Product Name'], 'product'),
-                                        SubProductGroup: normalizeText(row['Sub-product group'] || row['Sub-Product Group'], 'subgroup'), 
-                                        GroupSKU: normalizeText(row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'], 'sku'),
-                                        NetPrice: cleanCurrency(row['Net Price']), 
-                                        Cost: cleanCurrency(row['Cost'] || row['COGS'] || row['Standard Cost'] || row['Total Cost'] || row['Standard Price'] || 0),
-                                        Year: '2026'
-                                    });
-                                }
-                            }
-                            setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s26: 'success' } }));
-                        } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], s26: 'error' } }));
-
-                        if (bChRaw) {
-                            for (let i=0; i<bChRaw.length; i++) {
-                                const row = bChRaw[i];
-                                const rawGrp = row['Product Group'] || row['ProductGroup'];
-                                if (rawGrp && rawGrp.toUpperCase().trim() !== groupName) continue;
+                            } else if (type === 'bCh') {
                                 const rawCh = row['Channel'] ? row['Channel'].toString().toUpperCase().trim() : '';
                                 if (rawCh && rawCh !== 'TOTAL') {
-                                    groupBudgetChannel.push({
+                                    finalBudgetChannel.push({
                                         ProductGroup: groupName, 
                                         Channel: normalizeText(row['Channel'], 'channel'), 
                                         Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
@@ -2705,19 +2679,11 @@
                                         Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
                                     });
                                 }
-                            }
-                            setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bCh: 'success' } }));
-                        } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bCh: 'error' } }));
-
-                        if (bPrRaw) {
-                            for (let i=0; i<bPrRaw.length; i++) {
-                                const row = bPrRaw[i];
-                                const rawGrp = row['Product Group'] || row['ProductGroup'];
-                                if (rawGrp && rawGrp.toUpperCase().trim() !== groupName) continue;
+                            } else if (type === 'bPr') {
                                 const subGroup = row['Sub-product Group'] || row['Sub-Product Group'];
                                 const cleanSubGrp = subGroup ? subGroup.toString().toUpperCase().trim() : '';
                                 if (cleanSubGrp && cleanSubGrp !== 'TOTAL') {
-                                    groupBudgetProduct.push({
+                                    finalBudgetProduct.push({
                                         ProductGroup: groupName, 
                                         SubProductGroup: normalizeText(subGroup, 'subgroup'), 
                                         Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
@@ -2726,42 +2692,32 @@
                                     });
                                 }
                             }
-                            setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bCh: 'success' } }));
-                        } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bCh: 'error' } }));
+                        }
 
-                        if (bPrRaw) {
-                            for (let i=0; i<bPrRaw.length; i++) {
-                                const row = bPrRaw[i];
-                                const rawGrp = row['Product Group'] || row['ProductGroup'];
-                                if (rawGrp && rawGrp.toUpperCase().trim() !== groupName) continue;
-                                const subGroup = row['Sub-product Group'] || row['Sub-Product Group'];
-                                if (subGroup && subGroup !== 'TOTAL') {
-                                    groupBudgetProduct.push({
-                                        ProductGroup: groupName, SubProductGroup: subGroup, 
-                                        Target2026: cleanCurrency(row['Target 2026 (Plan)'] || row['Target 2026 (Budget)'] || row['Target 2026']),
-                                        Plan2027: cleanCurrency(row['Target 2027 (Plan)'] || row['Target 2027 (Budget)'] || row['Plan 2027'] || 0),
-                                        Forecast2026: cleanCurrency(row['L.E. 2026 (Forecast)'] || row['Forecast 2026'] || row['L.E. 2026'] || 0)
-                                    });
-                                }
-                            }
-                            setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bPr: 'success' } }));
-                        } else setFilesStatus(prev => ({ ...prev, [groupName]: { ...prev[groupName], bPr: 'error' } }));
-
-                        return { groupSales, groupBudgetChannel, groupBudgetProduct };
+                        // Batch update status for all groups sharing this URL
+                        setFilesStatus(prev => {
+                            const next = { ...prev };
+                            targetGroups.forEach(g => { next[g] = { ...next[g], [type]: 'success' }; });
+                            return next;
+                        });
                     } catch (error) {
-                        console.error(`Unexpected error syncing ${groupName}:`, error);
-                        setFilesStatus(prev => ({ ...prev, [groupName]: { s25: 'error', s26: 'error', bCh: 'error', bPr: 'error' } }));
-                        return { groupSales: [], groupBudgetChannel: [], groupBudgetProduct: [] };
+                        console.error(`Sync Error [${type}]:`, error);
+                        setFilesStatus(prev => {
+                            const next = { ...prev };
+                            targetGroups.forEach(g => { next[g] = { ...next[g], [type]: 'error' }; });
+                            return next;
+                        });
                     }
+                };
+
+                const promises = [];
+                Object.entries(urlTasks).forEach(([type, urls]) => {
+                    Object.entries(urls).forEach(([url, groups]) => {
+                        promises.push(fetchAndProcess(url, groups, type));
+                    });
                 });
 
-                const results = await Promise.all(groupPromises);
-
-                results.forEach(res => {
-                    for (let i = 0; i < res.groupSales.length; i++) finalSales.push(res.groupSales[i]);
-                    for (let i = 0; i < res.groupBudgetChannel.length; i++) finalBudgetChannel.push(res.groupBudgetChannel[i]);
-                    for (let i = 0; i < res.groupBudgetProduct.length; i++) finalBudgetProduct.push(res.groupBudgetProduct[i]);
-                });
+                await Promise.all(promises);
 
                 setSalesData(finalSales);
                 setBudgetChannel(finalBudgetChannel);
