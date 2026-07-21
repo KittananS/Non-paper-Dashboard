@@ -608,13 +608,25 @@
 
         const NewAcquisitionWidget = ({ filteredData }) => {
             const [filterType, setFilterType] = useState('All');
+            const [subGroupFilter, setSubGroupFilter] = useState('All');
+            const [isCopied, setIsCopied] = useState(false);
+
+            const subGroups = useMemo(() => {
+                const groups = new Set();
+                (filteredData || []).forEach(d => {
+                    if (d.SubProductGroup) groups.add(d.SubProductGroup);
+                });
+                return Array.from(groups).sort();
+            }, [filteredData]);
 
             const { summary, list } = useMemo(() => {
                 const customerMap = {};
                 // Map text month to index for gap calculation
                 const monthMap = { 'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12 };
 
-                (filteredData || []).forEach(d => {
+                const dataToUse = subGroupFilter === 'All' ? filteredData : (filteredData || []).filter(d => d.SubProductGroup === subGroupFilter);
+
+                (dataToUse || []).forEach(d => {
                     const customerName = ['MT', 'ONLINE'].includes(d.Channel?.toUpperCase() || '') ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
                     if (!customerName || customerName === 'Unknown') return;
                     
@@ -672,12 +684,33 @@
                     summary: { newCount, newSales, reactCount, reactSales }, 
                     list: acquiredList.sort((a, b) => b.sales26 - a.sales26) 
                 };
-            }, [filteredData]);
+            }, [filteredData, subGroupFilter]);
 
             const displayList = useMemo(() => {
                 if (filterType === 'All') return list;
                 return (list || []).filter(item => item.type === filterType);
             }, [list, filterType]);
+
+            const handleCopy = () => {
+                if (!displayList || displayList.length === 0) return;
+                const textToCopy = `New Acquisition List (${filterType === 'All' ? 'All Types' : filterType} - ${subGroupFilter})\n\n` + 
+                    displayList.map((item, idx) => `${idx + 1}. ${item.name} (${item.channel})\n   Type: ${item.type}\n   Top Product: ${item.topProduct}\n   Sales: ฿${(item.sales26 || 0).toLocaleString()}`).join('\n\n');
+                
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    setIsCopied(true);
+                    setTimeout(() => setIsCopied(false), 2000);
+                } catch (error) {
+                    console.error('Copy failed', error);
+                }
+                textArea.remove();
+            };
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
@@ -698,27 +731,39 @@
                                 <p className="text-xs text-[#86868b] font-medium mt-0.5">Tracking Pure New & Reactivated Customers</p>
                             </div>
                         </div>
-                        <div className="flex flex-wrap gap-3">
-                            <button 
-                                onClick={() => setFilterType('All')}
-                                className={`px-4 py-2 rounded-xl border flex items-center justify-center text-xs font-bold transition-all ${filterType === 'All' ? 'bg-[#1d1d1f] text-white border-transparent shadow-md' : 'bg-[#f5f5f7] text-[#86868b] border-black/5 hover:bg-[#e8e8ed]'}`}
-                            >
-                                All
-                            </button>
-                            <button 
-                                onClick={() => setFilterType('Pure New')}
-                                className={`px-4 py-2 rounded-xl flex flex-col min-w-[120px] border transition-all text-left ${filterType === 'Pure New' ? 'bg-[#34c759]/10 border-[#34c759]/30 shadow-sm' : 'bg-[#f5f5f7] border-black/5 hover:bg-[#e8e8ed]'}`}
-                            >
-                                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1 ${filterType === 'Pure New' ? 'text-[#34c759]' : 'text-[#86868b]'}`}><UserPlus className="w-3 h-3"/> Pure New ({summary.newCount})</span>
-                                <span className={`text-sm font-bold ${filterType === 'Pure New' ? 'text-[#34c759]' : 'text-[#1d1d1f]'}`}>฿{(summary.newSales/1000000).toFixed(2)}M</span>
-                            </button>
-                            <button 
-                                onClick={() => setFilterType('Reactivated')}
-                                className={`px-4 py-2 rounded-xl flex flex-col min-w-[120px] border transition-all text-left ${filterType === 'Reactivated' ? 'bg-[#ff9500]/10 border-[#ff9500]/30 shadow-sm' : 'bg-[#f5f5f7] border-black/5 hover:bg-[#e8e8ed]'}`}
-                            >
-                                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1 ${filterType === 'Reactivated' ? 'text-[#ff9500]' : 'text-[#86868b]'}`}><UserCheck className="w-3 h-3"/> Reactivated ({summary.reactCount})</span>
-                                <span className={`text-sm font-bold ${filterType === 'Reactivated' ? 'text-[#ff9500]' : 'text-[#1d1d1f]'}`}>฿{(summary.reactSales/1000000).toFixed(2)}M</span>
-                            </button>
+                        <div className="flex flex-col lg:flex-row gap-3 w-full xl:w-auto items-start lg:items-center">
+                            <div className="flex items-center gap-2">
+                                <FilterDropdown label="Sub-Product" value={subGroupFilter} options={['All', ...subGroups]} onChange={setSubGroupFilter} icon={<Layers />} />
+                                <button 
+                                    onClick={handleCopy}
+                                    className={`px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all border ${isCopied ? 'bg-[#34c759]/10 text-[#34c759] border-[#34c759]/30 shadow-sm' : 'bg-white text-[#1d1d1f] border-black/10 hover:bg-[#f5f5f7]'}`}
+                                    title="Copy target list to clipboard"
+                                >
+                                    {isCopied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy List</>}
+                                </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button 
+                                    onClick={() => setFilterType('All')}
+                                    className={`px-4 py-2 rounded-xl border flex items-center justify-center text-xs font-bold transition-all ${filterType === 'All' ? 'bg-[#1d1d1f] text-white border-transparent shadow-md' : 'bg-[#f5f5f7] text-[#86868b] border-black/5 hover:bg-[#e8e8ed]'}`}
+                                >
+                                    All
+                                </button>
+                                <button 
+                                    onClick={() => setFilterType('Pure New')}
+                                    className={`px-4 py-2 rounded-xl flex flex-col min-w-[120px] border transition-all text-left ${filterType === 'Pure New' ? 'bg-[#34c759]/10 border-[#34c759]/30 shadow-sm' : 'bg-[#f5f5f7] border-black/5 hover:bg-[#e8e8ed]'}`}
+                                >
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1 ${filterType === 'Pure New' ? 'text-[#34c759]' : 'text-[#86868b]'}`}><UserPlus className="w-3 h-3"/> Pure New ({summary.newCount})</span>
+                                    <span className={`text-sm font-bold ${filterType === 'Pure New' ? 'text-[#34c759]' : 'text-[#1d1d1f]'}`}>฿{(summary.newSales/1000000).toFixed(2)}M</span>
+                                </button>
+                                <button 
+                                    onClick={() => setFilterType('Reactivated')}
+                                    className={`px-4 py-2 rounded-xl flex flex-col min-w-[120px] border transition-all text-left ${filterType === 'Reactivated' ? 'bg-[#ff9500]/10 border-[#ff9500]/30 shadow-sm' : 'bg-[#f5f5f7] border-black/5 hover:bg-[#e8e8ed]'}`}
+                                >
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1 ${filterType === 'Reactivated' ? 'text-[#ff9500]' : 'text-[#86868b]'}`}><UserCheck className="w-3 h-3"/> Reactivated ({summary.reactCount})</span>
+                                    <span className={`text-sm font-bold ${filterType === 'Reactivated' ? 'text-[#ff9500]' : 'text-[#1d1d1f]'}`}>฿{(summary.reactSales/1000000).toFixed(2)}M</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -1104,7 +1149,7 @@
             if (value === 0 || value === undefined || value === null) return null;
             
             const pointData = data[index];
-            const cx = (props.width && !isNaN(props.width)) ? x + props.width / 2 : x;
+            const cx = (props.width && !isNaN(props.width)) ? x + width / 2 : x;
             const cy = !isNaN(y) ? y - 10 : y;
 
             if (isNaN(cx) || isNaN(cy)) return null;
@@ -2416,6 +2461,15 @@
         const WhiteSpaceWidget = ({ filteredData, debouncedSearch, searchStr, setSearchStr }) => {
             const [selectedGap, setSelectedGap] = useState(null);
             const [isCopied, setIsCopied] = useState(false);
+            const [subGroupFilter, setSubGroupFilter] = useState('All');
+            
+            const subGroups = useMemo(() => {
+                const groups = new Set();
+                (filteredData || []).forEach(d => {
+                    if (d.Year === '2026' && d.SubProductGroup) groups.add(d.SubProductGroup);
+                });
+                return Array.from(groups).sort();
+            }, [filteredData]);
             
             // --- 1. Clipboard Copy Logic (iframe safe) ---
             const handleCopy = () => {
@@ -2439,7 +2493,10 @@
             };
             
             const grid = useMemo(() => {
-                const base2026 = (filteredData || []).filter(d => d.Year === '2026');
+                let base2026 = (filteredData || []).filter(d => d.Year === '2026');
+                if (subGroupFilter !== 'All') {
+                    base2026 = base2026.filter(d => d.SubProductGroup === subGroupFilter);
+                }
                 const subChannelSales = {}, skuSales = {}, subChannelCustomers = {}, matrix = {}; 
                 
                 base2026.forEach(d => {
@@ -2459,11 +2516,11 @@
                 if ((debouncedSearch || '').length >= 2) rows = rows.filter(sku => sku.toLowerCase().includes(debouncedSearch.toLowerCase()));
 
                 return { columns, rows, subChannelCustomers, matrix };
-            }, [filteredData, debouncedSearch]);
+            }, [filteredData, debouncedSearch, subGroupFilter]);
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] relative">
-                    <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                         <div className="flex items-center gap-3">
                             <div className="bg-[#ff2d55]/10 p-2 rounded-xl"><Crosshair className="w-6 h-6 text-[#ff2d55]" /></div>
                             <div>
@@ -2471,9 +2528,12 @@
                                 <p className="text-xs text-[#86868b] font-medium mt-0.5">Click on a gap to view missed target list.</p>
                             </div>
                         </div>
-                        <div className="relative">
-                            <input type="text" placeholder="Search SKU..." className="w-64 pl-9 pr-3 py-2.5 bg-[#f5f5f7] rounded-[12px] text-sm outline-none" value={searchStr} onChange={(e) => setSearchStr(e.target.value)} />
-                            <Search className="w-4 h-4 text-[#86868b] absolute left-3 top-3" />
+                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                            <FilterDropdown label="Sub-Product" value={subGroupFilter} options={['All', ...subGroups]} onChange={setSubGroupFilter} icon={<Layers />} />
+                            <div className="relative w-full sm:w-64">
+                                <input type="text" placeholder="Search SKU..." className="w-full pl-9 pr-3 py-2 bg-[#f5f5f7] border border-transparent focus:border-[#0071e3]/30 focus:bg-white focus:ring-4 focus:ring-[#0071e3]/10 rounded-[12px] text-sm font-medium transition-all outline-none" value={searchStr} onChange={(e) => setSearchStr(e.target.value)} />
+                                <Search className="w-4 h-4 text-[#86868b] absolute left-3 top-2.5" />
+                            </div>
                         </div>
                     </div>
                     <div className="overflow-x-auto custom-scrollbar max-h-[600px] rounded-xl border border-black/5">
