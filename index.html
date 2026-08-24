@@ -16,18 +16,21 @@
             -moz-osx-font-smoothing: grayscale;
         }
 
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: rgba(0, 0, 0, 0.15);
-            border-radius: 10px;
-            border: 2px solid transparent;
-            background-clip: content-box;
+        @layer utilities {
+            .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+            .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+                background: rgba(0, 0, 0, 0.15);
+                border-radius: 10px;
+                border: 2px solid transparent;
+                background-clip: content-box;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                background: rgba(0, 0, 0, 0.3);
+                background-clip: content-box;
+            }
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: rgba(0, 0, 0, 0.3);
-            background-clip: content-box;
-        }
+        
         button, a, .group { transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); }
     </style>
 
@@ -62,7 +65,6 @@
         if (window.__module !== undefined) window.module = window.__module;
         if (window.__exports !== undefined) window.exports = window.__exports;
 
-        // บังคับให้ Babel ใช้ Classic Runtime โดยอ้างอิงจาก availablePresets โดยตรง
         if (window.Babel) {
             window.Babel.registerPreset('react-classic', {
                 presets: [
@@ -77,7 +79,7 @@
     <div id="root"></div>
 
     <script type="text/babel" data-presets="react-classic">
-        const { useState, useMemo, useEffect, useRef, Component } = React;
+        const { useState, useMemo, useEffect, useRef, Component, useCallback, memo, useTransition, useDeferredValue } = React;
         const { 
             BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
             PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, ComposedChart, LabelList,
@@ -90,14 +92,14 @@
             get: function(target, prop) {
                 if (prop in target) return target[prop];
                 if (typeof prop !== 'string') return undefined;
-                return (props) => React.createElement('svg', {
+                return memo((props) => React.createElement('svg', {
                     width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none',
                     stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
                     ...props
                 }, 
                 React.createElement('circle', { cx: 12, cy: 12, r: 10 }), 
                 React.createElement('line', { x1: 12, y1: 8, x2: 12, y2: 12 }), 
-                React.createElement('line', { x1: 12, y1: 16, x2: 12.01, y2: 16 }));
+                React.createElement('line', { x1: 12, y1: 16, x2: 12.01, y2: 16 })));
             }
         });
 
@@ -106,194 +108,28 @@
             PieChart: PieIcon, X, Search, ChevronDown, Calendar, Layers, ShoppingBag, 
             Trophy, Medal, Store, ArrowLeft, Grid3X3, AlertCircle, MapPin, Lightbulb, Sparkles, ArrowRightCircle, Package, Check,
             RefreshCw, Database, CheckCircle2, XCircle, Info, ArrowDown, Eye, EyeOff, Filter, Copy, Crosshair, ChevronRight, LayoutList,
-            Star, Settings, TrendingDown, ArrowUpRight, BarChart3, Banknote, AlertTriangle, UserPlus, UserCheck
+            Star, Settings, TrendingDown, ArrowUpRight, BarChart3, Banknote, AlertTriangle, UserPlus, UserCheck, Menu
         } = LucideProxy;
 
-        // --- Error Boundary (Prevent White Screen) ---
-        class ErrorBoundary extends Component {
-            constructor(props) {
-                super(props);
-                this.state = { hasError: false };
-            }
-            static getDerivedStateFromError(error) {
-                return { hasError: true };
-            }
-            componentDidCatch(error, errorInfo) {
-                console.error("Widget Crash Prevented:", error, errorInfo);
-            }
-            render() {
-                if (this.state.hasError) {
-                    return (
-                        <div className="bg-red-50 p-6 rounded-[24px] border border-red-100 flex flex-col items-center justify-center h-full min-h-[200px] text-center">
-                            <AlertTriangle className="w-8 h-8 text-red-400 mb-2" />
-                            <h3 className="text-sm font-bold text-red-800">เกิดข้อผิดพลาดในส่วนประกอบนี้</h3>
-                            <p className="text-xs text-red-600 mt-1">ข้อมูลอาจไม่สมบูรณ์ หรือรูปแบบผิดพลาด กรุณารีเฟรช</p>
-                        </div>
-                    );
-                }
-                return this.props.children;
-            }
-        }
-
-        const SafeWidget = ({ children }) => <ErrorBoundary>{children}</ErrorBoundary>;
-
-        // --- Hooks ---
-        function useDebounce(value, delay) {
-            const [debouncedValue, setDebouncedValue] = useState(value);
-            useEffect(() => {
-                const handler = setTimeout(() => setDebouncedValue(value), delay);
-                return () => clearTimeout(handler);
-            }, [value, delay]);
-            return debouncedValue;
-        }
-
-        // --- Helpers ---
-        const normalizeText = (text, type = 'general') => {
-            if (!text || text.toString().trim() === '') return 'Unknown';
-            const str = text.toString().trim();
-            const upper = str.toUpperCase();
-
-            // 1. กำหนดรูปแบบตายตัวสำหรับ Channel หลัก
-            if (upper === 'MT') return 'MT';
-            if (upper === 'GT') return 'GT';
-            if (upper === 'TT') return 'TT';
-            if (upper === 'OB') return 'OB';
-            if (upper === 'BJC') return 'BJC';
-            if (upper === 'CVS') return 'CVS';
-            if (upper === 'ONLINE') return 'Online';
-            if (upper === 'INTER COMPANY' || upper === 'INTERCOMPANY') return 'Inter Company';
-
-            // 2. จัดรูปแบบชื่อลูกค้าและช่องทาง ให้เป็น Title Case (ตัวพิมพ์ใหญ่คำแรก)
-            if (type === 'channel' || type === 'customer') {
-                let formatted = str.toLowerCase().replace(/(?:^|\s|-|\/)\S/g, function(match) {
-                    return match.toUpperCase();
-                });
-
-                // ปรับแก้ตัวพิมพ์ใหญ่สำหรับตัวย่อ (Acronyms) หรือชื่อแบรนด์เฉพาะในตลาด
-                const brandOverrides = {
-                    'ofm': 'OFM',
-                    'b2s': 'B2S',
-                    'cj': 'CJ',
-                    'cp': 'CP',
-                    'cp all': 'CP ALL',
-                    'diy': 'DIY',
-                    'mr.diy': 'MR.DIY',
-                    'mr. diy': 'MR.DIY',
-                    'mr.d.i.y.': 'MR.D.I.Y.',
-                    'se-ed': 'SE-ED',
-                    'ctr': 'CTR',
-                    'ptt': 'PTT',
-                    'pt': 'PT',
-                    'fn': 'FN',
-                    'aeon': 'AEON',
-                    'ikea': 'IKEA',
-                    'spar': 'SPAR',
-                    'jc': 'JC',
-                    'gms': 'GMS',
-                    'homepro': 'HomePro',
-                    'familymart': 'FamilyMart',
-                    'maxvalu': 'MaxValu',
-                    'watson': 'Watsons',
-                    'watsons': 'Watsons',
-                    'kingpower': 'King Power',
-                    'tiktok': 'TikTok',
-                    'shopee': 'Shopee',
-                    'lazada': 'Lazada'
-                };
-
-                Object.keys(brandOverrides).forEach(key => {
-                    // ปรับปรุง Regex ให้รองรับสัญลักษณ์พิเศษเช่น . หรือ - ไว้ท้ายคำได้อย่างแม่นยำ
-                    const safeKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-                    const regex = new RegExp(`\\b${safeKey}(?!\\w)`, 'gi');
-                    formatted = formatted.replace(regex, brandOverrides[key]);
-                });
-
-                return formatted;
-            }
-            
-            // 3. จัดรูปแบบ Product และ SKU ให้เป็นตัวพิมพ์ใหญ่ทั้งหมด เพื่อให้ Grouping สมบูรณ์ 100%
-            if (type === 'product' || type === 'sku' || type === 'subgroup') {
-                return upper;
-            }
-
-            return str;
-        };
-
-        const cleanCurrency = (val) => {
-            if (typeof val === 'number') return val;
-            if (!val) return 0;
-            return parseFloat(val.toString().replace(/[฿",]/g, '').trim()) || 0;
-        };
-
-        const isChainBasedChannel = (channel) => {
-            const upper = channel?.toUpperCase() || '';
-            return ['MT', 'INTER COMPANY', 'ONLINE', 'BJC'].includes(upper);
-        };
-
-        const getImgFilename = (groupName) => {
-            return `image/${(groupName || '').toLowerCase().replace(/&/g, '')}.png`;
-        };
-
-        const getParetoTopItems = (dataObj, maxItems = 5, threshold = 0.8) => {
-            if(!dataObj) return [];
-            const entries = Object.entries(dataObj).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
-            const total = entries.reduce((sum, [, val]) => sum + val, 0);
-            if (total === 0) return [];
-            
-            let cumulative = 0;
-            const result = [];
-            for (let i = 0; i < entries.length; i++) {
-                const pct = ((entries[i][1] / total) * 100).toFixed(1);
-                result.push({ name: entries[i][0], pct });
-                cumulative += entries[i][1];
-                if (cumulative / total >= threshold || result.length >= maxItems) break;
-            }
-            return result;
-        };
-
-        // --- 3. Dynamic Projection Logic ---
-        const calculateDynamicForecast = (ytd26, ytd25, fy25, target26, monthsCount26) => {
-            const validYtd26 = ytd26 || 0;
-            const validYtd25 = ytd25 || 0;
-            const validFy25 = fy25 || 0;
-            const validTarget26 = target26 || 0;
-            const validMonths = monthsCount26 || 1; // ป้องกันการหารด้วยศูนย์
-
-            let forecast26 = 0;
-            if (validYtd25 > 0 && validFy25 > 0) {
-                // กรณีมีประวัติปีที่แล้ว: คำนวณแบบ Seasonality
-                forecast26 = validYtd26 * (validFy25 / validYtd25);
-            } else {
-                // กรณีไม่มีประวัติ หรือเป็นสินค้าใหม่: คำนวณแบบ Linear Run Rate
-                forecast26 = (validYtd26 / validMonths) * 12;
-            }
-
-            const percent = validTarget26 > 0 ? (forecast26 / validTarget26) * 100 : 0;
-            const isMissing = percent < 100;
-
-            return {
-                forecast26,
-                forecastStatus: { percent, isMissing }
-            };
-        };
-
+        // --- Constants extracted from render cycle ---
         const GROUP_ORDER = ['DACARE', 'DATISSUE', 'DAOS', 'DABATTERY', 'DASP', 'DANB', 'QUALITY', 'DALIFESTYLE'];
         
         const GROUP_COLORS = {
-            'DACARE': 'text-[#0071e3] bg-[#0071e3]/10',
-            'DATISSUE': 'text-[#32ade6] bg-[#32ade6]/10',
-            'DAOS': 'text-[#ff9500] bg-[#ff9500]/10',
-            'DABATTERY': 'text-[#d49b00] bg-[#ffcc00]/20',
-            'DASP': 'text-[#30b0c7] bg-[#30b0c7]/10',
-            'DANB': 'text-[#5e5ce6] bg-[#5e5ce6]/10',
-            'QUALITY': 'text-[#34c759] bg-[#34c759]/10',
-            'DALIFESTYLE': 'text-[#af52de] bg-[#af52de]/10',
+            'DACARE': 'text-[#0071e3] bg-[#0071e3]/10', 'DATISSUE': 'text-[#32ade6] bg-[#32ade6]/10',
+            'DAOS': 'text-[#ff9500] bg-[#ff9500]/10', 'DABATTERY': 'text-[#d49b00] bg-[#ffcc00]/20',
+            'DASP': 'text-[#30b0c7] bg-[#30b0c7]/10', 'DANB': 'text-[#5e5ce6] bg-[#5e5ce6]/10',
+            'QUALITY': 'text-[#34c759] bg-[#34c759]/10', 'DALIFESTYLE': 'text-[#af52de] bg-[#af52de]/10',
         };
 
         const GROUP_HEX = {
             'DACARE': '#0071e3', 'DATISSUE': '#32ade6', 'DAOS': '#ff9500', 'DABATTERY': '#ffcc00',
             'DASP': '#30b0c7', 'DANB': '#5e5ce6', 'QUALITY': '#34c759', 'DALIFESTYLE': '#af52de',
         };
+
+        const APPLE_PALETTE = ['#0071e3', '#34c759', '#ff9500', '#ff3b30', '#af52de', '#32ade6', '#ff2d55', '#5856d6'];
+        
+        const MONTHS_LIST = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const MONTH_MAP = { 'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12 };
 
         const DATA_SOURCES = {
             'DACARE': {
@@ -346,6 +182,126 @@
             }
         };
 
+        const BRAND_OVERRIDES = {
+            'ofm': 'OFM', 'b2s': 'B2S', 'cj': 'CJ', 'cp': 'CP', 'cp all': 'CP ALL', 'diy': 'DIY',
+            'mr.diy': 'MR.DIY', 'mr. diy': 'MR.DIY', 'mr.d.i.y.': 'MR.D.I.Y.', 'se-ed': 'SE-ED',
+            'ctr': 'CTR', 'ptt': 'PTT', 'pt': 'PT', 'fn': 'FN', 'aeon': 'AEON', 'ikea': 'IKEA',
+            'spar': 'SPAR', 'jc': 'JC', 'gms': 'GMS', 'homepro': 'HomePro', 'familymart': 'FamilyMart',
+            'maxvalu': 'MaxValu', 'watson': 'Watsons', 'watsons': 'Watsons', 'kingpower': 'King Power',
+            'tiktok': 'TikTok', 'shopee': 'Shopee', 'lazada': 'Lazada'
+        };
+        const PRECOMPILED_BRAND_REGEXES = Object.keys(BRAND_OVERRIDES).map(key => {
+            const safeKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            return { regex: new RegExp(`\\b${safeKey}(?!\\w)`, 'gi'), replacement: BRAND_OVERRIDES[key] };
+        });
+
+        // --- Error Boundary ---
+        class ErrorBoundary extends Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false };
+            }
+            static getDerivedStateFromError(error) {
+                return { hasError: true };
+            }
+            componentDidCatch(error, errorInfo) {
+                console.error("Widget Crash Prevented:", error, errorInfo);
+            }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="bg-red-50 p-6 rounded-[24px] border border-red-100 flex flex-col items-center justify-center h-full min-h-[200px] text-center">
+                            <AlertTriangle className="w-8 h-8 text-red-400 mb-2" />
+                            <h3 className="text-sm font-bold text-red-800">Error rendering component</h3>
+                            <p className="text-xs text-red-600 mt-1">Please try refreshing</p>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
+        const SafeWidget = memo(({ children }) => <ErrorBoundary>{children}</ErrorBoundary>);
+
+        // --- Helpers ---
+        const normalizeText = (text, type = 'general') => {
+            if (!text || text.toString().trim() === '') return 'Unknown';
+            const str = text.toString().trim();
+            const upper = str.toUpperCase();
+
+            if (upper === 'MT') return 'MT';
+            if (upper === 'GT') return 'GT';
+            if (upper === 'TT') return 'TT';
+            if (upper === 'OB') return 'OB';
+            if (upper === 'BJC') return 'BJC';
+            if (upper === 'CVS') return 'CVS';
+            if (upper === 'ONLINE') return 'Online';
+            if (upper === 'INTER COMPANY' || upper === 'INTERCOMPANY') return 'Inter Company';
+
+            if (type === 'channel' || type === 'customer') {
+                let formatted = str.toLowerCase().replace(/(?:^|\s|-|\/)\S/g, match => match.toUpperCase());
+                PRECOMPILED_BRAND_REGEXES.forEach(({ regex, replacement }) => {
+                    formatted = formatted.replace(regex, replacement);
+                });
+                return formatted;
+            }
+            
+            if (type === 'product' || type === 'sku' || type === 'subgroup') {
+                return upper;
+            }
+            return str;
+        };
+
+        const cleanCurrency = (val) => {
+            if (typeof val === 'number') return val;
+            if (!val) return 0;
+            return parseFloat(val.toString().replace(/[฿",]/g, '').trim()) || 0;
+        };
+
+        const isChainBasedChannel = (channel) => {
+            const upper = channel?.toUpperCase() || '';
+            return ['MT', 'INTER COMPANY', 'ONLINE', 'BJC'].includes(upper);
+        };
+
+        const getImgFilename = (groupName) => `image/${(groupName || '').toLowerCase().replace(/&/g, '')}.png`;
+
+        const getParetoTopItems = (dataObj, maxItems = 5, threshold = 0.8) => {
+            if(!dataObj) return [];
+            const entries = Object.entries(dataObj).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
+            const total = entries.reduce((sum, [, val]) => sum + val, 0);
+            if (total === 0) return [];
+            
+            let cumulative = 0;
+            const result = [];
+            for (let i = 0; i < entries.length; i++) {
+                const pct = ((entries[i][1] / total) * 100).toFixed(1);
+                result.push({ name: entries[i][0], pct });
+                cumulative += entries[i][1];
+                if (cumulative / total >= threshold || result.length >= maxItems) break;
+            }
+            return result;
+        };
+
+        const calculateDynamicForecast = (ytd26, ytd25, fy25, target26, monthsCount26) => {
+            const validYtd26 = ytd26 || 0;
+            const validYtd25 = ytd25 || 0;
+            const validFy25 = fy25 || 0;
+            const validTarget26 = target26 || 0;
+            const validMonths = monthsCount26 || 1; 
+
+            let forecast26 = 0;
+            if (validYtd25 > 0 && validFy25 > 0) {
+                forecast26 = validYtd26 * (validFy25 / validYtd25);
+            } else {
+                forecast26 = (validYtd26 / validMonths) * 12;
+            }
+
+            const percent = validTarget26 > 0 ? (forecast26 / validTarget26) * 100 : 0;
+            const isMissing = percent < 100;
+
+            return { forecast26, forecastStatus: { percent, isMissing } };
+        };
+
         const requestCache = new Map();
 
         const fetchCSV = async (url) => {
@@ -380,7 +336,8 @@
             return fetchPromise;
         };
 
-        const FilterDropdown = ({ label, value, options, onChange, icon }) => {
+        // --- Common UI Components ---
+        const FilterDropdown = memo(({ label, value, options, onChange, icon }) => {
             const [isOpen, setIsOpen] = useState(false);
             const dropdownRef = useRef(null);
 
@@ -441,9 +398,112 @@
                     )}
                 </div>
             );
-        };
+        });
 
-        const SyncStatusSlot = ({ label, status }) => {
+        // --- New Multi-Select Dropdown Component ---
+        const MultiSelectDropdown = memo(({ label, selectedValues, options, onChange, icon }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const dropdownRef = useRef(null);
+
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setIsOpen(false);
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
+
+            const toggleOption = (optVal) => {
+                let newSelected;
+                if (selectedValues.includes(optVal)) {
+                    newSelected = selectedValues.filter(v => v !== optVal);
+                } else {
+                    newSelected = [...selectedValues, optVal];
+                }
+                onChange(newSelected);
+            };
+
+            const toggleAll = () => {
+                if (selectedValues.length === options.length) {
+                    onChange([]); // Deselect all
+                } else {
+                    onChange(options.map(opt => typeof opt === 'string' ? opt : opt.val)); // Select all
+                }
+            };
+
+            // Dynamic Label logic
+            let displayValue = 'All';
+            if (selectedValues.length > 0) {
+                if (selectedValues.length === options.length) {
+                    displayValue = 'All';
+                } else if (selectedValues.length <= 2) {
+                    displayValue = selectedValues.join(', ');
+                } else {
+                    displayValue = `${selectedValues.length} Selected`;
+                }
+            } else {
+                 displayValue = 'None';
+            }
+
+            const isAllSelected = selectedValues.length === options.length && options.length > 0;
+
+            return (
+                <div className="relative" ref={dropdownRef}>
+                    <button 
+                        onClick={() => setIsOpen(!isOpen)} 
+                        className="flex items-center gap-2 text-sm font-medium text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] px-4 py-2 rounded-xl transition-colors min-w-[160px] justify-between"
+                    >
+                        <div className="flex items-center gap-2">
+                            {React.cloneElement(icon, { className: "w-4 h-4 text-[#86868b]" })}
+                            <span className="text-[#86868b]">{label}:</span>
+                            <span className="font-semibold truncate max-w-[100px] text-[#1d1d1f]" title={selectedValues.join(', ')}>{displayValue}</span>
+                        </div>
+                        <ChevronDown className={`w-4 h-4 text-[#86868b] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isOpen && (
+                        <div className="absolute top-full left-0 mt-2 w-64 bg-white/90 backdrop-blur-xl border border-black/5 rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] z-50 max-h-[400px] overflow-y-auto animate-in fade-in zoom-in-95 duration-100 custom-scrollbar py-2">
+                            <div className="sticky top-0 bg-white/90 backdrop-blur-xl px-4 py-2 text-[11px] font-semibold text-[#86868b] uppercase tracking-wider z-10 border-b border-black/5 flex justify-between items-center">
+                                <span>Select {label}</span>
+                                <button onClick={toggleAll} className="text-[#0071e3] hover:underline text-[10px]">
+                                    {isAllSelected ? 'Clear All' : 'Select All'}
+                                </button>
+                            </div>
+                            <div className="py-1">
+                                {(options || []).length > 0 ? options.map((opt, index) => {
+                                    const optVal = typeof opt === 'string' ? opt : opt.val;
+                                    const optGroup = typeof opt === 'string' ? null : opt.group;
+                                    const isSelected = selectedValues.includes(optVal);
+                                    
+                                    const prevOptGroup = index > 0 ? (typeof options[index-1] === 'string' ? null : options[index-1].group) : null;
+                                    const showGroupHeader = optGroup && optGroup !== prevOptGroup;
+
+                                    return (
+                                        <React.Fragment key={optVal || index}>
+                                            {showGroupHeader && (
+                                                <div className={`px-4 py-1.5 mt-2 mb-1 mx-2 text-[10px] font-extrabold uppercase tracking-wider rounded-lg ${GROUP_COLORS[optGroup] || 'text-[#86868b] bg-[#f5f5f7]'}`}>
+                                                    {optGroup}
+                                                </div>
+                                            )}
+                                            <button 
+                                                className={`w-full text-left px-5 py-2.5 text-sm font-medium hover:bg-[#f5f5f7] transition-colors flex items-center gap-3 ${isSelected ? 'text-[#0071e3]' : 'text-[#1d1d1f]'}`} 
+                                                onClick={() => toggleOption(optVal)}
+                                            >
+                                                <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-[#0071e3] border-[#0071e3]' : 'border-[#d1d1d6] bg-white'}`}>
+                                                    {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                                </div>
+                                                <span className={`${isSelected ? 'font-bold' : ''} ${optGroup ? 'pl-2' : ''} truncate`}>{optVal}</span>
+                                            </button>
+                                        </React.Fragment>
+                                    );
+                                }) : <div className="px-4 py-3 text-sm text-[#86868b] text-center italic font-medium">No options available</div>}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        });
+
+        const SyncStatusSlot = memo(({ label, status }) => {
             let statusColor = 'bg-[#e5e5ea]';
             let statusText = 'Pending';
             let icon = null;
@@ -479,9 +539,9 @@
                     </div>
                 </div>
             );
-        };
+        });
 
-        const ImageWithFallback = ({ src, alt, className, onClick, title }) => {
+        const ImageWithFallback = memo(({ src, alt, className, onClick, title }) => {
             const [error, setError] = useState(false);
             if (error) {
                 return (
@@ -494,9 +554,7 @@
                 );
             }
             return <img src={src} alt={alt} className={className} onClick={onClick} title={title} onError={() => setError(true)} style={{ WebkitUserDrag: 'none' }} />;
-        };
-
-        const APPLE_PALETTE = ['#0071e3', '#34c759', '#ff9500', '#ff3b30', '#af52de', '#32ade6', '#ff2d55', '#5856d6'];
+        });
 
         const renderCustomLabel = (props) => {
             const { x, y, width, value } = props;
@@ -509,14 +567,13 @@
             return <text x={cx} y={cy} fill="#86868b" textAnchor="middle" fontSize={10} fontWeight={600}>{formatted}</text>;
         };
 
-        // --- 4. Executive Summary Widget (Refined Logic & UX) ---
-        const ExecutiveSummaryWidget = ({ kpi }) => {
+        // --- Widgets ---
+        const ExecutiveSummaryWidget = memo(({ kpi }) => {
             const [isExpanded, setIsExpanded] = useState(false);
 
             if (!kpi) return null;
             const { s26, growthYoY, target26, forecast26, forecastStatus, monthsCount26 } = kpi;
             
-            // Insight Calculations
             const validTarget = target26 || 0;
             const currentRunRate = s26 / (monthsCount26 || 1);
             const remainingMonths = 12 - (monthsCount26 || 1);
@@ -556,7 +613,6 @@
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Insight 1: Run Rate Velocity */}
                         <div className="flex items-start gap-3 bg-[#f5f5f7] p-4 rounded-[16px] border border-black/5">
                             <div className="mt-0.5 w-2 h-2 rounded-full flex-shrink-0 bg-[#0071e3]"></div>
                             <div>
@@ -572,7 +628,6 @@
                             </div>
                         </div>
 
-                        {/* Insight 2: Reality vs Target */}
                         <div className="flex items-start gap-3 bg-[#f5f5f7] p-4 rounded-[16px] border border-black/5">
                             <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${!isTrackingBehind ? 'bg-[#34c759]' : (isGrowing ? '#ff9500' : 'bg-[#ff3b30]')}`}></div>
                             <div>
@@ -589,7 +644,6 @@
                             </div>
                         </div>
 
-                        {/* Insight 3: Directive */}
                         <div className="flex items-start gap-3 bg-[#f5f5f7] p-4 rounded-[16px] border border-black/5">
                             <div className="mt-0.5 w-2 h-2 rounded-full flex-shrink-0 bg-[#1d1d1f]"></div>
                             <div>
@@ -604,9 +658,9 @@
                     </div>
                 </div>
             );
-        };
+        });
 
-        const NewAcquisitionWidget = ({ filteredData }) => {
+        const NewAcquisitionWidget = memo(({ filteredData }) => {
             const [filterType, setFilterType] = useState('All');
             const [subGroupFilter, setSubGroupFilter] = useState('All');
             const [isCopied, setIsCopied] = useState(false);
@@ -621,9 +675,6 @@
 
             const { summary, list } = useMemo(() => {
                 const customerMap = {};
-                // Map text month to index for gap calculation
-                const monthMap = { 'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12 };
-
                 const dataToUse = subGroupFilter === 'All' ? filteredData : (filteredData || []).filter(d => d.SubProductGroup === subGroupFilter);
 
                 (dataToUse || []).forEach(d => {
@@ -636,7 +687,7 @@
                     }
                     
                     const mStr = d.Month ? d.Month.substring(0, 3) : null;
-                    const mIdx = mStr ? monthMap[mStr] : null;
+                    const mIdx = mStr ? MONTH_MAP[mStr] : null;
 
                     if (d.Year === '2025' && mIdx) customerMap[key].months25.push(mIdx);
                     if (d.Year === '2026' && mIdx) {
@@ -654,7 +705,7 @@
                 let newCount = 0, newSales = 0, reactCount = 0, reactSales = 0;
 
                 Object.values(customerMap).forEach(c => {
-                    if (c.sales26 <= 0) return; // Only focus on 2026 active customers
+                    if (c.sales26 <= 0) return; 
                     
                     let type = null;
                     if (c.months25.length === 0) {
@@ -662,10 +713,7 @@
                     } else {
                         const max25 = Math.max(...c.months25);
                         const min26 = Math.min(...c.months26);
-                        // Calculate gap in months across the year change
                         const gap = (min26 + 12) - max25;
-                        
-                        // Condition for Reactivated: Gap >= 6 months
                         if (gap >= 6) type = 'Reactivated';
                     }
 
@@ -691,7 +739,7 @@
                 return (list || []).filter(item => item.type === filterType);
             }, [list, filterType]);
 
-            const handleCopy = () => {
+            const handleCopy = useCallback(() => {
                 if (!displayList || displayList.length === 0) return;
                 const textToCopy = `New Acquisition List (${filterType === 'All' ? 'All Types' : filterType} - ${subGroupFilter})\n\n` + 
                     displayList.map((item, idx) => `${idx + 1}. ${item.name} (${item.channel})\n   Type: ${item.type}\n   Top Product: ${item.topProduct}\n   Sales: ฿${(item.sales26 || 0).toLocaleString()}`).join('\n\n');
@@ -710,7 +758,7 @@
                     console.error('Copy failed', error);
                 }
                 textArea.remove();
-            };
+            }, [displayList, filterType, subGroupFilter]);
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
@@ -743,23 +791,12 @@
                                 </button>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <button 
-                                    onClick={() => setFilterType('All')}
-                                    className={`px-4 py-2 rounded-xl border flex items-center justify-center text-xs font-bold transition-all ${filterType === 'All' ? 'bg-[#1d1d1f] text-white border-transparent shadow-md' : 'bg-[#f5f5f7] text-[#86868b] border-black/5 hover:bg-[#e8e8ed]'}`}
-                                >
-                                    All
-                                </button>
-                                <button 
-                                    onClick={() => setFilterType('Pure New')}
-                                    className={`px-4 py-2 rounded-xl flex flex-col min-w-[120px] border transition-all text-left ${filterType === 'Pure New' ? 'bg-[#34c759]/10 border-[#34c759]/30 shadow-sm' : 'bg-[#f5f5f7] border-black/5 hover:bg-[#e8e8ed]'}`}
-                                >
+                                <button onClick={() => setFilterType('All')} className={`px-4 py-2 rounded-xl border flex items-center justify-center text-xs font-bold transition-all ${filterType === 'All' ? 'bg-[#1d1d1f] text-white border-transparent shadow-md' : 'bg-[#f5f5f7] text-[#86868b] border-black/5 hover:bg-[#e8e8ed]'}`}>All</button>
+                                <button onClick={() => setFilterType('Pure New')} className={`px-4 py-2 rounded-xl flex flex-col min-w-[120px] border transition-all text-left ${filterType === 'Pure New' ? 'bg-[#34c759]/10 border-[#34c759]/30 shadow-sm' : 'bg-[#f5f5f7] border-black/5 hover:bg-[#e8e8ed]'}`}>
                                     <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1 ${filterType === 'Pure New' ? 'text-[#34c759]' : 'text-[#86868b]'}`}><UserPlus className="w-3 h-3"/> Pure New ({summary.newCount})</span>
                                     <span className={`text-sm font-bold ${filterType === 'Pure New' ? 'text-[#34c759]' : 'text-[#1d1d1f]'}`}>฿{(summary.newSales/1000000).toFixed(2)}M</span>
                                 </button>
-                                <button 
-                                    onClick={() => setFilterType('Reactivated')}
-                                    className={`px-4 py-2 rounded-xl flex flex-col min-w-[120px] border transition-all text-left ${filterType === 'Reactivated' ? 'bg-[#ff9500]/10 border-[#ff9500]/30 shadow-sm' : 'bg-[#f5f5f7] border-black/5 hover:bg-[#e8e8ed]'}`}
-                                >
+                                <button onClick={() => setFilterType('Reactivated')} className={`px-4 py-2 rounded-xl flex flex-col min-w-[120px] border transition-all text-left ${filterType === 'Reactivated' ? 'bg-[#ff9500]/10 border-[#ff9500]/30 shadow-sm' : 'bg-[#f5f5f7] border-black/5 hover:bg-[#e8e8ed]'}`}>
                                     <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1 ${filterType === 'Reactivated' ? 'text-[#ff9500]' : 'text-[#86868b]'}`}><UserCheck className="w-3 h-3"/> Reactivated ({summary.reactCount})</span>
                                     <span className={`text-sm font-bold ${filterType === 'Reactivated' ? 'text-[#ff9500]' : 'text-[#1d1d1f]'}`}>฿{(summary.reactSales/1000000).toFixed(2)}M</span>
                                 </button>
@@ -804,17 +841,15 @@
                     </div>
                 </div>
             );
-        };
+        });
 
-        // --- 5. Sub-Category Deep Dive Widget ---
-        const SubProductAnalysisWidget = ({ filteredData, salesData, monthsList }) => {
-            const [drillDownPath, setDrillDownPath] = useState(null); // null = SubProduct view, string = SKU view
+        const SubProductAnalysisWidget = memo(({ filteredData, salesData, monthsList }) => {
+            const [drillDownPath, setDrillDownPath] = useState(null); 
             const [activeSub, setActiveSub] = useState(null);
             const [activeSku, setActiveSku] = useState(null);
 
             const valid2026Months = useMemo(() => new Set((salesData || []).filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0])), [salesData]);
 
-            // Generate List based on drillDown state
             const currentList = useMemo(() => {
                 const map = {};
                 (filteredData || []).forEach(d => {
@@ -823,12 +858,7 @@
                     const key = drillDownPath ? (d.GroupSKU || 'Unknown') : (d.SubProductGroup || 'Unknown');
                     
                     if (!map[key]) {
-                        map[key] = { 
-                            name: key, 
-                            group: d.ProductGroup || 'Unknown', 
-                            s26: 0, 
-                            s25: 0 
-                        };
+                        map[key] = { name: key, group: d.ProductGroup || 'Unknown', s26: 0, s25: 0 };
                     }
                     if (d.Year === '2026') {
                         map[key].s26 += (d.NetPrice || 0);
@@ -842,7 +872,6 @@
                 })).sort((a, b) => b.s26 - a.s26);
             }, [filteredData, valid2026Months, drillDownPath]);
 
-            // Handle Auto-select
             useEffect(() => {
                 if ((currentList || []).length > 0) {
                     if (drillDownPath) {
@@ -856,21 +885,14 @@
                 }
             }, [currentList, drillDownPath]);
 
-            // Chart Data
             const activeName = drillDownPath ? activeSku : activeSub;
             
             const chartData = useMemo(() => {
                 if (!activeName) return [];
                 const isSkuView = !!drillDownPath;
                 
-                const base25 = (filteredData || []).filter(d => 
-                    d.Year === '2025' && 
-                    (isSkuView ? (d.GroupSKU || 'Unknown') === activeName : (d.SubProductGroup || 'Unknown') === activeName)
-                );
-                const base26 = (filteredData || []).filter(d => 
-                    d.Year === '2026' && 
-                    (isSkuView ? (d.GroupSKU || 'Unknown') === activeName : (d.SubProductGroup || 'Unknown') === activeName)
-                );
+                const base25 = (filteredData || []).filter(d => d.Year === '2025' && (isSkuView ? (d.GroupSKU || 'Unknown') === activeName : (d.SubProductGroup || 'Unknown') === activeName));
+                const base26 = (filteredData || []).filter(d => d.Year === '2026' && (isSkuView ? (d.GroupSKU || 'Unknown') === activeName : (d.SubProductGroup || 'Unknown') === activeName));
                 
                 return (monthsList || []).map(m => {
                     const val25 = base25.filter(d => d.Month && d.Month.startsWith(m)).reduce((s, r) => s + (r.NetPrice || 0), 0);
@@ -909,15 +931,10 @@
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[320px]">
-                        {/* Left: Scrollable List with Drill-down */}
                         <div className="flex flex-col h-full bg-[#f5f5f7]/50 rounded-xl border border-black/5 overflow-hidden">
-                            {/* Header / Breadcrumb */}
                             <div className="p-3 bg-white border-b border-black/5 flex items-center shadow-sm">
                                 {drillDownPath ? (
-                                    <button 
-                                        onClick={() => setDrillDownPath(null)}
-                                        className="flex items-center gap-1.5 text-[#0071e3] text-xs font-bold hover:text-[#0077ED] transition-colors"
-                                    >
+                                    <button onClick={() => setDrillDownPath(null)} className="flex items-center gap-1.5 text-[#0071e3] text-xs font-bold hover:text-[#0077ED] transition-colors">
                                         <ArrowLeft className="w-3.5 h-3.5" /> Back to Sub-Products
                                     </button>
                                 ) : (
@@ -971,7 +988,6 @@
                             </div>
                         </div>
 
-                        {/* Right: Area Chart */}
                         <div className="lg:col-span-2 h-full bg-[#f5f5f7]/30 border border-black/5 rounded-xl p-4 flex flex-col">
                             <div className="flex justify-between items-center mb-4">
                                 <div>
@@ -1012,9 +1028,9 @@
                     </div>
                 </div>
             );
-        };
+        });
 
-        const PortfolioSummaryWidget = ({ selectedGroups, toggleGroup }) => (
+        const PortfolioSummaryWidget = memo(({ selectedGroups, toggleGroup }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col items-center justify-center h-full relative overflow-hidden group animate-in fade-in zoom-in-95 duration-500">
                 <div className="absolute inset-0 bg-gradient-to-br from-[#0071e3]/5 to-transparent pointer-events-none"></div>
                 <div className="relative z-10 w-full flex flex-col h-full justify-center">
@@ -1033,9 +1049,9 @@
                     </div>
                 </div>
             </div>
-        );
+        ));
 
-        const KPIYTDWidget = ({ kpi }) => (
+        const KPIYTDWidget = memo(({ kpi }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-shadow animate-in fade-in zoom-in-95 duration-500 delay-75">
                 <div className="flex justify-between items-start mb-2">
                     <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">YTD Actual 2026</span>
@@ -1048,9 +1064,9 @@
                     </div>
                 </div>
             </div>
-        );
+        ));
 
-        const KPITargetWidget = ({ kpi }) => (
+        const KPITargetWidget = memo(({ kpi }) => (
             <div className={`bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] animate-in fade-in zoom-in-95 duration-500 delay-100 ${kpi.target26 === null ? 'opacity-60 grayscale' : ''}`}>
                 <div className="flex justify-between items-start mb-1">
                     <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">Target 2026</span>
@@ -1072,9 +1088,9 @@
                     ) : <div className="h-full flex items-center justify-center text-[#86868b] font-medium text-sm italic py-2">N/A</div>}
                 </div>
             </div>
-        );
+        ));
 
-        const KPIForecastWidget = ({ kpi, showForecast, setShowForecast }) => (
+        const KPIForecastWidget = memo(({ kpi, showForecast, setShowForecast }) => (
             <div className={`bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] animate-in fade-in zoom-in-95 duration-500 delay-150 ${kpi.forecast26 === null ? 'opacity-60 grayscale' : ''}`}>
                 <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-1.5 group cursor-help relative">
@@ -1121,9 +1137,9 @@
                     ) : <div className="text-[32px] font-semibold text-[#d1d1d6]">N/A</div>}
                 </div>
             </div>
-        );
+        ));
 
-        const KPIPlanWidget = ({ kpi }) => (
+        const KPIPlanWidget = memo(({ kpi }) => (
             <div className={`bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] animate-in fade-in zoom-in-95 duration-500 delay-200 ${kpi.plan27 === null ? 'opacity-60 grayscale' : ''}`}>
                 <div className="flex justify-between items-start mb-2">
                     <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">Plan 2027</span>
@@ -1142,9 +1158,9 @@
                     ) : <div className="text-[32px] font-semibold text-[#d1d1d6]">N/A</div>}
                 </div>
             </div>
-        );
+        ));
 
-        const TrendInsightAnnotation = (props) => {
+        const TrendInsightAnnotation = memo((props) => {
             const { x, y, value, index, data, onInsightClick } = props;
             if (value === 0 || value === undefined || value === null) return null;
             
@@ -1170,9 +1186,9 @@
                     <text x={cx} y={cy - 24} fill="#fff" textAnchor="middle" fontSize={8} fontWeight={700} style={{ pointerEvents: 'none' }}>TAP FOR INSIGHTS</text>
                 </g>
             );
-        };
+        });
 
-        const TrendChartWidget = ({ trendChartData, selectedGroups, show2025Trend, setShow2025Trend, yAxisTicks }) => {
+        const TrendChartWidget = memo(({ trendChartData, show2025Trend, setShow2025Trend, yAxisTicks }) => {
             const [selectedInsight, setSelectedInsight] = useState(null);
             const [showProjection, setShowProjection] = useState(true);
 
@@ -1295,9 +1311,9 @@
                     )}
                 </>
             );
-        };
+        });
 
-        const ChannelMixWidget = ({ channelMix, kpi }) => (
+        const ChannelMixWidget = memo(({ channelMix, kpi }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
                 <h3 className="text-base font-bold text-[#1d1d1f] mb-4 flex items-center gap-2"><PieIcon className="w-5 h-5 text-[#af52de]" /> Channel Mix 2026</h3>
                 <div className="h-48 relative">
@@ -1334,9 +1350,9 @@
                     })}
                 </div>
             </div>
-        );
+        ));
 
-        const PortfolioMixWidget = ({ filteredData, monthsList }) => {
+        const PortfolioMixWidget = memo(({ filteredData, monthsList }) => {
             const [mixLevel, setMixLevel] = useState('ProductGroup');
 
             const { chartData, keys, colors } = useMemo(() => {
@@ -1388,7 +1404,7 @@
                 return { chartData, keys: keysToUse, colors };
             }, [filteredData, mixLevel, monthsList]);
 
-            const CustomMixTooltip = ({ active, payload, label }) => {
+            const CustomMixTooltip = useCallback(({ active, payload, label }) => {
                 if (active && payload && payload.length) {
                     const total = payload[0].payload.total || 0;
                     return (
@@ -1417,7 +1433,7 @@
                     );
                 }
                 return null;
-            };
+            }, []);
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] lg:col-span-3 flex flex-col">
@@ -1460,14 +1476,14 @@
                     </div>
                 </div>
             );
-        };
+        });
 
-        const CostToValueWidget = ({ filteredData }) => {
+        const CostToValueWidget = memo(({ filteredData }) => {
             const { scatterData, avgMargin, avgSales, reformulationTargets, heroes } = useMemo(() => {
-                const data26 = (filteredData || []).filter(d => d.Year === '2026');
                 const map = {};
 
-                data26.forEach(d => {
+                (filteredData || []).forEach(d => {
+                    if(d.Year !== '2026') return;
                     const sku = d.GroupSKU || 'Unknown';
                     const name = d.ProductName || 'Unknown';
                     const uniqueKey = `${sku}::${name}`;
@@ -1513,7 +1529,7 @@
                 return { scatterData: validList, avgMargin: refMargin, avgSales: refSales, reformulationTargets: refTargs, heroes: hs };
             }, [filteredData]);
 
-            const CustomScatterTooltip = ({ active, payload }) => {
+            const CustomScatterTooltip = useCallback(({ active, payload }) => {
                 if (active && payload && payload.length) {
                     const data = payload[0].payload;
                     return (
@@ -1538,7 +1554,7 @@
                     );
                 }
                 return null;
-            };
+            }, [avgMargin]);
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] lg:col-span-3 flex flex-col">
@@ -1568,7 +1584,7 @@
                                         <ReferenceLine x={avgMargin || 0} stroke="#0071e3" strokeOpacity={0.5} strokeDasharray="3 3" />
                                         <ReferenceLine y={avgSales || 0} stroke="#0071e3" strokeOpacity={0.5} strokeDasharray="3 3" />
                                         
-                                        <Scatter name="SKUs" data={scatterData} fill="#0071e3" opacity={0.6}>
+                                        <Scatter name="SKUs" data={scatterData} opacity={0.6}>
                                             {(scatterData || []).map((entry, index) => {
                                                 let color = '#86868b';
                                                 if (entry.sales >= avgSales && entry.margin >= avgMargin) color = '#34c759';
@@ -1625,11 +1641,12 @@
                     </div>
                 </div>
             );
-        };
+        });
 
-        const ProductProfitabilityWidget = ({ filteredData }) => {
+        const ProductProfitabilityWidget = memo(({ filteredData }) => {
             const [breadcrumbs, setBreadcrumbs] = useState([]);
             const [search, setSearch] = useState('');
+            const deferredSearch = useDeferredValue(search);
 
             const base2026 = useMemo(() => (filteredData || []).filter(d => d.Year === '2026'), [filteredData]);
 
@@ -1692,9 +1709,9 @@
 
             const { list, summary } = useMemo(() => {
                 let arr = [...(rawData.list || [])].sort((a, b) => b.sales - a.sales);
-                if (search) arr = arr.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
+                if (deferredSearch) arr = arr.filter(item => item.name.toLowerCase().includes(deferredSearch.toLowerCase()));
                 return { list: arr, summary: rawData.summary };
-            }, [rawData, search]);
+            }, [rawData, deferredSearch]);
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col lg:col-span-3">
@@ -1783,9 +1800,9 @@
                     </div>
                 </div>
             );
-        };
+        });
 
-        const TopPerformersWidget = ({ topPerformers, topPerfDrillDown, setTopPerfDrillDown, topPerfSearch, setTopPerfSearch, topPerfSortMode, setTopPerfSortMode, kpi }) => (
+        const TopPerformersWidget = memo(({ topPerformers, topPerfDrillDown, setTopPerfDrillDown, topPerfSearch, setTopPerfSearch, topPerfSortMode, setTopPerfSortMode, kpi }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                     <div className="flex items-center gap-2">
@@ -1876,12 +1893,12 @@
                     </table>
                 </div>
             </div>
-        );
+        ));
 
-        const SkuHealthWidget = ({ filteredData }) => {
+        const SkuHealthWidget = memo(({ filteredData }) => {
             const [healthSearch, setHealthSearch] = useState('');
             const [selectedSku, setSelectedSku] = useState(null);
-            const debouncedHealthSearch = useDebounce(healthSearch, 300);
+            const deferredHealthSearch = useDeferredValue(healthSearch);
 
             const returnData = useMemo(() => {
                 let grossSalesTotal = 0, totalReturns26 = 0;
@@ -1914,9 +1931,9 @@
 
             const filteredReturnList = useMemo(() => {
                 let list = returnData.topReturns;
-                if (debouncedHealthSearch.length >= 2) list = list.filter(item => item.sku.toLowerCase().includes(debouncedHealthSearch.toLowerCase()) || item.name.toLowerCase().includes(debouncedHealthSearch.toLowerCase()));
+                if (deferredHealthSearch.length >= 2) list = list.filter(item => item.sku.toLowerCase().includes(deferredHealthSearch.toLowerCase()) || item.name.toLowerCase().includes(deferredHealthSearch.toLowerCase()));
                 return list;
-            }, [returnData.topReturns, debouncedHealthSearch]);
+            }, [returnData.topReturns, deferredHealthSearch]);
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
@@ -1991,9 +2008,9 @@
                     </div>
                 </div>
             );
-        };
+        });
 
-        const NPDVitalityWidget = ({ npdData, kpi }) => (
+        const NPDVitalityWidget = memo(({ npdData, kpi }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex flex-col justify-between relative overflow-hidden">
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -2021,9 +2038,9 @@
                     </div>
                 </div>
             </div>
-        );
+        ));
 
-        const TopNPDWidget = ({ npdData }) => (
+        const TopNPDWidget = memo(({ npdData }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] lg:col-span-2 flex flex-col">
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-2">
@@ -2065,23 +2082,21 @@
                     )}
                 </div>
             </div>
-        );
+        ));
 
-        const NPDTrajectoryWidget = ({ salesData, npdData }) => {
-            const [viewMode, setViewMode] = useState('monthly'); // 'monthly' or 'cumulative'
+        const NPDTrajectoryWidget = memo(({ salesData, npdData }) => {
+            const [viewMode, setViewMode] = useState('monthly'); 
 
             const { chartData, lines, insights } = useMemo(() => {
                 if (!npdData?.topNPDs?.length) return { chartData: [], lines: [], insights: null };
                 const topNPDNames = npdData.topNPDs.slice(0, 5).map(n => n.name);
-                const monthMap = { 'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12 };
                 const firstMonths = {};
 
-                // 1. Find absolute launch month for normalization
                 (salesData || []).forEach(d => {
                     if (topNPDNames.includes(d.ProductName)) {
                         const mStr = d.Month ? d.Month.substring(0, 3) : null;
-                        if (mStr && monthMap[mStr]) {
-                            const absMonth = parseInt(d.Year) * 12 + monthMap[mStr];
+                        if (mStr && MONTH_MAP[mStr]) {
+                            const absMonth = parseInt(d.Year) * 12 + MONTH_MAP[mStr];
                             if (!firstMonths[d.ProductName] || absMonth < firstMonths[d.ProductName]) {
                                 firstMonths[d.ProductName] = absMonth;
                             }
@@ -2089,15 +2104,14 @@
                     }
                 });
 
-                // 2. Initialize raw monthly data (M1-M12)
                 const rawMonthly = {};
                 topNPDNames.forEach(name => { rawMonthly[name] = new Array(12).fill(null); });
 
                 (salesData || []).forEach(d => {
                     if (topNPDNames.includes(d.ProductName)) {
                         const mStr = d.Month ? d.Month.substring(0, 3) : null;
-                        if (mStr && monthMap[mStr]) {
-                            const absMonth = parseInt(d.Year) * 12 + monthMap[mStr];
+                        if (mStr && MONTH_MAP[mStr]) {
+                            const absMonth = parseInt(d.Year) * 12 + MONTH_MAP[mStr];
                             const relM = absMonth - firstMonths[d.ProductName];
                             if (relM >= 0 && relM < 12) {
                                 if (rawMonthly[d.ProductName][relM] === null) rawMonthly[d.ProductName][relM] = 0;
@@ -2107,7 +2121,6 @@
                     }
                 });
 
-                // Fill zero for active months (prevent disconnected lines)
                 topNPDNames.forEach(name => {
                     let lastActiveIndex = -1;
                     for(let i=11; i>=0; i--) { if(rawMonthly[name][i] !== null) { lastActiveIndex = i; break; } }
@@ -2116,7 +2129,6 @@
                     }
                 });
 
-                // 3. Build Chart Data (Monthly vs Cumulative)
                 const cData = Array.from({ length: 12 }, (_, i) => ({ name: `M${i + 1}` }));
                 
                 topNPDNames.forEach(name => {
@@ -2131,7 +2143,6 @@
                     }
                 });
 
-                // 4. Calculate Business Insights
                 let fastestStarter = { name: '-', val: 0 };
                 let topSustainer = { name: '-', val: -Infinity, m1: 0, m3: 0 }; 
 
@@ -2171,7 +2182,6 @@
                     </div>
 
                     <div className="flex flex-col xl:flex-row gap-6 h-full">
-                        {/* Left: Chart Area */}
                         <div className="flex-1 min-h-[250px] xl:min-h-[280px]">
                             {(chartData || []).length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
@@ -2193,7 +2203,6 @@
                             ) : <div className="h-full flex flex-col items-center justify-center text-[#86868b] font-medium">No trajectory data</div>}
                         </div>
 
-                        {/* Right: Insights Panel */}
                         {insights && (
                             <div className="flex-shrink-0 w-full xl:w-[280px] bg-[#f5f5f7]/60 rounded-xl p-4 border border-black/5 flex flex-col gap-3.5">
                                 <h4 className="text-xs font-bold text-[#86868b] uppercase tracking-wider mb-1">Trajectory Insights</h4>
@@ -2240,9 +2249,9 @@
                     </div>
                 </div>
             );
-        };
+        });
 
-        const TopCustomersWidget = ({ topCustomers, uniqueCustomersCount, customerSearch, setCustomerSearch, topCustomerSortMode, setTopCustomerSortMode, kpi, topCustomerDrillDown, setTopCustomerDrillDown }) => (
+        const TopCustomersWidget = memo(({ topCustomers, uniqueCustomersCount, customerSearch, setCustomerSearch, topCustomerSortMode, setTopCustomerSortMode, kpi, topCustomerDrillDown, setTopCustomerDrillDown }) => (
             <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                     <div className="flex items-center gap-3">
@@ -2310,11 +2319,12 @@
                     </table>
                 </div>
             </div>
-        );
+        ));
 
-        const ProductPresenceWidget = ({ filteredData }) => {
+        const ProductPresenceWidget = memo(({ filteredData }) => {
             const [breadcrumbs, setBreadcrumbs] = useState([]);
             const [search, setSearch] = useState('');
+            const deferredSearch = useDeferredValue(search);
 
             const base2026 = useMemo(() => (filteredData || []).filter(d => d.Year === '2026'), [filteredData]);
             useEffect(() => { setBreadcrumbs([]); setSearch(''); }, [filteredData]);
@@ -2367,9 +2377,9 @@
             const { list, detail, totalLocations } = useMemo(() => {
                 if (!rawData.rawList) return { list: null, detail: rawData.detail, totalLocations: rawData.totalLocations };
                 let arr = [...rawData.rawList].sort((a, b) => b.sales - a.sales);
-                if (search) arr = arr.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
+                if (deferredSearch) arr = arr.filter(item => item.name.toLowerCase().includes(deferredSearch.toLowerCase()));
                 return { list: arr, detail: rawData.detail, totalLocations: rawData.totalLocations };
-            }, [rawData, search]);
+            }, [rawData, deferredSearch]);
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04]">
@@ -2431,7 +2441,6 @@
                         </div>
                     )}
                     
-                    {/* --- 2. Locations Breakdown UI --- */}
                     {detail && detail.channels && Object.keys(detail.channels).length > 0 && (
                         <div className="mt-6 pt-6 border-t border-black/5 animate-in fade-in duration-500">
                             <h4 className="text-sm font-bold text-[#1d1d1f] mb-4 flex items-center gap-2">
@@ -2461,9 +2470,9 @@
                     )}
                 </div>
             );
-        };
+        });
 
-        const WhiteSpaceWidget = ({ filteredData, debouncedSearch, searchStr, setSearchStr }) => {
+        const WhiteSpaceWidget = memo(({ filteredData, debouncedSearch, searchStr, setSearchStr }) => {
             const [selectedGap, setSelectedGap] = useState(null);
             const [isCopied, setIsCopied] = useState(false);
             const [subGroupFilter, setSubGroupFilter] = useState('All');
@@ -2476,8 +2485,7 @@
                 return Array.from(groups).sort();
             }, [filteredData]);
             
-            // --- 1. Clipboard Copy Logic (iframe safe) ---
-            const handleCopy = () => {
+            const handleCopy = useCallback(() => {
                 if (!selectedGap?.missed) return;
                 const textToCopy = `Target List for ${selectedGap.sku} in ${selectedGap.subCh}:\n\n` + selectedGap.missed.join('\n');
                 
@@ -2495,7 +2503,7 @@
                     console.error('Copy failed', error);
                 }
                 textArea.remove();
-            };
+            }, [selectedGap]);
             
             const grid = useMemo(() => {
                 let base2026 = (filteredData || []).filter(d => d.Year === '2026');
@@ -2589,7 +2597,6 @@
                         </table>
                     </div>
                     
-                    {/* --- 1. Target List Modal UI --- */}
                     {selectedGap && (
                         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={(e) => {if(e.target === e.currentTarget) setSelectedGap(null);}}>
                             <div className="bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 flex flex-col max-h-[85vh]">
@@ -2602,7 +2609,6 @@
                                     <button onClick={() => setSelectedGap(null)} className="text-[#86868b] hover:text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] p-1.5 rounded-full transition-colors"><X className="w-4 h-4" /></button>
                                 </div>
                                 <div className="p-5 overflow-y-auto custom-scrollbar flex-1 bg-white flex flex-col gap-5">
-                                    {/* Target List Section */}
                                     <div>
                                         <div className="text-xs font-bold text-[#1d1d1f] mb-3 flex items-center gap-2">
                                             <Users className="w-4 h-4 text-[#86868b]" /> {selectedGap.missed.length} Missed Customers
@@ -2630,10 +2636,14 @@
                     )}
                 </div>
             );
-        };
+        });
 
+        // --- Main Dashboard Component ---
         function Dashboard() {
             const [activeTab, setActiveTab] = useState('Overview');
+            const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+            const [isPending, startTransition] = useTransition();
+
             const tabs = [
                 { id: 'Overview', label: 'Executive Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
                 { id: 'Core', label: 'Core Portfolio & Health', icon: <Package className="w-4 h-4" /> },
@@ -2655,16 +2665,16 @@
             const [whiteSpaceSearch, setWhiteSpaceSearch] = useState('');
             const [customerSearch, setCustomerSearch] = useState('');
 
-            const debouncedTopPerfSearch = useDebounce(topPerfSearch, 300);
-            const debouncedWhiteSpaceSearch = useDebounce(whiteSpaceSearch, 300);
-            const debouncedCustomerSearch = useDebounce(customerSearch, 300);
+            const debouncedTopPerfSearch = useDeferredValue(topPerfSearch);
+            const debouncedWhiteSpaceSearch = useDeferredValue(whiteSpaceSearch);
+            const debouncedCustomerSearch = useDeferredValue(customerSearch);
             
             const [topPerfSortMode, setTopPerfSortMode] = useState('sales');
             const [topCustomerSortMode, setTopCustomerSortMode] = useState('sales');
 
             const [filterSubProduct, setFilterSubProduct] = useState('All');
             const [filterChannel, setFilterChannel] = useState('All');
-            const [filterMonth, setFilterMonth] = useState('All');
+            const [filterMonth, setFilterMonth] = useState(MONTHS_LIST); // Initialize with all months
             
             const [topPerfDrillDown, setTopPerfDrillDown] = useState(null);
             const [topCustomerDrillDown, setTopCustomerDrillDown] = useState(null);
@@ -2681,7 +2691,7 @@
             });
             const [uploadTab, setUploadTab] = useState('DACARE');
 
-            const syncAllData = async () => {
+            const syncAllData = useCallback(async () => {
                 if (isSyncing) return;
                 setIsSyncing(true);
                 setShowUpload(true);
@@ -2694,7 +2704,6 @@
 
                 let finalSales = [], finalBudgetChannel = [], finalBudgetProduct = [];
 
-                // 1. Group unique URLs to prevent redundant fetching and looping (Optimization)
                 const urlTasks = { s25: {}, s26: {}, bCh: {}, bPr: {} };
                 Object.entries(DATA_SOURCES).forEach(([groupName, sources]) => {
                     if (sources.s25) { urlTasks.s25[sources.s25] = urlTasks.s25[sources.s25] || []; urlTasks.s25[sources.s25].push(groupName); }
@@ -2703,7 +2712,6 @@
                     if (sources.bPr) { urlTasks.bPr[sources.bPr] = urlTasks.bPr[sources.bPr] || []; urlTasks.bPr[sources.bPr].push(groupName); }
                 });
 
-                // 2. Process each unique URL exactly once (Single-Pass Process)
                 const fetchAndProcess = async (url, targetGroups, type) => {
                     try {
                         const rawData = await fetchCSV(url);
@@ -2714,7 +2722,6 @@
                             const rawGrp = row['Product Group'] || row['ProductGroup'];
                             const groupName = rawGrp ? rawGrp.toUpperCase().trim() : '';
 
-                            // Process only if the row belongs to one of the groups that needs this URL
                             if (!targetGroups.includes(groupName)) continue; 
 
                             if (type === 's25' || type === 's26') {
@@ -2759,7 +2766,6 @@
                             }
                         }
 
-                        // Batch update status for all groups sharing this URL
                         setFilesStatus(prev => {
                             const next = { ...prev };
                             targetGroups.forEach(g => { next[g] = { ...next[g], [type]: 'success' }; });
@@ -2784,28 +2790,37 @@
 
                 await Promise.all(promises);
 
-                setSalesData(finalSales);
-                setBudgetChannel(finalBudgetChannel);
-                setBudgetProduct(finalBudgetProduct);
+                startTransition(() => {
+                    setSalesData(finalSales);
+                    setBudgetChannel(finalBudgetChannel);
+                    setBudgetProduct(finalBudgetProduct);
+                });
                 setIsSyncing(false);
                 setTimeout(() => setShowUpload(false), 1200);
-            };
+            }, [isSyncing, filesStatus]);
 
+            // ป้องกันการ Sync ซ้ำ (Infinite Loop) โดยกำหนดให้ทำงานแค่ครั้งเดียวตอนโหลดหน้าเว็บ
             useEffect(() => { syncAllData(); }, []);
 
-            const toggleGroup = (group) => {
-                if (group === 'ALL') setSelectedGroups(['ALL']);
-                else {
-                    let newGroups = selectedGroups.filter(g => g !== 'ALL');
-                    if (newGroups.includes(group)) {
-                        newGroups = newGroups.filter(g => g !== group);
-                        if (newGroups.length === 0) newGroups = ['ALL'];
-                    } else newGroups.push(group);
-                    newGroups.sort((a, b) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b));
-                    setSelectedGroups(newGroups);
-                }
-                setFilterSubProduct('All');
-            };
+            const toggleGroup = useCallback((group) => {
+                startTransition(() => {
+                    if (group === 'ALL') setSelectedGroups(['ALL']);
+                    else {
+                        let newGroups = selectedGroups.filter(g => g !== 'ALL');
+                        if (newGroups.includes(group)) {
+                            newGroups = newGroups.filter(g => g !== group);
+                            if (newGroups.length === 0) newGroups = ['ALL'];
+                        } else newGroups.push(group);
+                        newGroups.sort((a, b) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b));
+                        setSelectedGroups(newGroups);
+                    }
+                    setFilterSubProduct('All');
+                });
+            }, [selectedGroups]);
+
+            const handleFilterChange = useCallback((setter) => (val) => {
+                startTransition(() => setter(val));
+            }, []);
 
             const availableSubProducts = useMemo(() => {
                 const base = selectedGroups.includes('ALL') ? salesData : salesData.filter(d => selectedGroups.includes(d.ProductGroup));
@@ -2829,36 +2844,54 @@
                 return Object.entries(channelSalesMap).sort((a, b) => b[1] - a[1]).map(item => item[0]);
             }, [salesData, selectedGroups]);
 
-            const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const isAllMonthsSelected = useMemo(() => filterMonth.length === MONTHS_LIST.length, [filterMonth]);
 
             const filteredData = useMemo(() => {
                 return salesData.filter(d => {
                     const matchGroup = selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup);
                     const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
                     const matchChannel = filterChannel === 'All' || d.Channel === filterChannel;
-                    const matchMonth = filterMonth === 'All' || (d.Month && d.Month.startsWith(filterMonth));
+                    
+                    let matchMonth = true;
+                    if (!isAllMonthsSelected) {
+                        const mStr = d.Month ? d.Month.substring(0, 3) : null;
+                        matchMonth = filterMonth.includes(mStr);
+                    }
+
                     return matchGroup && matchSub && matchChannel && matchMonth;
                 });
-            }, [salesData, selectedGroups, filterSubProduct, filterChannel, filterMonth]);
+            }, [salesData, selectedGroups, filterSubProduct, filterChannel, filterMonth, isAllMonthsSelected]);
 
             const kpi = useMemo(() => {
-                const filterFn = (d) => {
+                const valid2026MonthsData = salesData.filter(d => d.Year === '2026' && (isAllMonthsSelected || filterMonth.includes(d.Month?.substring(0,3))));
+                const valid2026Months = new Set(valid2026MonthsData.map(d => d.Month?.split('-')[0])); 
+                const monthsCount26 = valid2026Months.size || 1; 
+                
+                const data2026 = filteredData.filter(d => d.Year === '2026');
+                const s26 = data2026.reduce((a, b) => a + (b.NetPrice || 0), 0);
+                
+                // For YoY, we must only compare the exact months selected and present in 2026
+                const filterFn25 = (d) => {
                     const matchGroup = selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup);
                     const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
                     const matchChannel = filterChannel === 'All' || d.Channel === filterChannel;
-                    const matchMonth = filterMonth === 'All' || (d.Month && d.Month.startsWith(filterMonth));
+                    // Only sum 2025 months if they are selected in filter AND exist in the 2026 valid months
+                    const mStr = d.Month ? d.Month.substring(0, 3) : null;
+                    const matchMonth = (isAllMonthsSelected || filterMonth.includes(mStr)) && valid2026Months.has(mStr);
                     return matchGroup && matchSub && matchChannel && matchMonth;
                 };
+
+                const data2025_filtered = salesData.filter(d => d.Year === '2025' && filterFn25(d));
+                const s25_YTD = data2025_filtered.reduce((a, b) => a + (b.NetPrice || 0), 0);
                 
-                const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0])); 
-                const monthsCount26 = valid2026Months.size || 1; // ส่งค่าให้ Dynamic Projection
-                
-                const data2026 = salesData.filter(d => d.Year === '2026' && filterFn(d));
-                const s26 = data2026.reduce((a, b) => a + (b.NetPrice || 0), 0);
-                
-                const data2025 = salesData.filter(d => d.Year === '2025' && filterFn(d));
-                const fy25 = data2025.reduce((a, b) => a + (b.NetPrice || 0), 0);
-                const s25_YTD = data2025.filter(d => valid2026Months.has(d.Month?.split('-')[0])).reduce((a, b) => a + (b.NetPrice || 0), 0);
+                // Full FY25 base for Dynamic Projection (might need all months for seasonality calc, keeping original logic for FY25)
+                const fy25FilterFn = (d) => {
+                     const matchGroup = selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup);
+                    const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
+                    const matchChannel = filterChannel === 'All' || d.Channel === filterChannel;
+                    return matchGroup && matchSub && matchChannel;
+                }
+                const fy25 = salesData.filter(d => d.Year === '2025' && fy25FilterFn(d)).reduce((a, b) => a + (b.NetPrice || 0), 0);
                 
                 const growthYoY = s25_YTD > 0 ? ((s26 - s25_YTD) / s25_YTD) * 100 : 0;
 
@@ -2874,33 +2907,30 @@
                 const target26 = relevantBudgets.length ? relevantBudgets.reduce((a,b) => a + (b.Target2026 || 0), 0) : null;
                 const plan27 = relevantBudgets.length ? relevantBudgets.reduce((a,b) => a + (b.Plan2027 || 0), 0) : null;
                 
-                // --- Inject Dynamic Projection Logic ---
                 const { forecast26, forecastStatus } = calculateDynamicForecast(s26, s25_YTD, fy25, target26, monthsCount26);
 
                 const progress = (target26 && target26 > 0) ? (s26 / target26) * 100 : 0;
                 const growthPlan = (target26 && plan27 && target26 > 0) ? ((plan27 - target26) / target26) * 100 : 0;
 
-                return { s26, s25_YTD, growthYoY, target26, forecast26, forecastStatus, plan27, progress, growthPlan, monthsCount26 }; // Export monthsCount26 for Insight math
-            }, [salesData, budgetChannel, budgetProduct, selectedGroups, filterSubProduct, filterChannel, filterMonth]);
+                return { s26, s25_YTD, growthYoY, target26, forecast26, forecastStatus, plan27, progress, growthPlan, monthsCount26 }; 
+            }, [filteredData, salesData, budgetChannel, budgetProduct, selectedGroups, filterSubProduct, filterChannel]);
 
             const trendChartData = useMemo(() => {
                 const base2025 = filteredData.filter(d => d.Year === '2025');
                 const base2026 = filteredData.filter(d => d.Year === '2026');
                 
-                // 1. Find the latest month with valid 2026 data
                 let latestMonthIdx = -1;
-                const monthlyData26 = monthsList.map((m, idx) => {
+                const monthlyData26 = MONTHS_LIST.map((m, idx) => {
                     const dataForMonth = base2026.filter(d => d.Month && d.Month.startsWith(m));
                     const val = dataForMonth.reduce((s, r) => s + (r.NetPrice || 0), 0);
                     if (val > 0) latestMonthIdx = idx;
                     return { name: m, val, data: dataForMonth };
                 });
 
-                // 2. Generate insights for the latest month
                 let latestMonthInsights = null;
                 if (latestMonthIdx >= 0) {
                     const latestData26 = monthlyData26[latestMonthIdx].data;
-                    const latestData25 = base2025.filter(d => d.Month && d.Month.startsWith(monthsList[latestMonthIdx]));
+                    const latestData25 = base2025.filter(d => d.Month && d.Month.startsWith(MONTHS_LIST[latestMonthIdx]));
                     
                     const prodMap26 = {};
                     const prodMap25 = {};
@@ -2936,38 +2966,41 @@
                     };
 
                     latestMonthInsights = {
-                        month: monthsList[latestMonthIdx],
+                        month: MONTHS_LIST[latestMonthIdx],
                         topProducts: formatTop(prodMap26, prodMap25, totalMonthSales),
                         topChannels: formatTop(chMap26, chMap25, totalMonthSales),
                         sales: totalMonthSales
                     };
                 }
 
-                // 3. Setup Projection Logic
                 const fy25Total = base2025.reduce((s, r) => s + (r.NetPrice || 0), 0);
                 const validMonthsCount = latestMonthIdx + 1;
                 const ytd26 = monthlyData26.slice(0, validMonthsCount).reduce((s, m) => s + m.val, 0);
                 
                 let isSeasonality = false;
                 let ytd25 = 0;
-                const monthly25Sales = monthsList.map(m => {
+                const monthly25Sales = MONTHS_LIST.map(m => {
                     return base2025.filter(d => d.Month && d.Month.startsWith(m)).reduce((s, r) => s + (r.NetPrice || 0), 0);
                 });
                 
                 ytd25 = monthly25Sales.slice(0, validMonthsCount).reduce((s, v) => s + v, 0);
                 if (ytd25 > 0 && fy25Total > 0) isSeasonality = true;
 
-                const runRate = validMonthsCount > 0 ? (ytd26 / validMonthsCount) : 0;
+                // Adjust runrate calculation to only count selected months
+                const activeSelectedMonthsCount = filterMonth.filter(m => {
+                    const mIdx = MONTHS_LIST.indexOf(m);
+                    return mIdx !== -1 && mIdx <= latestMonthIdx;
+                }).length || 1;
 
-                // 4. Map into chart data format
-                return monthsList.map((m, idx) => {
+                const runRate = activeSelectedMonthsCount > 0 ? (ytd26 / activeSelectedMonthsCount) : 0;
+
+                return MONTHS_LIST.map((m, idx) => {
                     const sales25 = monthly25Sales[idx] === 0 ? null : monthly25Sales[idx];
                     let sales26 = null;
                     let proj26 = null;
 
                     if (idx <= latestMonthIdx) {
                         sales26 = monthlyData26[idx].val === 0 ? null : monthlyData26[idx].val;
-                        // Bridge the projection line so it connects seamlessly
                         if (idx === latestMonthIdx) proj26 = sales26;
                     } else {
                         if (isSeasonality && ytd25 > 0) {
@@ -2978,15 +3011,12 @@
                     }
 
                     return { 
-                        name: m, 
-                        sales25, 
-                        sales26, 
-                        proj26,
+                        name: m, sales25, sales26, proj26,
                         isLatest: idx === latestMonthIdx,
                         insights: idx === latestMonthIdx ? latestMonthInsights : null
                     };
                 });
-            }, [filteredData, monthsList]);
+            }, [filteredData]);
 
             const yAxisTicks = useMemo(() => {
                 const maxVal = (trendChartData || []).reduce((max, d) => Math.max(max, d.sales25 || 0, d.sales26 || 0, d.proj26 || 0), 0);
@@ -3011,7 +3041,10 @@
 
             const rawTopPerformers = useMemo(() => {
                 const skuMap = {};
-                const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
+                // Only consider months valid in 2026 AND selected in the filter
+                const valid2026MonthsData = salesData.filter(d => d.Year === '2026' && (isAllMonthsSelected || filterMonth.includes(d.Month?.substring(0,3))));
+                const valid2026Months = new Set(valid2026MonthsData.map(d => d.Month?.split('-')[0]));
+
                 filteredData.forEach(d => {
                     const key = d.GroupSKU || 'Unknown';
                     if (!skuMap[key]) skuMap[key] = { totalSales26: 0, totalSales25: 0, products: {}, channels: {} };
@@ -3025,7 +3058,7 @@
                         skuMap[key].products[pName].channels[channelName] = (skuMap[key].products[pName].channels[channelName] || 0) + (d.NetPrice || 0);
                     } else if (d.Year === '2025') {
                         const monthPrefix = d.Month ? d.Month.split('-')[0] : '';
-                        if (filterMonth !== 'All' || valid2026Months.has(monthPrefix)) {
+                        if (valid2026Months.has(monthPrefix)) {
                             skuMap[key].totalSales25 += (d.NetPrice || 0);
                             const pName = d.ProductName || 'Unknown';
                             if (!skuMap[key].products[pName]) skuMap[key].products[pName] = { val26: 0, val25: 0, channels: {} };
@@ -3048,7 +3081,10 @@
 
             const rawTopCustomers = useMemo(() => {
                 const customerMap = {};
-                const valid2026Months = new Set(salesData.filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0]));
+                // Only consider months valid in 2026 AND selected in the filter
+                const valid2026MonthsData = salesData.filter(d => d.Year === '2026' && (isAllMonthsSelected || filterMonth.includes(d.Month?.substring(0,3))));
+                const valid2026Months = new Set(valid2026MonthsData.map(d => d.Month?.split('-')[0]));
+
                 filteredData.forEach(d => {
                     const customerName = ['MT', 'ONLINE'].includes(d.Channel?.toUpperCase() || '') ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
                     const key = `${customerName}|${d.Channel || 'Unknown'}`;
@@ -3064,7 +3100,7 @@
                         customerMap[key].productDetails[pName].val26 += (d.NetPrice || 0);
                     } else if (d.Year === '2025') {
                         const monthPrefix = d.Month ? d.Month.split('-')[0] : '';
-                        if (filterMonth !== 'All' || valid2026Months.has(monthPrefix)) {
+                        if (valid2026Months.has(monthPrefix)) {
                             customerMap[key].totalSales25 += (d.NetPrice || 0);
                             customerMap[key].productDetails[pName].val25 += (d.NetPrice || 0);
                         }
@@ -3095,12 +3131,11 @@
 
             const npdData = useMemo(() => {
                 const productStats = {};
-                const monthMap = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
                 
                 salesData.forEach(d => {
                     const m = d.Month ? d.Month.substring(0, 3) : null;
                     if (!m || !d.ProductName) return;
-                    const mIdx = monthMap[m];
+                    const mIdx = MONTH_MAP[m];
                     if (mIdx === undefined) return;
                     const absMonth = (parseInt(d.Year) - 2025) * 12 + mIdx;
                     if (!productStats[d.ProductName]) productStats[d.ProductName] = { firstAbsMonth: absMonth };
@@ -3130,109 +3165,171 @@
             }, [salesData, filteredData, kpi.s26]);
 
             return (
-                <div className="min-h-screen pb-10 w-full relative">
-                    <header className="bg-white/85 backdrop-blur-xl border-b border-black/5 sticky top-0 z-30 shadow-[0_1px_10px_rgba(0,0,0,0.02)]">
-                        <div className="w-full px-6 py-3.5 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 min-h-[4rem]">
-                            <div className="flex items-center gap-3 shrink-0">
-                                <div className="bg-[#0071e3] p-1.5 rounded-lg shadow-sm">
-                                    <Activity className="w-5 h-5 text-white" />
+                <div className="flex h-screen bg-[#f5f5f7] w-full font-sans overflow-hidden text-[#1d1d1f]">
+                    {/* --- Left Sidebar --- */}
+                    <aside className={`w-[280px] bg-white/95 backdrop-blur-xl border-r border-black/5 flex flex-col justify-between shrink-0 z-40 shadow-[4px_0_24px_rgba(0,0,0,0.02)] relative transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0 ml-0' : '-translate-x-full -ml-[280px]'}`}>
+                        <div className="flex flex-col h-full">
+                            {/* Sidebar Header / Logo */}
+                            <div className="p-6 border-b border-black/5">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-[#0071e3] p-2.5 rounded-xl shadow-[0_2px_8px_rgba(0,113,227,0.3)]">
+                                        <Activity className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-sm font-extrabold text-[#1d1d1f] leading-tight tracking-tight">NPD Performance</h1>
+                                        <p className="text-[11px] text-[#0071e3] font-bold tracking-wider uppercase mt-0.5">Dashboard 2026</p>
+                                    </div>
                                 </div>
-                                <h1 className="text-[19px] font-semibold tracking-tight text-[#1d1d1f]">Non-paper Performance Dashboard <span className="text-[#0071e3] font-bold">2026</span></h1>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto justify-start xl:justify-end">
-                                <div className="flex flex-wrap bg-[#e3e3e8] rounded-xl p-1 gap-1">
+
+                            {/* Sidebar Navigation */}
+                            <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-2 custom-scrollbar">
+                                <div className="text-[10px] font-extrabold text-[#86868b] uppercase tracking-wider mb-4 px-2">Main Menu</div>
+                                {tabs.map(tab => {
+                                    const isActive = activeTab === tab.id;
+                                    return (
+                                        <button 
+                                            key={tab.id} 
+                                            onClick={() => setActiveTab(tab.id)} 
+                                            className={`w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-semibold rounded-[14px] transition-all duration-200 group relative overflow-hidden ${isActive ? 'text-[#0071e3] bg-[#0071e3]/10 shadow-sm' : 'text-[#86868b] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]'}`}
+                                        >
+                                            {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1/2 bg-[#0071e3] rounded-r-full"></div>}
+                                            {React.cloneElement(tab.icon, { className: `w-5 h-5 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}` })}
+                                            {tab.label}
+                                        </button>
+                                    );
+                                })}
+                            </nav>
+
+                            {/* Sidebar Footer / Action */}
+                            <div className="p-5 border-t border-black/5 bg-[#f5f5f7]/50 flex flex-col gap-3">
+                                <button 
+                                    onClick={() => syncAllData()} 
+                                    disabled={isSyncing} 
+                                    className={`w-full flex justify-center items-center gap-2 text-white px-5 py-3.5 rounded-[14px] text-sm font-bold transition-all shadow-md group ${isSyncing ? 'bg-[#0071e3]/70 cursor-not-allowed' : 'bg-[#1d1d1f] hover:bg-black active:scale-95'}`}
+                                >
+                                    <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} /> 
+                                    {isSyncing ? 'Syncing Data...' : 'Sync Data'}
+                                </button>
+                                <div className="text-center text-[10px] text-[#86868b] font-medium">Developed by NPD Team<br/>v1.5.0 (Sidebar Layout)</div>
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* --- Main Content Area --- */}
+                    <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#f5f5f7] relative">
+                        {/* Sticky Top Header */}
+                        <header className="bg-white/85 backdrop-blur-xl border-b border-black/5 sticky top-0 z-30 shadow-[0_4px_24px_rgba(0,0,0,0.02)] shrink-0 transition-opacity duration-300">
+                            {/* Top Row: Active Tab Title & Global Group Filters */}
+                            <div className="px-8 py-5 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-5 min-h-[5rem]">
+                                <div className="flex items-center gap-4">
+                                    <button 
+                                        onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+                                        className="p-2 hover:bg-[#e8e8ed] rounded-xl transition-colors text-[#86868b] hover:text-[#1d1d1f]"
+                                        title="Toggle Sidebar"
+                                    >
+                                        <Menu className="w-5 h-5" />
+                                    </button>
+                                    <h2 className="text-[22px] font-extrabold text-[#1d1d1f] tracking-tight flex items-center gap-3">
+                                        <div className="bg-[#f5f5f7] p-2 rounded-xl text-[#1d1d1f]">
+                                            {React.cloneElement(tabs.find(t => t.id === activeTab)?.icon, { className: 'w-6 h-6' })}
+                                        </div>
+                                        {tabs.find(t => t.id === activeTab)?.label}
+                                    </h2>
+                                </div>
+                                
+                                <div className="flex flex-wrap bg-[#e3e3e8] rounded-[14px] p-1.5 gap-1.5 shadow-inner">
                                     {['ALL', ...GROUP_ORDER].map(group => (
-                                        <button key={group} onClick={() => toggleGroup(group)} className={`px-4 py-1.5 text-sm font-medium rounded-[8px] transition-all ${selectedGroups.includes(group) ? 'bg-white text-[#1d1d1f] shadow-[0_1px_4px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f]'}`}>
+                                        <button 
+                                            key={group} 
+                                            onClick={() => toggleGroup(group)} 
+                                            className={`px-4 py-2 text-xs font-bold rounded-[10px] transition-all ${selectedGroups.includes(group) ? 'bg-white text-[#1d1d1f] shadow-[0_2px_8px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-black/5'}`}
+                                        >
                                             {group}
                                         </button>
                                     ))}
                                 </div>
-                                <button onClick={() => syncAllData()} disabled={isSyncing} className={`flex items-center gap-2 text-white px-5 py-2 rounded-full text-sm font-semibold transition-all shrink-0 shadow-sm hover:shadow-md ${isSyncing ? 'bg-[#0071e3]/70 cursor-not-allowed' : 'bg-[#0071e3] hover:bg-[#0077ED] active:scale-95'}`}>
-                                    <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} /> <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
-                                </button>
                             </div>
-                        </div>
-                        <div className="bg-white/50 border-t border-black/5 py-3 relative z-40">
-                            <div className="w-full px-6 flex flex-wrap gap-4 items-center">
-                                <span className="text-sm font-semibold text-[#86868b] flex items-center gap-2 tracking-wide"><Filter className="w-4 h-4" /> FILTERS:</span>
-                                <FilterDropdown label="Product" value={filterSubProduct} options={[{val: 'All', group: null}, ...availableSubProducts]} onChange={setFilterSubProduct} icon={<ShoppingBag />} />
-                                <FilterDropdown label="Channel" value={filterChannel} options={['All', ...availableChannels]} onChange={setFilterChannel} icon={<Users />} />
-                                <FilterDropdown label="Month" value={filterMonth} options={['All', ...monthsList]} onChange={setFilterMonth} icon={<Calendar />} />
-                                {(filterSubProduct !== 'All' || filterChannel !== 'All' || filterMonth !== 'All' || !selectedGroups.includes('ALL')) && (
-                                    <button onClick={() => { setSelectedGroups(['ALL']); setFilterSubProduct('All'); setFilterChannel('All'); setFilterMonth('All'); }} className="text-sm text-[#ff3b30] hover:text-white font-medium ml-auto flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#ff3b30]/10 hover:bg-[#ff3b30] transition-colors">
-                                        <X className="w-4 h-4" /> Clear All
+
+                            {/* Bottom Row: Granular Filters */}
+                            <div className={`bg-[#f5f5f7]/60 border-t border-black/5 py-3.5 px-8 flex flex-wrap gap-4 items-center transition-opacity duration-300 ${isPending ? 'opacity-50' : 'opacity-100'}`}>
+                                <span className="text-xs font-extrabold text-[#86868b] flex items-center gap-1.5 tracking-wider mr-2">
+                                    <Filter className="w-4 h-4" /> FILTERS:
+                                </span>
+                                <FilterDropdown label="Product" value={filterSubProduct} options={[{val: 'All', group: null}, ...availableSubProducts]} onChange={handleFilterChange(setFilterSubProduct)} icon={<ShoppingBag />} />
+                                <FilterDropdown label="Channel" value={filterChannel} options={['All', ...availableChannels]} onChange={handleFilterChange(setFilterChannel)} icon={<Users />} />
+                                <MultiSelectDropdown label="Month" selectedValues={filterMonth} options={MONTHS_LIST} onChange={handleFilterChange(setFilterMonth)} icon={<Calendar />} />
+                                
+                                {(filterSubProduct !== 'All' || filterChannel !== 'All' || !isAllMonthsSelected || !selectedGroups.includes('ALL')) && (
+                                    <button 
+                                        onClick={() => startTransition(() => { setSelectedGroups(['ALL']); setFilterSubProduct('All'); setFilterChannel('All'); setFilterMonth(MONTHS_LIST); })} 
+                                        className="text-xs text-[#ff3b30] hover:text-white font-bold ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#ff3b30]/10 hover:bg-[#ff3b30] transition-colors shadow-sm"
+                                    >
+                                        <X className="w-3.5 h-3.5" /> Clear All Filters
                                     </button>
                                 )}
                             </div>
-                        </div>
-                        <div className="bg-[#f5f5f7] px-6 py-2 border-t border-black/5 flex overflow-x-auto custom-scrollbar shadow-inner relative z-30">
-                            <div className="flex bg-[#e3e3e8] p-1 rounded-xl w-max gap-1">
-                                {tabs.map(tab => (
-                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-[10px] transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-[#1d1d1f] shadow-[0_1px_3px_rgba(0,0,0,0.1)]' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-black/5'}`}>
-                                        {tab.icon} {tab.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </header>
+                        </header>
 
-                    <main className="w-full px-6 py-8 max-w-[1920px] mx-auto overflow-hidden">
-                        {activeTab === 'Overview' && (
-                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-                                    <SafeWidget><PortfolioSummaryWidget selectedGroups={selectedGroups} toggleGroup={toggleGroup} /></SafeWidget>
-                                    <SafeWidget><KPIYTDWidget kpi={kpi} /></SafeWidget>
-                                    <SafeWidget><KPITargetWidget kpi={kpi} /></SafeWidget>
-                                    <SafeWidget><KPIForecastWidget kpi={kpi} showForecast={showForecast} setShowForecast={setShowForecast} /></SafeWidget>
-                                    <SafeWidget><KPIPlanWidget kpi={kpi} /></SafeWidget>
-                                </div>
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    <SafeWidget><TrendChartWidget trendChartData={trendChartData} selectedGroups={selectedGroups} show2025Trend={show2025Trend} setShow2025Trend={setShow2025Trend} yAxisTicks={yAxisTicks} /></SafeWidget>
-                                    <SafeWidget><ChannelMixWidget channelMix={channelMix} kpi={kpi} /></SafeWidget>
-                                </div>
+                        {/* Scrollable Dashboard Content */}
+                        <main className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-8">
+                            <div className={`transition-opacity duration-300 w-full max-w-[1600px] mx-auto ${isPending ? 'opacity-40' : 'opacity-100'}`}>
+                                {activeTab === 'Overview' && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+                                            <SafeWidget><PortfolioSummaryWidget selectedGroups={selectedGroups} toggleGroup={toggleGroup} /></SafeWidget>
+                                            <SafeWidget><KPIYTDWidget kpi={kpi} /></SafeWidget>
+                                            <SafeWidget><KPITargetWidget kpi={kpi} /></SafeWidget>
+                                            <SafeWidget><KPIForecastWidget kpi={kpi} showForecast={showForecast} setShowForecast={setShowForecast} /></SafeWidget>
+                                            <SafeWidget><KPIPlanWidget kpi={kpi} /></SafeWidget>
+                                        </div>
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                            <SafeWidget><TrendChartWidget trendChartData={trendChartData} show2025Trend={show2025Trend} setShow2025Trend={setShow2025Trend} yAxisTicks={yAxisTicks} /></SafeWidget>
+                                            <SafeWidget><ChannelMixWidget channelMix={channelMix} kpi={kpi} /></SafeWidget>
+                                        </div>
+                                        <SafeWidget><SubProductAnalysisWidget filteredData={filteredData} salesData={salesData} monthsList={MONTHS_LIST} /></SafeWidget>
+                                        <SafeWidget><NewAcquisitionWidget filteredData={filteredData} /></SafeWidget>
+                                        <SafeWidget><ExecutiveSummaryWidget kpi={kpi} /></SafeWidget>
+                                    </div>
+                                )}
+
+                                {activeTab === 'Core' && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
+                                        <div className="grid grid-cols-1 gap-6">
+                                            <SafeWidget><PortfolioMixWidget filteredData={filteredData} monthsList={MONTHS_LIST} /></SafeWidget>
+                                        </div>
+                                        <SafeWidget><ProductProfitabilityWidget filteredData={filteredData} /></SafeWidget>
+                                        <SafeWidget><TopPerformersWidget topPerformers={topPerformers} topPerfDrillDown={topPerfDrillDown} setTopPerfDrillDown={setTopPerfDrillDown} topPerfSearch={topPerfSearch} setTopPerfSearch={setTopPerfSearch} topPerfSortMode={topPerfSortMode} setTopPerfSortMode={setTopPerfSortMode} kpi={kpi} /></SafeWidget>
+                                        <SafeWidget><SkuHealthWidget filteredData={filteredData} /></SafeWidget>
+                                    </div>
+                                )}
+
+                                {activeTab === 'Innovation' && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                            <SafeWidget><NPDVitalityWidget npdData={npdData} kpi={kpi} /></SafeWidget>
+                                            <SafeWidget><TopNPDWidget npdData={npdData} /></SafeWidget>
+                                            <SafeWidget><NPDTrajectoryWidget salesData={salesData} npdData={npdData} /></SafeWidget>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'Distribution' && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
+                                        <SafeWidget><TopCustomersWidget topCustomers={topCustomers} uniqueCustomersCount={uniqueCustomersCount} customerSearch={customerSearch} setCustomerSearch={setCustomerSearch} topCustomerSortMode={topCustomerSortMode} setTopCustomerSortMode={setTopCustomerSortMode} kpi={kpi} topCustomerDrillDown={topCustomerDrillDown} setTopCustomerDrillDown={setTopCustomerDrillDown} /></SafeWidget>
+                                        <SafeWidget><ProductPresenceWidget filteredData={filteredData} /></SafeWidget>
+                                        <SafeWidget><WhiteSpaceWidget filteredData={filteredData} searchStr={whiteSpaceSearch} setSearchStr={setWhiteSpaceSearch} debouncedSearch={debouncedWhiteSpaceSearch} /></SafeWidget>
+                                    </div>
+                                )}
                                 
-                                {/* New Deep-Dive Widget */}
-                                <SafeWidget><SubProductAnalysisWidget filteredData={filteredData} salesData={salesData} monthsList={monthsList} /></SafeWidget>
-
-                                {/* New Acquisition Widget */}
-                                <SafeWidget><NewAcquisitionWidget filteredData={filteredData} /></SafeWidget>
-
-                                {/* ย้าย Executive Summary มาด้านล่าง พร้อมระบบ Tap to view */}
-                                <SafeWidget><ExecutiveSummaryWidget kpi={kpi} /></SafeWidget>
+                                <footer className="w-full text-center mt-12 pb-4 text-[#86868b] font-medium text-sm">
+                                    NPD Performance Insights &copy; 2026
+                                </footer>
                             </div>
-                        )}
+                        </main>
+                    </div>
 
-                        {activeTab === 'Core' && (
-                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
-                                <div className="grid grid-cols-1 gap-6">
-                                    <SafeWidget><PortfolioMixWidget filteredData={filteredData} monthsList={monthsList} /></SafeWidget>
-                                </div>
-                                <SafeWidget><ProductProfitabilityWidget filteredData={filteredData} /></SafeWidget>
-                                <SafeWidget><TopPerformersWidget topPerformers={topPerformers} topPerfDrillDown={topPerfDrillDown} setTopPerfDrillDown={setTopPerfDrillDown} topPerfSearch={topPerfSearch} setTopPerfSearch={setTopPerfSearch} topPerfSortMode={topPerfSortMode} setTopPerfSortMode={setTopPerfSortMode} kpi={kpi} /></SafeWidget>
-                                <SafeWidget><SkuHealthWidget filteredData={filteredData} /></SafeWidget>
-                            </div>
-                        )}
-
-                        {activeTab === 'Innovation' && (
-                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    <SafeWidget><NPDVitalityWidget npdData={npdData} kpi={kpi} /></SafeWidget>
-                                    <SafeWidget><TopNPDWidget npdData={npdData} /></SafeWidget>
-                                    <SafeWidget><NPDTrajectoryWidget salesData={salesData} npdData={npdData} /></SafeWidget>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'Distribution' && (
-                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
-                                <SafeWidget><TopCustomersWidget topCustomers={topCustomers} uniqueCustomersCount={uniqueCustomersCount} customerSearch={customerSearch} setCustomerSearch={setCustomerSearch} topCustomerSortMode={topCustomerSortMode} setTopCustomerSortMode={setTopCustomerSortMode} kpi={kpi} topCustomerDrillDown={topCustomerDrillDown} setTopCustomerDrillDown={setTopCustomerDrillDown} /></SafeWidget>
-                                <SafeWidget><ProductPresenceWidget filteredData={filteredData} /></SafeWidget>
-                                <SafeWidget><WhiteSpaceWidget filteredData={filteredData} searchStr={whiteSpaceSearch} setSearchStr={setWhiteSpaceSearch} debouncedSearch={debouncedWhiteSpaceSearch} /></SafeWidget>
-                            </div>
-                        )}
-                        <footer className="w-full text-center pt-8 pb-4 text-[#86868b] font-medium text-sm">Developed by NPD Team - Version 1.3.1 (Safe Mode)</footer>
-                    </main>
-
+                    {/* Sync Modal Component (Unchanged logic, positioned relatively) */}
                     {showUpload && (
                         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
                             <div className="bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20">
