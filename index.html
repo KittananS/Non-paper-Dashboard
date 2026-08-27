@@ -847,7 +847,6 @@
             const [drillDownPath, setDrillDownPath] = useState(null); 
             const [activeSub, setActiveSub] = useState(null);
             const [activeSku, setActiveSku] = useState(null);
-            const [healthFilter, setHealthFilter] = useState('all');
 
             const valid2026Months = useMemo(() => new Set((salesData || []).filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0])), [salesData]);
 
@@ -867,37 +866,18 @@
                         map[key].s25 += (d.NetPrice || 0);
                     }
                 });
-                
-                const rawList = Object.values(map).map(item => {
-                    const yoy = item.s25 > 0 ? ((item.s26 - item.s25) / item.s25) * 100 : null;
-                    let status = 'unknown';
-                    if (yoy !== null) {
-                        if (yoy >= 0) status = 'healthy';
-                        else if (yoy >= -10) status = 'watch';
-                        else status = 'risk';
-                    }
-                    return { ...item, yoy, status };
-                }).sort((a, b) => b.s26 - a.s26);
-
-                const counts = { healthy: 0, watch: 0, risk: 0 };
-                rawList.forEach(i => { if (counts[i.status] !== undefined) counts[i.status]++; });
-
-                return {
-                    data: healthFilter === 'all' ? rawList : rawList.filter(i => i.status === healthFilter),
-                    counts
-                };
-            }, [filteredData, valid2026Months, drillDownPath, healthFilter]);
-
-            const totalWidgetSales = useMemo(() => {
-                return (currentList.data || []).reduce((acc, curr) => acc + (curr.s26 || 0), 0);
-            }, [currentList.data]);
+                return Object.values(map).map(item => ({
+                    ...item,
+                    yoy: item.s25 > 0 ? ((item.s26 - item.s25) / item.s25) * 100 : null
+                })).sort((a, b) => b.s26 - a.s26);
+            }, [filteredData, valid2026Months, drillDownPath]);
 
             useEffect(() => {
-                if ((currentList.data || []).length > 0) {
+                if ((currentList || []).length > 0) {
                     if (drillDownPath) {
-                        if (!activeSku || !currentList.data.find(i => i.name === activeSku)) setActiveSku(currentList.data[0].name);
+                        if (!activeSku || !currentList.find(i => i.name === activeSku)) setActiveSku(currentList[0].name);
                     } else {
-                        if (!activeSub || !currentList.data.find(i => i.name === activeSub)) setActiveSub(currentList.data[0].name);
+                        if (!activeSub || !currentList.find(i => i.name === activeSub)) setActiveSub(currentList[0].name);
                     }
                 } else {
                     if (drillDownPath) setActiveSku(null);
@@ -907,18 +887,6 @@
 
             const activeName = drillDownPath ? activeSku : activeSub;
             
-            const activeItemStats = useMemo(() => {
-                if (!activeName) return { sales: 0, yoy: null };
-                const isSkuView = !!drillDownPath;
-                const matchData = (filteredData || []).filter(d => isSkuView ? (d.GroupSKU || 'Unknown') === activeName : (d.SubProductGroup || 'Unknown') === activeName);
-                
-                const s26 = matchData.filter(d => d.Year === '2026').reduce((acc, curr) => acc + (curr.NetPrice || 0), 0);
-                const s25 = matchData.filter(d => d.Year === '2025' && valid2026Months.has(d.Month?.split('-')[0])).reduce((acc, curr) => acc + (curr.NetPrice || 0), 0);
-                const yoy = s25 > 0 ? ((s26 - s25) / s25) * 100 : null;
-
-                return { sales: s26, yoy };
-            }, [filteredData, activeName, drillDownPath, valid2026Months]);
-
             const chartData = useMemo(() => {
                 if (!activeName) return [];
                 const isSkuView = !!drillDownPath;
@@ -955,72 +923,42 @@
                             <div className="bg-[#30b0c7]/10 p-2 rounded-xl">
                                 <Layers className="w-5 h-5 text-[#30b0c7]" />
                             </div>
-                            <div className="flex items-center gap-2">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-base font-bold text-[#1d1d1f]">Executive Health Check</h3>
-                                        <span className="bg-[#f5f5f7] text-[#1d1d1f] px-2 py-0.5 rounded-md text-xs font-bold border border-black/5 shadow-sm">
-                                            Total: ฿{((totalWidgetSales || 0) / 1000000).toFixed(2)}M
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-[#86868b] font-medium mt-0.5">Select an item to view trends or drill down</p>
-                                </div>
-                                <div className="group cursor-help relative ml-1">
-                                    <Info className="w-4 h-4 text-[#86868b]" />
-                                    <div className="absolute top-full left-0 mt-2 w-72 p-4 bg-white/95 backdrop-blur-xl text-[#1d1d1f] text-xs leading-relaxed rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-black/5 pointer-events-none">
-                                        <span className="font-bold text-[#1d1d1f]">หลักการประเมินสถานะสุขภาพ (Health Criteria):</span><br/><br/>
-                                        <span className="font-bold text-[#34c759]">🟢 Healthy (เขียว):</span> YoY Growth &ge; 0% (เติบโตขึ้นหรือทรงตัว)<br/>
-                                        <span className="font-bold text-[#ff9500]">🟡 Watch (เหลือง):</span> -10% &le; YoY Growth &lt; 0% (ยอดขายลดลงเล็กน้อยในเกณฑ์เฝ้าระวัง)<br/>
-                                        <span className="font-bold text-[#ff3b30]">🔴 Risk (แดง):</span> YoY Growth &lt; -10% (ยอดขายหดตัวรุนแรงต้องเข้าแก้ไข)
-                                    </div>
-                                </div>
+                            <div>
+                                <h3 className="text-base font-bold text-[#1d1d1f]">Sub-Category Deep Dive</h3>
+                                <p className="text-xs text-[#86868b] font-medium mt-0.5">Select a group to view trends or drill down</p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[340px]">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[320px]">
                         <div className="flex flex-col h-full bg-[#f5f5f7]/50 rounded-xl border border-black/5 overflow-hidden">
-                            <div className="p-3 bg-white border-b border-black/5 flex flex-col gap-3 shadow-sm z-10">
-                                <div className="flex items-center justify-between">
-                                    {drillDownPath ? (
-                                        <button onClick={() => setDrillDownPath(null)} className="flex items-center gap-1.5 text-[#0071e3] text-xs font-bold hover:text-[#0077ED] transition-colors">
-                                            <ArrowLeft className="w-3.5 h-3.5" /> Back to Sub-Products
-                                        </button>
-                                    ) : (
-                                        <span className="text-[#86868b] text-xs font-bold uppercase tracking-wider pl-1">Sub-Product List</span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
-                                    <button onClick={() => setHealthFilter('all')} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors shrink-0 ${healthFilter === 'all' ? 'bg-[#1d1d1f] text-white' : 'bg-[#f5f5f7] text-[#86868b] hover:bg-[#e8e8ed]'}`}>All</button>
-                                    <button onClick={() => setHealthFilter('healthy')} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors flex items-center gap-1.5 shrink-0 ${healthFilter === 'healthy' ? 'bg-[#34c759]/20 text-[#34c759]' : 'bg-[#f5f5f7] text-[#86868b] hover:bg-[#e8e8ed]'}`}><div className="w-1.5 h-1.5 rounded-full bg-[#34c759]"></div>Healthy ({currentList.counts?.healthy || 0})</button>
-                                    <button onClick={() => setHealthFilter('watch')} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors flex items-center gap-1.5 shrink-0 ${healthFilter === 'watch' ? 'bg-[#ff9500]/20 text-[#ff9500]' : 'bg-[#f5f5f7] text-[#86868b] hover:bg-[#e8e8ed]'}`}><div className="w-1.5 h-1.5 rounded-full bg-[#ff9500]"></div>Watch ({currentList.counts?.watch || 0})</button>
-                                    <button onClick={() => setHealthFilter('risk')} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors flex items-center gap-1.5 shrink-0 ${healthFilter === 'risk' ? 'bg-[#ff3b30]/20 text-[#ff3b30]' : 'bg-[#f5f5f7] text-[#86868b] hover:bg-[#e8e8ed]'}`}><div className="w-1.5 h-1.5 rounded-full bg-[#ff3b30]"></div>Risk ({currentList.counts?.risk || 0})</button>
-                                </div>
+                            <div className="p-3 bg-white border-b border-black/5 flex items-center shadow-sm">
+                                {drillDownPath ? (
+                                    <button onClick={() => setDrillDownPath(null)} className="flex items-center gap-1.5 text-[#0071e3] text-xs font-bold hover:text-[#0077ED] transition-colors">
+                                        <ArrowLeft className="w-3.5 h-3.5" /> Back to Sub-Products
+                                    </button>
+                                ) : (
+                                    <span className="text-[#86868b] text-xs font-bold uppercase tracking-wider pl-1">Sub-Product List</span>
+                                )}
                             </div>
                             
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-2 flex flex-col gap-2">
-                                {(currentList.data || []).map((item, idx) => {
+                                {(currentList || []).map((item, idx) => {
                                     const isActive = drillDownPath ? (item.name === activeSku) : (item.name === activeSub);
-                                    let statusColor = 'bg-transparent';
-                                    if (item.status === 'healthy') statusColor = 'bg-[#34c759]';
-                                    else if (item.status === 'watch') statusColor = 'bg-[#ff9500]';
-                                    else if (item.status === 'risk') statusColor = 'bg-[#ff3b30]';
-
                                     return (
                                         <div 
                                             key={item.name} 
                                             onClick={() => drillDownPath ? setActiveSku(item.name) : setActiveSub(item.name)}
-                                            className={`p-3 rounded-xl border cursor-pointer transition-all relative overflow-hidden h-auto min-h-fit flex-shrink-0 ${isActive ? 'bg-[#30b0c7]/10 border-[#30b0c7]/30 shadow-sm' : 'bg-white border-black/5 hover:bg-[#e8e8ed]'}`}
+                                            className={`p-3 rounded-xl border cursor-pointer transition-all ${isActive ? 'bg-[#30b0c7]/10 border-[#30b0c7]/30 shadow-sm' : 'bg-white border-black/5 hover:bg-[#e8e8ed]'}`}
                                         >
-                                            <div className={`absolute left-0 top-0 w-1.5 h-full ${statusColor}`}></div>
-                                            <div className="flex justify-between items-start mb-2 pl-2">
+                                            <div className="flex justify-between items-start mb-2">
                                                 <div className="flex flex-col gap-1.5 w-full pr-2">
-                                                    <span className={`text-sm font-bold leading-normal break-words ${isActive ? 'text-[#30b0c7]' : 'text-[#1d1d1f]'}`} title={item.name}>{item.name}</span>
+                                                    <span className={`text-sm font-bold leading-tight line-clamp-2 ${isActive ? 'text-[#30b0c7]' : 'text-[#1d1d1f]'}`} title={item.name}>{item.name}</span>
                                                     <span className={`w-max text-[9px] px-1.5 py-0.5 rounded uppercase font-extrabold tracking-wider ${GROUP_COLORS[item.group] || 'bg-gray-100 text-gray-500'}`}>{item.group}</span>
                                                 </div>
                                                 <span className="text-[10px] font-semibold text-[#86868b] shrink-0 mt-0.5">#{idx + 1}</span>
                                             </div>
-                                            <div className="flex justify-between items-end border-t border-black/5 pt-2 pl-2 pb-0.5">
+                                            <div className="flex justify-between items-end border-t border-black/5 pt-2">
                                                 <span className="text-xs font-semibold text-[#1d1d1f]">฿{((item.s26 || 0)/1000000).toFixed(2)}M</span>
                                                 <div className="flex items-center gap-2">
                                                     {item.yoy !== null ? (
@@ -1041,7 +979,7 @@
                                         </div>
                                     );
                                 })}
-                                {(currentList.data || []).length === 0 && (
+                                {(currentList || []).length === 0 && (
                                     <div className="h-full flex flex-col items-center justify-center text-[#86868b] opacity-50 py-10">
                                         <ShoppingBag className="w-8 h-8 mb-2" />
                                         <span className="text-xs font-medium">No items found</span>
@@ -1053,23 +991,12 @@
                         <div className="lg:col-span-2 h-full bg-[#f5f5f7]/30 border border-black/5 rounded-xl p-4 flex flex-col">
                             <div className="flex justify-between items-center mb-4">
                                 <div>
-                                    <h4 className="text-sm font-bold text-[#1d1d1f] truncate max-w-[250px] xl:max-w-[320px]" title={activeName || 'Select an item'}>{activeName || 'Select an item'}</h4>
+                                    <h4 className="text-sm font-bold text-[#1d1d1f] truncate max-w-[300px] xl:max-w-[400px]">{activeName || 'Select an item'}</h4>
                                     <p className="text-[10px] text-[#86868b] font-medium">{drillDownPath ? 'SKU Trend Comparison' : 'Sub-Product Trend Comparison'}</p>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-xs font-bold text-[#0071e3]">฿{((activeItemStats.sales || 0)/1000000).toFixed(2)}M</span>
-                                        {activeItemStats.yoy !== null ? (
-                                            <span className={`text-[10px] font-bold ${activeItemStats.yoy >= 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'}`}>
-                                                {activeItemStats.yoy >= 0 ? '▲' : '▼'} {Math.abs(activeItemStats.yoy).toFixed(1)}% YoY
-                                            </span>
-                                        ) : <span className="text-[10px] text-[#86868b]">N/A YoY</span>}
-                                    </div>
-                                    <div className="h-6 w-px bg-black/10"></div>
-                                    <div className="flex items-center gap-2 text-[10px] font-bold text-[#86868b] uppercase tracking-wider">
-                                        <div className="flex items-center gap-1"><div className="w-3 h-1 rounded-sm bg-[#30b0c7]"></div> 2026</div>
-                                        <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded-full border-b-2 border-dashed border-[#86868b]"></div> 2025</div>
-                                    </div>
+                                <div className="flex items-center gap-3 text-[10px] font-bold text-[#86868b] uppercase tracking-wider">
+                                    <div className="flex items-center gap-1"><div className="w-3 h-1 rounded-sm bg-[#30b0c7]"></div> 2026</div>
+                                    <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded-full border-b-2 border-dashed border-[#86868b]"></div> 2025</div>
                                 </div>
                             </div>
                             <div className="flex-1 min-h-[200px]">
@@ -2202,35 +2129,22 @@
                     }
                 });
 
-                const cData = Array.from({ length: 12 }, (_, i) => ({ name: `M${i + 1}`, 'Avg Benchmark': 0 }));
-                let activeCountPerMonth = new Array(12).fill(0);
+                const cData = Array.from({ length: 12 }, (_, i) => ({ name: `M${i + 1}` }));
                 
                 topNPDNames.forEach(name => {
                     let runningTotal = 0;
                     for (let i = 0; i < 12; i++) {
                         if (rawMonthly[name][i] !== null) {
                             runningTotal += rawMonthly[name][i];
-                            const val = viewMode === 'cumulative' ? runningTotal : rawMonthly[name][i];
-                            cData[i][name] = val;
-                            cData[i]['Avg Benchmark'] += val;
-                            activeCountPerMonth[i]++;
+                            cData[i][name] = viewMode === 'cumulative' ? runningTotal : rawMonthly[name][i];
                         } else {
                             cData[i][name] = null;
                         }
                     }
                 });
 
-                for (let i = 0; i < 12; i++) {
-                    if (activeCountPerMonth[i] > 0) {
-                        cData[i]['Avg Benchmark'] = cData[i]['Avg Benchmark'] / activeCountPerMonth[i];
-                    } else {
-                        cData[i]['Avg Benchmark'] = null;
-                    }
-                }
-
                 let fastestStarter = { name: '-', val: 0 };
                 let topSustainer = { name: '-', val: -Infinity, m1: 0, m3: 0 }; 
-                let bestRetention = { name: '-', val: -Infinity, m1: 0, m6: 0 };
 
                 topNPDNames.forEach(name => {
                     const m1 = rawMonthly[name][0] || 0;
@@ -2241,18 +2155,12 @@
                         const growth = ((m3 - m1) / m1) * 100;
                         if (growth > topSustainer.val) topSustainer = { name, val: growth, m1, m3 };
                     }
-
-                    const m6 = rawMonthly[name][5];
-                    if (m1 > 0 && m6 !== null) {
-                        const retention = (m6 / m1) * 100;
-                        if (retention > bestRetention.val) bestRetention = { name, val: retention, m1, m6 };
-                    }
                 });
 
                 return { 
                     chartData: cData, 
                     lines: topNPDNames, 
-                    insights: { fastestStarter, topSustainer, bestRetention } 
+                    insights: { fastestStarter, topSustainer } 
                 };
             }, [salesData, npdData, viewMode]);
 
@@ -2287,8 +2195,6 @@
                                             formatter={(v) => `฿${((v||0)/1000000).toFixed(2)}M`}
                                         />
                                         <Legend wrapperStyle={{fontSize: '11px', color: '#86868b', paddingTop: '10px', fontWeight: '500'}} />
-                                        <ReferenceLine x="M3" stroke="#ff3b30" strokeDasharray="3 3" label={{ position: 'top', value: 'M3 Review', fill: '#ff3b30', fontSize: 10, fontWeight: 'bold' }} />
-                                        <Line type="monotone" dataKey="Avg Benchmark" stroke="#86868b" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={false} />
                                         {(lines || []).map((lineName, idx) => (
                                             <Line key={lineName} type="monotone" dataKey={lineName} stroke={APPLE_PALETTE[idx % APPLE_PALETTE.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6, strokeWidth: 0}} connectNulls={false} />
                                         ))}
@@ -2335,32 +2241,399 @@
                                     )}
                                 </div>
 
-                                <div className="bg-white p-3.5 rounded-xl border border-black/5 shadow-[0_2px_8px_rgba(0,0,0,0.02)] relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 w-8 h-8 bg-gradient-to-bl from-[#0071e3]/10 to-transparent rounded-bl-full"></div>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Activity className="w-4 h-4 text-[#0071e3]" />
-                                        <span className="text-[10px] font-bold text-[#86868b] uppercase">M6 Retention Rate</span>
-                                    </div>
-                                    {insights.bestRetention.val > -Infinity ? (
-                                        <>
-                                            <div className="text-sm font-bold text-[#1d1d1f] truncate leading-tight" title={insights.bestRetention.name}>{insights.bestRetention.name}</div>
-                                            <div className="flex items-end gap-2 mt-1">
-                                                <div className="text-base font-bold text-[#0071e3]">
-                                                    {insights.bestRetention.val.toFixed(1)}% <span className="text-[10px] text-[#86868b] font-medium">of M1</span>
-                                                </div>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="text-xs text-[#86868b] mt-1">Need 6 months of data</div>
-                                    )}
-                                </div>
-
                                 <p className="text-[10px] text-[#86868b] mt-auto font-medium leading-relaxed">
                                     *<span className="font-bold text-[#1d1d1f]">Monthly Sales</span> helps identify run-rate drop-offs after launch. <span className="font-bold text-[#1d1d1f]">Cumulative</span> tracks progress towards Year 1 Business Case.
                                 </p>
                             </div>
                         )}
                     </div>
+                </div>
+            );
+        });
+
+        const TopCustomersWidget = memo(({ topCustomers, uniqueCustomersCount, customerSearch, setCustomerSearch, topCustomerSortMode, setTopCustomerSortMode, kpi, topCustomerDrillDown, setTopCustomerDrillDown }) => (
+            <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <div className="flex items-center gap-3">
+                        <Store className="w-6 h-6 text-[#ff2d55]" />
+                        <div>
+                            <h3 className="text-base font-bold text-[#1d1d1f]">{topCustomerDrillDown ? `Top Products: ${topCustomerDrillDown.name}` : 'Top Sold-To Party (2026)'}</h3>
+                            <p className="text-xs text-[#86868b] font-medium">{topCustomerDrillDown ? `Channel: ${topCustomerDrillDown.channel}` : `Showing ${uniqueCustomersCount || 0} unique active outlets/chains`}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {topCustomerDrillDown ? (
+                            <button onClick={() => setTopCustomerDrillDown(null)} className="flex items-center gap-1.5 text-sm text-[#0071e3] bg-[#f5f5f7] hover:bg-[#e8e8ed] px-4 py-2 rounded-full font-medium"><ArrowLeft className="w-4 h-4" /> Back</button>
+                        ) : (
+                            <div className="relative w-64">
+                                <input type="text" placeholder="Filter Customer..." className="w-full pl-9 pr-3 py-2 bg-[#f5f5f7] border-0 rounded-[12px] text-sm focus:outline-none" value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
+                                <Search className="w-4 h-4 text-[#86868b] absolute left-3 top-2.5" />
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="overflow-x-auto custom-scrollbar max-h-[400px]">
+                    <table className="w-full text-sm text-left border-collapse min-w-[900px]">
+                        <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_#e5e5ea] text-[#86868b] font-semibold text-xs uppercase">
+                            <tr>
+                                <th className="py-3 px-4 w-16 text-center">Rank</th>
+                                <th className="py-3 px-4">{topCustomerDrillDown ? 'Product Name' : 'Sold-To Party / Chain'}</th>
+                                {!topCustomerDrillDown && <th className="py-3 px-4 w-24">Channel</th>}
+                                <th className="py-3 px-4 text-right cursor-pointer" onClick={() => setTopCustomerSortMode('sales')}>Sales {topCustomerSortMode === 'sales' && <ArrowDown className="w-3 h-3 inline text-[#0071e3]" />}</th>
+                                <th className="py-3 px-4 text-right cursor-pointer" onClick={() => setTopCustomerSortMode('yoy')}>YoY {topCustomerSortMode === 'yoy' && <ArrowDown className="w-3 h-3 inline text-[#0071e3]" />}</th>
+                                <th className="py-3 px-4 text-right">% Proportion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {topCustomerDrillDown ? (
+                                (topCustomerDrillDown.allProducts || []).map((prod, idx) => {
+                                    const yoy = prod.sales25 > 0 ? ((prod.value - prod.sales25) / prod.sales25) * 100 : null;
+                                    const proportion = topCustomerDrillDown.totalSales26 > 0 ? ((prod.value / topCustomerDrillDown.totalSales26) * 100).toFixed(1) : "0.0";
+                                    return (
+                                        <tr key={idx} className="border-b border-[#e5e5ea]/50 hover:bg-[#f5f5f7]">
+                                            <td className="py-4 px-4 text-center font-semibold text-[#86868b]">#{idx + 1}</td>
+                                            <td className="py-4 px-4 font-medium text-[#1d1d1f]">{prod.name}</td>
+                                            <td className="py-4 px-4 text-right font-semibold text-[#1d1d1f]">฿{(prod.value || 0).toLocaleString()}</td>
+                                            <td className="py-4 px-4 text-right font-medium">{yoy !== null ? <span className={yoy >= 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'}>{yoy >= 0 ? '▲' : '▼'} {Math.abs(yoy).toFixed(1)}%</span> : <span className="text-[#86868b]">N/A</span>}</td>
+                                            <td className="py-4 px-4 text-right font-semibold text-[#86868b]">{proportion}%</td>
+                                        </tr>
+                                    );
+                                })
+                            ) : (
+                                (topCustomers || []).map((item, idx) => {
+                                    const proportion = kpi.s26 > 0 ? ((item.totalSales26 / kpi.s26) * 100).toFixed(1) : "0.0";
+                                    const yoy = item.totalSales25 > 0 ? ((item.totalSales26 - item.totalSales25) / item.totalSales25) * 100 : null;
+                                    return (
+                                        <tr key={idx} className={`border-b border-[#e5e5ea]/50 hover:bg-[#f5f5f7] cursor-pointer ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f5f5f7]/30'}`} onClick={() => setTopCustomerDrillDown(item)}>
+                                            <td className="py-4 px-4 text-center font-semibold text-[#86868b]">#{idx + 1}</td>
+                                            <td className="py-4 px-4 font-medium text-[#1d1d1f]">{item.name}</td>
+                                            <td className="py-4 px-4"><span className="bg-[#e5e5ea] px-2.5 py-1 rounded-md text-[11px] font-semibold">{item.channel}</span></td>
+                                            <td className="py-4 px-4 text-right font-semibold text-[#1d1d1f]">฿{(item.totalSales26 || 0).toLocaleString()}</td>
+                                            <td className="py-4 px-4 text-right font-medium">{yoy !== null ? <span className={yoy >= 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'}>{yoy >= 0 ? '▲' : '▼'} {Math.abs(yoy).toFixed(1)}%</span> : <span className="text-[#86868b]">N/A</span>}</td>
+                                            <td className="py-4 px-4 text-right font-semibold text-[#86868b]">{proportion}%</td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        ));
+
+        const ProductPresenceWidget = memo(({ filteredData }) => {
+            const [breadcrumbs, setBreadcrumbs] = useState([]);
+            const [search, setSearch] = useState('');
+            const deferredSearch = useDeferredValue(search);
+
+            const base2026 = useMemo(() => (filteredData || []).filter(d => d.Year === '2026'), [filteredData]);
+            useEffect(() => { setBreadcrumbs([]); setSearch(''); }, [filteredData]);
+
+            const levelNames = ['Sub-Product Group', 'Group SKU', 'Product Name'];
+            const currentLevelIdx = breadcrumbs.length;
+            const currentLevelName = levelNames[currentLevelIdx] || 'Detail';
+
+            const rawData = useMemo(() => {
+                let data = base2026;
+                if (breadcrumbs.length > 0) data = data.filter(d => d.SubProductGroup === breadcrumbs[0]);
+                if (breadcrumbs.length > 1) data = data.filter(d => d.GroupSKU === breadcrumbs[1]);
+                if (breadcrumbs.length > 2) data = data.filter(d => d.ProductName === breadcrumbs[2]);
+
+                const uniqueLocs = new Set();
+                const channelMap = {};
+
+                data.forEach(d => {
+                    const isSubChView = ['MT', 'ONLINE'].includes(d.Channel?.toUpperCase() || '');
+                    const loc = isSubChView ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
+                    if (loc !== 'Unknown') {
+                        uniqueLocs.add(`${d.Channel}|${loc}`);
+                        const ch = d.Channel || 'Unknown';
+                        if (!channelMap[ch]) channelMap[ch] = new Set();
+                        channelMap[ch].add(loc);
+                    }
+                });
+
+                const formattedDetail = {};
+                Object.keys(channelMap).sort().forEach(ch => {
+                    const locs = Array.from(channelMap[ch]).sort();
+                    formattedDetail[ch] = { locations: locs, count: locs.length };
+                });
+
+                if (breadcrumbs.length < 3) {
+                    let groupBy = breadcrumbs.length === 0 ? 'SubProductGroup' : (breadcrumbs.length === 1 ? 'GroupSKU' : 'ProductName');
+                    const map = {};
+                    data.forEach(d => {
+                        const key = d[groupBy] || 'Unknown';
+                        if (!map[key]) map[key] = { name: key, sales: 0, locations: new Set() };
+                        map[key].sales += (d.NetPrice || 0);
+                        const loc = ['MT', 'ONLINE'].includes(d.Channel?.toUpperCase() || '') ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
+                        if (loc !== 'Unknown') map[key].locations.add(`${d.Channel}|${loc}`);
+                    });
+                    return { rawList: Object.values(map).map(v => ({ ...v, count: v.locations.size })), detail: { channels: formattedDetail }, totalLocations: uniqueLocs.size };
+                }
+                return { rawList: null, detail: { channels: formattedDetail }, totalLocations: uniqueLocs.size };
+            }, [base2026, breadcrumbs]);
+
+            const { list, detail, totalLocations } = useMemo(() => {
+                if (!rawData.rawList) return { list: null, detail: rawData.detail, totalLocations: rawData.totalLocations };
+                let arr = [...rawData.rawList].sort((a, b) => b.sales - a.sales);
+                if (deferredSearch) arr = arr.filter(item => item.name.toLowerCase().includes(deferredSearch.toLowerCase()));
+                return { list: arr, detail: rawData.detail, totalLocations: rawData.totalLocations };
+            }, [rawData, deferredSearch]);
+
+            return (
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04]">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-[#0071e3]/10 p-2 rounded-xl"><MapPin className="w-6 h-6 text-[#0071e3]" /></div>
+                            <div>
+                                <h3 className="text-base font-bold text-[#1d1d1f]">Product Presence (2026)</h3>
+                                <p className="text-xs text-[#86868b] font-medium mt-0.5">Total Active Locations: <span className="font-bold text-[#1d1d1f]">{totalLocations || 0}</span></p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            {breadcrumbs.length > 0 && (
+                                <button 
+                                    onClick={() => { setBreadcrumbs(breadcrumbs.slice(0, -1)); setSearch(''); }} 
+                                    className="flex items-center gap-1.5 text-sm text-[#0071e3] bg-[#f5f5f7] hover:bg-[#e8e8ed] px-4 py-2 rounded-full font-medium transition-colors shrink-0"
+                                >
+                                    <ArrowLeft className="w-4 h-4" /> Back
+                                </button>
+                            )}
+                            {breadcrumbs.length < 3 && (
+                                <div className="relative w-full md:w-64">
+                                    <input type="text" placeholder={`Search ${currentLevelName}...`} className="w-full pl-9 pr-3 py-2.5 bg-[#f5f5f7] rounded-[12px] text-sm outline-none" value={search} onChange={(e) => setSearch(e.target.value)} />
+                                    <Search className="w-4 h-4 text-[#86868b] absolute left-3 top-3" />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    {list && (
+                        <div className="overflow-x-auto custom-scrollbar border border-black/5 rounded-xl max-h-[380px] mb-6">
+                            <table className="w-full text-sm text-left border-collapse min-w-[600px]">
+                                <thead className="sticky top-0 bg-[#f5f5f7] z-10 text-[#86868b] text-xs uppercase">
+                                    <tr>
+                                        <th className="py-3 px-4 w-16 text-center">Rank</th>
+                                        <th className="py-3 px-4">{currentLevelName}</th>
+                                        <th className="py-3 px-4 text-right">Sales 2026</th>
+                                        <th className="py-3 px-4 text-right">Active Locations</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(list || []).length > 0 ? list.map((item, idx) => {
+                                        const pct = Math.max(...list.map(i => i.count)) > 0 ? (item.count / Math.max(...list.map(i => i.count))) * 100 : 0;
+                                        return (
+                                            <tr key={item.name} onClick={() => { setBreadcrumbs([...breadcrumbs, item.name]); setSearch(''); }} className="border-b border-[#e5e5ea]/50 hover:bg-[#0071e3]/5 cursor-pointer">
+                                                <td className="py-4 px-4 text-center text-[#86868b]">#{idx + 1}</td>
+                                                <td className="py-4 px-4 font-semibold text-[#1d1d1f]">{item.name}</td>
+                                                <td className="py-4 px-4 text-right text-[#1d1d1f]">฿{(item.sales || 0).toLocaleString()}</td>
+                                                <td className="py-4 px-4 pr-10 text-right font-bold">
+                                                    <div className="flex items-center justify-end gap-3">
+                                                        {item.count}
+                                                        <div className="w-24 h-1.5 bg-[#e5e5ea] rounded-full overflow-hidden"><div className="h-full bg-[#0071e3]" style={{ width: `${pct}%` }}></div></div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    }) : <tr><td colSpan="4" className="py-12 text-center text-[#86868b]">No records found</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    
+                    {detail && detail.channels && Object.keys(detail.channels).length > 0 && (
+                        <div className="mt-6 pt-6 border-t border-black/5 animate-in fade-in duration-500">
+                            <h4 className="text-sm font-bold text-[#1d1d1f] mb-4 flex items-center gap-2">
+                                <Store className="w-4 h-4 text-[#0071e3]" /> Locations Breakdown
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                                {Object.entries(detail.channels).map(([chName, chData]) => (
+                                    <div key={chName} className="bg-[#f5f5f7] rounded-xl overflow-hidden flex flex-col h-[200px] border border-black/5">
+                                        <div className="bg-white/60 px-3 py-2 border-b border-black/5 flex justify-between items-center sticky top-0 backdrop-blur-md">
+                                            <span className="text-[11px] font-bold text-[#1d1d1f] uppercase tracking-wider">{chName}</span>
+                                            <span className="text-[10px] font-bold text-[#0071e3] bg-[#0071e3]/10 px-2 py-0.5 rounded-full">{chData.count}</span>
+                                        </div>
+                                        <div className="p-3 overflow-y-auto custom-scrollbar flex-1">
+                                            <ul className="space-y-1.5">
+                                                {(chData.locations || []).map((loc, i) => (
+                                                    <li key={i} className="text-xs text-[#1d1d1f] flex items-start gap-1.5">
+                                                        <div className="w-1 h-1 rounded-full bg-[#86868b] mt-1.5 flex-shrink-0"></div>
+                                                        <span className="truncate" title={loc}>{loc}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        });
+
+        const WhiteSpaceWidget = memo(({ filteredData, debouncedSearch, searchStr, setSearchStr }) => {
+            const [selectedGap, setSelectedGap] = useState(null);
+            const [isCopied, setIsCopied] = useState(false);
+            const [subGroupFilter, setSubGroupFilter] = useState('All');
+            
+            const subGroups = useMemo(() => {
+                const groups = new Set();
+                (filteredData || []).forEach(d => {
+                    if (d.Year === '2026' && d.SubProductGroup) groups.add(d.SubProductGroup);
+                });
+                return Array.from(groups).sort();
+            }, [filteredData]);
+            
+            const handleCopy = useCallback(() => {
+                if (!selectedGap?.missed) return;
+                const textToCopy = `Target List for ${selectedGap.sku} in ${selectedGap.subCh}:\n\n` + selectedGap.missed.join('\n');
+                
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    setIsCopied(true);
+                    setTimeout(() => setIsCopied(false), 2000);
+                } catch (error) {
+                    console.error('Copy failed', error);
+                }
+                textArea.remove();
+            }, [selectedGap]);
+            
+            const grid = useMemo(() => {
+                let base2026 = (filteredData || []).filter(d => d.Year === '2026');
+                if (subGroupFilter !== 'All') {
+                    base2026 = base2026.filter(d => d.SubProductGroup === subGroupFilter);
+                }
+                const subChannelSales = {}, skuSales = {}, subChannelCustomers = {}, matrix = {}; 
+                
+                base2026.forEach(d => {
+                    const subCh = d.SubChannel || 'Unknown', sku = d.GroupSKU || 'Unknown', customer = d.SoldToParty || 'Unknown', val = d.NetPrice || 0;
+                    if (!subChannelSales[subCh]) { subChannelSales[subCh] = 0; subChannelCustomers[subCh] = new Set(); }
+                    subChannelSales[subCh] += val;
+                    if(customer && customer !== 'Unknown') subChannelCustomers[subCh].add(customer);
+
+                    if (!skuSales[sku]) { skuSales[sku] = 0; matrix[sku] = {}; }
+                    skuSales[sku] += val;
+                    if (!matrix[sku][subCh]) matrix[sku][subCh] = new Set();
+                    if(customer && customer !== 'Unknown') matrix[sku][subCh].add(customer);
+                });
+
+                const columns = Object.keys(subChannelSales).filter(c => c !== 'Unknown').sort((a, b) => subChannelSales[b] - subChannelSales[a]).slice(0, 12); 
+                let rows = Object.keys(skuSales).filter(s => s !== 'Unknown').sort((a, b) => skuSales[b] - skuSales[a]);
+                if ((debouncedSearch || '').length >= 2) rows = rows.filter(sku => sku.toLowerCase().includes(debouncedSearch.toLowerCase()));
+
+                return { columns, rows, subChannelCustomers, matrix };
+            }, [filteredData, debouncedSearch, subGroupFilter]);
+
+            return (
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] relative">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-[#ff2d55]/10 p-2 rounded-xl"><Crosshair className="w-6 h-6 text-[#ff2d55]" /></div>
+                            <div>
+                                <h3 className="text-base font-bold text-[#1d1d1f]">White Space & Distribution Gap</h3>
+                                <p className="text-xs text-[#86868b] font-medium mt-0.5">Click on a gap to view missed target list.</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                            <FilterDropdown label="Sub-Product" value={subGroupFilter} options={['All', ...subGroups]} onChange={setSubGroupFilter} icon={<Layers />} />
+                            <div className="relative w-full sm:w-64">
+                                <input type="text" placeholder="Search SKU..." className="w-full pl-9 pr-3 py-2 bg-[#f5f5f7] border border-transparent focus:border-[#0071e3]/30 focus:bg-white focus:ring-4 focus:ring-[#0071e3]/10 rounded-[12px] text-sm font-medium transition-all outline-none" value={searchStr} onChange={(e) => setSearchStr(e.target.value)} />
+                                <Search className="w-4 h-4 text-[#86868b] absolute left-3 top-2.5" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto custom-scrollbar max-h-[600px] rounded-xl border border-black/5">
+                        <table className="w-full text-sm text-left border-collapse min-w-[800px]">
+                            <thead className="sticky top-0 bg-[#f5f5f7] z-10 text-[#86868b] text-xs uppercase">
+                                <tr>
+                                    <th className="py-4 px-4 sticky left-0 bg-[#f5f5f7] z-20">Hero SKU</th>
+                                    {(grid.columns || []).map(col => (
+                                        <th key={col} className="py-4 px-3 text-center min-w-[120px]">
+                                            <div className="text-[#1d1d1f] font-bold">{col}</div>
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(grid.rows || []).map((sku, idx) => (
+                                    <tr key={sku} className={`border-b border-[#e5e5ea]/50 ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f5f5f7]/30'}`}>
+                                        <td className="py-4 px-4 font-semibold text-[#1d1d1f] sticky left-0 z-10 bg-inherit max-w-[250px] truncate">{sku}</td>
+                                        {(grid.columns || []).map(col => {
+                                            const total = grid.subChannelCustomers[col]?.size || 0;
+                                            const bought = grid.matrix[sku]?.[col]?.size || 0;
+                                            if (total === 0) return <td key={col} className="p-2 text-center text-[#d1d1d6]">-</td>;
+                                            const pct = (bought / total) * 100;
+                                            return (
+                                                <td key={col} className="p-2 text-center border-l border-[#e5e5ea]/30">
+                                                    <div 
+                                                        className={`flex flex-col gap-1.5 p-2 rounded-xl transition-colors ${pct < 100 ? 'cursor-pointer hover:bg-[#ff3b30]/10' : ''}`}
+                                                        onClick={() => {
+                                                            if (pct < 100) {
+                                                                const allCust = Array.from(grid.subChannelCustomers[col] || []);
+                                                                const boughtCust = grid.matrix[sku]?.[col] || new Set();
+                                                                const missed = allCust.filter(c => !boughtCust.has(c)).sort();
+                                                                setSelectedGap({ sku, subCh: col, missed });
+                                                            }
+                                                        }}
+                                                    >
+                                                        <div className="flex justify-between items-center text-xs">
+                                                            <span className={`font-bold px-1.5 py-0.5 rounded-md ${pct === 100 ? 'text-[#34c759]' : 'text-[#ff3b30]'}`}>{pct === 100 ? 'Full' : (total - bought) + ' Gap'}</span>
+                                                        </div>
+                                                        <div className="w-full h-1.5 bg-[#e5e5ea] rounded-full"><div className={`h-full rounded-full ${pct === 100 ? 'bg-[#34c759]' : 'bg-[#ff3b30]'}`} style={{ width: `${pct}%` }}></div></div>
+                                                    </div>
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {selectedGap && (
+                        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={(e) => {if(e.target === e.currentTarget) setSelectedGap(null);}}>
+                            <div className="bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 flex flex-col max-h-[85vh]">
+                                <div className="p-5 border-b border-black/5 flex justify-between items-start bg-[#f5f5f7]/50">
+                                    <div>
+                                        <h3 className="text-[10px] font-bold text-[#ff2d55] uppercase tracking-wider mb-1">Actionable Insight</h3>
+                                        <h2 className="text-lg font-bold text-[#1d1d1f] leading-tight">Target List for Sales Team</h2>
+                                        <p className="text-xs text-[#86868b] mt-1 font-medium">{selectedGap.sku} <span className="mx-1">•</span> {selectedGap.subCh}</p>
+                                    </div>
+                                    <button onClick={() => setSelectedGap(null)} className="text-[#86868b] hover:text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] p-1.5 rounded-full transition-colors"><X className="w-4 h-4" /></button>
+                                </div>
+                                <div className="p-5 overflow-y-auto custom-scrollbar flex-1 bg-white flex flex-col gap-5">
+                                    <div>
+                                        <div className="text-xs font-bold text-[#1d1d1f] mb-3 flex items-center gap-2">
+                                            <Users className="w-4 h-4 text-[#86868b]" /> {selectedGap.missed.length} Missed Customers
+                                        </div>
+                                        <ul className="space-y-2 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
+                                            {selectedGap.missed.map((cust, i) => (
+                                                <li key={i} className="text-sm text-[#1d1d1f] flex items-center gap-2 p-2.5 bg-[#f5f5f7] hover:bg-[#e8e8ed] transition-colors rounded-lg border border-black/5">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-[#ff2d55] flex-shrink-0"></div>
+                                                    <span className="truncate font-medium">{cust}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div className="p-4 bg-white border-t border-black/5 flex gap-3">
+                                    <button 
+                                        onClick={handleCopy}
+                                        className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${isCopied ? 'bg-[#34c759] text-white shadow-[0_0_10px_rgba(52,199,89,0.3)]' : 'bg-[#1d1d1f] hover:bg-black text-white shadow-md hover:shadow-lg'}`}
+                                    >
+                                        {isCopied ? <><Check className="w-4 h-4" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy Target List</>}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         });
