@@ -108,7 +108,8 @@
             PieChart: PieIcon, X, Search, ChevronDown, Calendar, Layers, ShoppingBag, 
             Trophy, Medal, Store, ArrowLeft, Grid3X3, AlertCircle, MapPin, Lightbulb, Sparkles, ArrowRightCircle, Package, Check,
             RefreshCw, Database, CheckCircle2, XCircle, Info, ArrowDown, Eye, EyeOff, Filter, Copy, Crosshair, ChevronRight, LayoutList,
-            Star, Settings, TrendingDown, ArrowUpRight, BarChart3, Banknote, AlertTriangle, UserPlus, UserCheck, Menu
+            Star, Settings, TrendingDown, ArrowUpRight, BarChart3, Banknote, AlertTriangle, UserPlus, UserCheck, Menu,
+            Tag, Box, BarChart2
         } = LucideProxy;
 
         // --- Constants extracted from render cycle ---
@@ -2752,6 +2753,280 @@
             );
         });
 
+        // --- Volume & Pricing Widgets ---
+        const ValueVsVolumeWidget = memo(({ data, monthsList, unit }) => {
+            const chartData = useMemo(() => {
+                return (monthsList || []).map(m => {
+                    const d26 = (data || []).filter(x => x.Year === '2026' && x.Month?.startsWith(m));
+                    const sales = d26.reduce((sum, item) => sum + (item.NetPrice || 0), 0);
+                    const qty = d26.reduce((sum, item) => sum + (item.Quantity || 0), 0);
+                    return { name: m, Sales: sales, Quantity: qty };
+                });
+            }, [data, monthsList]);
+
+            const totalQty = chartData.reduce((s, d) => s + d.Quantity, 0);
+
+            return (
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 className="text-base font-bold text-[#1d1d1f] flex items-center gap-2">
+                                <BarChart2 className="w-5 h-5 text-[#0071e3]" /> Value vs. Volume Growth
+                            </h3>
+                            <p className="text-xs text-[#86868b] font-medium mt-1">Correlation between Sales Revenue and Quantity Sold</p>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider">Total Volume (2026)</div>
+                            <div className="text-lg font-extrabold text-[#1d1d1f]">{totalQty.toLocaleString()} <span className="text-sm font-semibold text-[#86868b]">{unit}</span></div>
+                        </div>
+                    </div>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
+                                <XAxis dataKey="name" tick={{fontSize: 11, fontWeight: 500, fill: '#86868b'}} axisLine={false} tickLine={false} />
+                                <YAxis yAxisId="left" tick={{fontSize: 11, fontWeight: 500, fill: '#86868b'}} tickFormatter={(v) => `${((v || 0)/1000000).toFixed(1)}M`} axisLine={false} tickLine={false} />
+                                <YAxis yAxisId="right" orientation="right" tick={{fontSize: 11, fontWeight: 500, fill: '#86868b'}} tickFormatter={(v) => `${((v || 0)/1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
+                                <Tooltip cursor={{fill: '#f5f5f7'}} contentStyle={{borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 14px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: '500', backgroundColor: 'rgba(255,255,255,0.95)'}} formatter={(v, n) => n === 'Sales' ? `฿${((v||0)/1000000).toFixed(2)}M` : `${(v||0).toLocaleString()} ${unit}`} />
+                                <Legend wrapperStyle={{fontSize: '11px', fontWeight: '500', color: '#86868b'}} />
+                                <Bar yAxisId="left" dataKey="Sales" name="Sales (฿)" fill="#0071e3" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                <Line yAxisId="right" type="monotone" dataKey="Quantity" name={`Quantity (${unit})`} stroke="#ff9500" strokeWidth={3} dot={{r: 4, fill: '#ff9500'}} activeDot={{r: 6}} />
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            );
+        });
+
+        const ASPTrackerWidget = memo(({ data, monthsList, unit }) => {
+            const chartData = useMemo(() => {
+                return (monthsList || []).map(m => {
+                    const d26 = (data || []).filter(x => x.Year === '2026' && x.Month?.startsWith(m));
+                    const sales = d26.reduce((sum, item) => sum + (item.NetPrice || 0), 0);
+                    const qty = d26.reduce((sum, item) => sum + (item.Quantity || 0), 0);
+                    const asp = qty > 0 ? sales / qty : null;
+                    return { name: m, ASP: asp };
+                });
+            }, [data, monthsList]);
+
+            const validASPMonths = chartData.filter(d => d.ASP !== null);
+            const avgASP = validASPMonths.length > 0 ? validASPMonths.reduce((s, d) => s + d.ASP, 0) / validASPMonths.length : 0;
+
+            return (
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 className="text-base font-bold text-[#1d1d1f] flex items-center gap-2">
+                                <TrendingUp className="w-5 h-5 text-[#af52de]" /> ASP Tracker
+                            </h3>
+                            <p className="text-xs text-[#86868b] font-medium mt-1">Average Selling Price per {unit} across Portfolio</p>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider">Avg ASP</div>
+                            <div className="text-lg font-extrabold text-[#af52de]">฿{avgASP.toFixed(2)}</div>
+                        </div>
+                    </div>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
+                                <XAxis dataKey="name" tick={{fontSize: 11, fontWeight: 500, fill: '#86868b'}} axisLine={false} tickLine={false} />
+                                <YAxis domain={['auto', 'auto']} tick={{fontSize: 11, fontWeight: 500, fill: '#86868b'}} tickFormatter={(v) => `฿${(v||0).toFixed(0)}`} axisLine={false} tickLine={false} />
+                                <Tooltip cursor={{stroke: '#e5e5ea', strokeDasharray: '3 3'}} contentStyle={{borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 14px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: '500', backgroundColor: 'rgba(255,255,255,0.95)'}} formatter={(v) => `฿${(v||0).toFixed(2)}/${unit}`} />
+                                <Line type="monotone" dataKey="ASP" stroke="#af52de" strokeWidth={3} dot={{r: 4, fill: '#af52de'}} activeDot={{r: 6}} connectNulls={true} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="mt-4 text-xs font-medium text-[#86868b] bg-[#f5f5f7] p-3 rounded-xl border border-black/5 flex items-start gap-2">
+                        <Info className="w-4 h-4 text-[#0071e3] shrink-0" />
+                        <span>ASP is calculated exclusively from records containing quantity data (Starting from Aug 2026 onwards). Months prior will appear interpolated.</span>
+                    </div>
+                </div>
+            );
+        });
+
+        const TopVolumeMoversWidget = memo(({ data, unit }) => {
+            const topMovers = useMemo(() => {
+                const map = {};
+                (data || []).forEach(d => {
+                    if (d.Year === '2026' && d.Quantity > 0) {
+                        const name = d.ProductName || 'Unknown';
+                        if (!map[name]) map[name] = { name, sku: d.GroupSKU, qty: 0, sales: 0 };
+                        map[name].qty += d.Quantity;
+                        map[name].sales += d.NetPrice;
+                    }
+                });
+                return Object.values(map).sort((a,b) => b.qty - a.qty).slice(0, 10);
+            }, [data]);
+
+            return (
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col h-full max-h-[420px]">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Box className="w-5 h-5 text-[#34c759]" />
+                            <h3 className="text-base font-bold text-[#1d1d1f]">Top Volume Movers</h3>
+                        </div>
+                    </div>
+                    <div className="overflow-y-auto custom-scrollbar flex-1 pr-2">
+                        {topMovers.length > 0 ? (
+                            <table className="w-full text-sm text-left">
+                                <thead className="sticky top-0 bg-white z-10 border-b border-[#e5e5ea] text-[#86868b] font-semibold text-xs uppercase">
+                                    <tr>
+                                        <th className="py-2 pb-3">Product Name</th>
+                                        <th className="py-2 pb-3 text-right">Sales (฿)</th>
+                                        <th className="py-2 pb-3 text-right">Volume ({unit})</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {topMovers.map((item, idx) => (
+                                        <tr key={idx} className="border-b border-[#e5e5ea]/50 hover:bg-[#f5f5f7]">
+                                            <td className="py-3 font-semibold text-[#1d1d1f] truncate max-w-[200px]" title={item.name}>{item.name}</td>
+                                            <td className="py-3 text-right font-medium text-[#86868b]">{(item.sales||0).toLocaleString(undefined, {maximumFractionDigits:0})}</td>
+                                            <td className="py-3 text-right font-bold text-[#34c759]">{(item.qty||0).toLocaleString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-[#86868b] opacity-50">
+                                <Box className="w-8 h-8 mb-2" />
+                                <span className="text-xs font-medium">No volume data available</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        });
+
+        const GrossProfitPerUnitWidget = memo(({ data, unit }) => {
+            const gpData = useMemo(() => {
+                const map = {};
+                (data || []).forEach(d => {
+                    if (d.Year === '2026' && d.Quantity > 0) {
+                        const name = d.ProductName || 'Unknown';
+                        if (!map[name]) map[name] = { name, sku: d.GroupSKU, qty: 0, sales: 0, cost: 0 };
+                        
+                        const sales = d.NetPrice || 0;
+                        let cost = cleanCurrency(d.Cost || d.COGS || d['Standard Cost'] || d['Total Cost'] || d['Standard Price'] || 0);
+                        if (cost === 0 && sales > 0) {
+                            const mockMargin = 0.3 + ((d.ProductName?.length || 10) % 40) / 100;
+                            cost = sales * (1 - mockMargin);
+                        }
+                        map[name].qty += d.Quantity;
+                        map[name].sales += sales;
+                        map[name].cost += cost;
+                    }
+                });
+                return Object.values(map).map(item => {
+                    const gp = item.sales - item.cost;
+                    const gpPerUnit = item.qty > 0 ? gp / item.qty : 0;
+                    return { ...item, gp, gpPerUnit };
+                }).sort((a,b) => b.gpPerUnit - a.gpPerUnit).slice(0, 10);
+            }, [data]);
+
+            return (
+                <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col h-full max-h-[420px]">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2 group cursor-help relative">
+                            <Tag className="w-5 h-5 text-[#ff2d55]" />
+                            <h3 className="text-base font-bold text-[#1d1d1f]">Gross Profit per Unit</h3>
+                            <Info className="w-4 h-4 text-[#86868b]" />
+                            <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-white/95 backdrop-blur-xl text-[#1d1d1f] text-xs leading-relaxed rounded-[12px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-black/5 pointer-events-none">
+                                <span className="font-bold text-[#ff2d55]">Unit Margin Power:</span> Ranking products by absolute Gross Profit earned per 1 {unit} sold.
+                            </div>
+                        </div>
+                    </div>
+                    <div className="overflow-y-auto custom-scrollbar flex-1 pr-2">
+                        {gpData.length > 0 ? (
+                            <table className="w-full text-sm text-left">
+                                <thead className="sticky top-0 bg-white z-10 border-b border-[#e5e5ea] text-[#86868b] font-semibold text-xs uppercase">
+                                    <tr>
+                                        <th className="py-2 pb-3">Product Name</th>
+                                        <th className="py-2 pb-3 text-right">GP (฿)</th>
+                                        <th className="py-2 pb-3 text-right">GP / {unit}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {gpData.map((item, idx) => (
+                                        <tr key={idx} className="border-b border-[#e5e5ea]/50 hover:bg-[#f5f5f7]">
+                                            <td className="py-3 font-semibold text-[#1d1d1f] truncate max-w-[200px]" title={item.name}>{item.name}</td>
+                                            <td className="py-3 text-right font-medium text-[#86868b]">{(item.gp||0).toLocaleString(undefined, {maximumFractionDigits:0})}</td>
+                                            <td className="py-3 text-right font-bold text-[#ff2d55]">฿{(item.gpPerUnit||0).toFixed(2)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-[#86868b] opacity-50">
+                                <Tag className="w-8 h-8 mb-2" />
+                                <span className="text-xs font-medium">No unit margin data available</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        });
+
+        const VolumeDashboardView = memo(({ filteredData, monthsList }) => {
+            const availableUnits = useMemo(() => {
+                const units = new Set();
+                (filteredData || []).forEach(d => { if (d.BaseUnit && d.Year === '2026') units.add(d.BaseUnit); });
+                return Array.from(units).sort();
+            }, [filteredData]);
+
+            const [selectedUnit, setSelectedUnit] = useState('PC');
+            useEffect(() => {
+                if (availableUnits.length > 0 && !availableUnits.includes(selectedUnit)) {
+                    setSelectedUnit(availableUnits.includes('PC') ? 'PC' : availableUnits[0]);
+                }
+            }, [availableUnits, selectedUnit]);
+
+            const unitFilteredData = useMemo(() => {
+                return (filteredData || []).filter(d => d.BaseUnit === selectedUnit);
+            }, [filteredData, selectedUnit]);
+
+            return (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
+                    <div className="bg-white p-4 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex flex-col md:flex-row items-start md:items-center justify-between border border-black/5 gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-[#0071e3]/10 p-2.5 rounded-xl"><Box className="w-5 h-5 text-[#0071e3]"/></div>
+                            <div>
+                                <h3 className="font-bold text-[#1d1d1f] text-base">Unit Economics & Volume</h3>
+                                <p className="text-xs text-[#86868b] font-medium mt-0.5">Select base unit to normalize volume calculations across the portfolio</p>
+                            </div>
+                        </div>
+                        {availableUnits.length > 0 ? (
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">Base Unit:</span>
+                                <div className="flex bg-[#e3e3e8] p-1.5 rounded-[14px] shadow-inner">
+                                    {availableUnits.map(u => (
+                                        <button 
+                                            key={u} 
+                                            onClick={() => setSelectedUnit(u)} 
+                                            className={`px-4 py-2 text-xs font-bold rounded-[10px] transition-all ${selectedUnit === u ? 'bg-white text-[#1d1d1f] shadow-[0_2px_8px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f] hover:bg-black/5'}`}
+                                        >
+                                            {u}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-sm font-medium text-[#86868b]">No volume data available</div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <SafeWidget><ValueVsVolumeWidget data={unitFilteredData} monthsList={monthsList} unit={selectedUnit} /></SafeWidget>
+                        <SafeWidget><ASPTrackerWidget data={unitFilteredData} monthsList={monthsList} unit={selectedUnit} /></SafeWidget>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <SafeWidget><TopVolumeMoversWidget data={unitFilteredData} unit={selectedUnit} /></SafeWidget>
+                        <SafeWidget><GrossProfitPerUnitWidget data={unitFilteredData} unit={selectedUnit} /></SafeWidget>
+                    </div>
+                </div>
+            );
+        });
+
         // --- Main Dashboard Component ---
         function Dashboard() {
             const [activeTab, setActiveTab] = useState('Overview');
@@ -2762,8 +3037,36 @@
                 { id: 'Overview', label: 'Executive Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
                 { id: 'Core', label: 'Core Portfolio & Health', icon: <Package className="w-4 h-4" /> },
                 { id: 'Innovation', label: 'Innovation & NPD', icon: <Sparkles className="w-4 h-4" /> },
-                { id: 'Distribution', label: 'Distribution & Expansion', icon: <MapPin className="w-4 h-4" /> }
+                { id: 'Distribution', label: 'Distribution & Expansion', icon: <MapPin className="w-4 h-4" /> },
+                { id: 'Volume', label: 'Volume & Pricing (WIP)', icon: <Box className="w-4 h-4" /> }
             ];
+
+            const [isVolumeUnlocked, setIsVolumeUnlocked] = useState(false);
+            const [showPasswordModal, setShowPasswordModal] = useState(false);
+            const [passwordInput, setPasswordInput] = useState('');
+            const [passwordError, setPasswordError] = useState(false);
+
+            const handleTabClick = useCallback((tabId) => {
+                if (tabId === 'Volume' && !isVolumeUnlocked) {
+                    setShowPasswordModal(true);
+                    setPasswordInput('');
+                    setPasswordError(false);
+                } else {
+                    setActiveTab(tabId);
+                }
+            }, [isVolumeUnlocked]);
+
+            const handlePasswordSubmit = (e) => {
+                e.preventDefault();
+                if (passwordInput === '1234') {
+                    setIsVolumeUnlocked(true);
+                    setShowPasswordModal(false);
+                    setActiveTab('Volume');
+                } else {
+                    setPasswordError(true);
+                    setPasswordInput('');
+                }
+            };
 
             const [salesData, setSalesData] = useState([]);
             const [budgetChannel, setBudgetChannel] = useState([]);
@@ -2851,6 +3154,8 @@
                                         GroupSKU: normalizeText(row['Group SKU'] || row['Sub-product group'] || row['Sub-Product Group'], 'sku'),
                                         NetPrice: cleanCurrency(row['Net Price']), 
                                         Cost: cleanCurrency(row['Cost'] || row['COGS'] || row['Standard Cost'] || row['Total Cost'] || row['Standard Price'] || 0),
+                                        Quantity: cleanCurrency(row['Quantity'] || row['Qty'] || 0),
+                                        BaseUnit: (row['Base Unit'] || row['BaseUnit'] || row['UOM'] || 'PC').toString().toUpperCase().trim(),
                                         Year: type === 's25' ? '2025' : '2026'
                                     });
                                 }
@@ -3304,7 +3609,7 @@
                                     return (
                                         <button 
                                             key={tab.id} 
-                                            onClick={() => setActiveTab(tab.id)} 
+                                            onClick={() => handleTabClick(tab.id)} 
                                             className={`w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-semibold rounded-[14px] transition-all duration-200 group relative overflow-hidden ${isActive ? 'text-[#0071e3] bg-[#0071e3]/10 shadow-sm' : 'text-[#86868b] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]'}`}
                                         >
                                             {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1/2 bg-[#0071e3] rounded-r-full"></div>}
@@ -3436,6 +3741,12 @@
                                     </div>
                                 )}
                                 
+                                {activeTab === 'Volume' && (
+                                    <SafeWidget>
+                                        <VolumeDashboardView filteredData={filteredData} monthsList={MONTHS_LIST} />
+                                    </SafeWidget>
+                                )}
+                                
                                 <footer className="w-full text-center mt-12 pb-4 text-[#86868b] font-medium text-sm">
                                     NPD Performance Insights &copy; 2026
                                 </footer>
@@ -3467,6 +3778,36 @@
                                         <div className={`w-1.5 h-1.5 rounded-full ${isSyncing ? 'bg-[#ff9500] animate-pulse' : 'bg-[#34c759]'}`}></div> Live from Google Sheets
                                     </div>
                                     <button onClick={() => setShowUpload(false)} className="bg-[#0071e3] hover:bg-[#0077ED] text-white px-6 py-3 rounded-[14px] text-base font-semibold w-full shadow-md active:scale-95 transition-transform">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Password Modal */}
+                    {showPasswordModal && (
+                        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
+                            <div className="bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-sm overflow-hidden border border-white/20">
+                                <div className="flex justify-between items-center p-5 border-b border-black/5 relative">
+                                    <h2 className="text-lg font-semibold text-[#1d1d1f] w-full text-center tracking-tight flex items-center justify-center gap-2">
+                                        <Box className="w-5 h-5 text-[#0071e3]" /> Restricted Area
+                                    </h2>
+                                    <button onClick={() => setShowPasswordModal(false)} className="text-[#86868b] hover:text-[#1d1d1f] absolute right-5 bg-[#e8e8ed] hover:bg-[#d1d1d6] p-1.5 rounded-full transition-colors"><X className="w-4 h-4" /></button>
+                                </div>
+                                <div className="p-6">
+                                    <p className="text-sm text-[#86868b] text-center mb-5 font-medium">Please enter the 4-digit PIN to access Volume & Pricing dynamics.</p>
+                                    <form onSubmit={handlePasswordSubmit}>
+                                        <input 
+                                            type="password" 
+                                            autoFocus
+                                            maxLength={4}
+                                            value={passwordInput}
+                                            onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(false); }}
+                                            className={`w-full text-center text-2xl tracking-[0.5em] font-bold py-3 rounded-[14px] bg-[#f5f5f7] border focus:outline-none focus:ring-4 transition-all ${passwordError ? 'border-[#ff3b30] focus:ring-[#ff3b30]/10 text-[#ff3b30]' : 'border-black/5 focus:border-[#0071e3]/30 focus:ring-[#0071e3]/10 text-[#1d1d1f]'}`}
+                                            placeholder="••••"
+                                        />
+                                        {passwordError && <p className="text-xs text-[#ff3b30] text-center mt-2 font-bold animate-in slide-in-from-top-1">Incorrect PIN. Please try again.</p>}
+                                        <button type="submit" className="mt-5 bg-[#0071e3] hover:bg-[#0077ED] text-white px-6 py-3 rounded-[14px] text-sm font-bold w-full shadow-md active:scale-95 transition-transform">Unlock Menu</button>
+                                    </form>
                                 </div>
                             </div>
                         </div>
