@@ -849,6 +849,7 @@
             const [activeSub, setActiveSub] = useState(null);
             const [activeSku, setActiveSku] = useState(null);
             const [healthFilter, setHealthFilter] = useState('all');
+            const [show2025Trend, setShow2025Trend] = useState(true); // เพิ่ม State ควบคุมการแสดงเส้น 2025
 
             const valid2026Months = useMemo(() => new Set((salesData || []).filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0])), [salesData]);
 
@@ -1067,9 +1068,19 @@
                                         ) : <span className="text-[10px] text-[#86868b]">N/A YoY</span>}
                                     </div>
                                     <div className="h-6 w-px bg-black/10"></div>
-                                    <div className="flex items-center gap-2 text-[10px] font-bold text-[#86868b] uppercase tracking-wider">
-                                        <div className="flex items-center gap-1"><div className="w-3 h-1 rounded-sm bg-[#30b0c7]"></div> 2026</div>
-                                        <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded-full border-b-2 border-dashed border-[#86868b]"></div> 2025</div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#86868b] uppercase tracking-wider">
+                                            <div className="w-3 h-1 rounded-sm bg-[#30b0c7]"></div> 2026
+                                        </div>
+                                        {/* ปรับ UI Toggle Button ให้ชัดเจนขึ้น */}
+                                        <button 
+                                            onClick={() => setShow2025Trend(!show2025Trend)}
+                                            className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-md transition-all ${show2025Trend ? 'bg-[#f5f5f7] text-[#1d1d1f] hover:bg-[#e8e8ed] shadow-sm' : 'bg-white text-[#86868b] border border-black/5 hover:bg-[#f5f5f7]'}`}
+                                            title={show2025Trend ? "Hide 2025 Trend" : "Show 2025 Trend"}
+                                        >
+                                            {show2025Trend ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                            <span className={show2025Trend ? '' : 'line-through decoration-[#ff3b30] opacity-60'}>2025</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -1091,7 +1102,8 @@
                                             <Area type="monotone" dataKey="sales26" name="2026 Sales" stroke="#30b0c7" strokeWidth={3} fillOpacity={1} fill="url(#colorDeepDive)" dot={{r: 4, fill: '#30b0c7'}} activeDot={{r: 6, strokeWidth: 0}}>
                                                 <LabelList dataKey="sales26" position="top" content={renderCustomLabel} />
                                             </Area>
-                                            <Line type="monotone" dataKey="sales25" name="2025 Sales" stroke="#86868b" strokeWidth={2} strokeDasharray="5 5" dot={{r: 4, fill: '#86868b'}} activeDot={{r: 6, strokeWidth: 0}} />
+                                            {/* เส้น 2025 จะแสดงหรือซ่อนขึ้นอยู่กับ State show2025Trend */}
+                                            {show2025Trend && <Line type="monotone" dataKey="sales25" name="2025 Sales" stroke="#86868b" strokeWidth={2} strokeDasharray="5 5" dot={{r: 4, fill: '#86868b'}} activeDot={{r: 6, strokeWidth: 0}} />}
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 ) : (
@@ -2974,14 +2986,16 @@
                 return Array.from(units).sort();
             }, [filteredData]);
 
-            const [selectedUnit, setSelectedUnit] = useState('PC');
+            const [selectedUnit, setSelectedUnit] = useState('');
+            
             useEffect(() => {
                 if (availableUnits.length > 0 && !availableUnits.includes(selectedUnit)) {
-                    setSelectedUnit(availableUnits.includes('PC') ? 'PC' : availableUnits[0]);
+                    setSelectedUnit(availableUnits[0]);
                 }
             }, [availableUnits, selectedUnit]);
 
             const unitFilteredData = useMemo(() => {
+                if (!selectedUnit) return [];
                 return (filteredData || []).filter(d => d.BaseUnit === selectedUnit);
             }, [filteredData, selectedUnit]);
 
@@ -3091,7 +3105,7 @@
 
             const [filterSubProduct, setFilterSubProduct] = useState('All');
             const [filterChannel, setFilterChannel] = useState('All');
-            const [filterMonth, setFilterMonth] = useState(MONTHS_LIST); // Initialize with all months
+            const [filterMonth, setFilterMonth] = useState(MONTHS_LIST); 
             
             const [topPerfDrillDown, setTopPerfDrillDown] = useState(null);
             const [topCustomerDrillDown, setTopCustomerDrillDown] = useState(null);
@@ -3218,7 +3232,6 @@
                 setTimeout(() => setShowUpload(false), 1200);
             }, [isSyncing, filesStatus]);
 
-            // ป้องกันการ Sync ซ้ำ (Infinite Loop) โดยกำหนดให้ทำงานแค่ครั้งเดียวตอนโหลดหน้าเว็บ
             useEffect(() => { syncAllData(); }, []);
 
             const toggleGroup = useCallback((group) => {
@@ -3289,12 +3302,10 @@
                 const data2026 = filteredData.filter(d => d.Year === '2026');
                 const s26 = data2026.reduce((a, b) => a + (b.NetPrice || 0), 0);
                 
-                // For YoY, we must only compare the exact months selected and present in 2026
                 const filterFn25 = (d) => {
                     const matchGroup = selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup);
                     const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
                     const matchChannel = filterChannel === 'All' || d.Channel === filterChannel;
-                    // Only sum 2025 months if they are selected in filter AND exist in the 2026 valid months
                     const mStr = d.Month ? d.Month.substring(0, 3) : null;
                     const matchMonth = (isAllMonthsSelected || filterMonth.includes(mStr)) && valid2026Months.has(mStr);
                     return matchGroup && matchSub && matchChannel && matchMonth;
@@ -3303,7 +3314,6 @@
                 const data2025_filtered = salesData.filter(d => d.Year === '2025' && filterFn25(d));
                 const s25_YTD = data2025_filtered.reduce((a, b) => a + (b.NetPrice || 0), 0);
                 
-                // Full FY25 base for Dynamic Projection (might need all months for seasonality calc, keeping original logic for FY25)
                 const fy25FilterFn = (d) => {
                      const matchGroup = selectedGroups.includes('ALL') || selectedGroups.includes(d.ProductGroup);
                     const matchSub = filterSubProduct === 'All' || d.SubProductGroup === filterSubProduct;
@@ -3405,7 +3415,6 @@
                 ytd25 = monthly25Sales.slice(0, validMonthsCount).reduce((s, v) => s + v, 0);
                 if (ytd25 > 0 && fy25Total > 0) isSeasonality = true;
 
-                // Adjust runrate calculation to only count selected months
                 const activeSelectedMonthsCount = filterMonth.filter(m => {
                     const mIdx = MONTHS_LIST.indexOf(m);
                     return mIdx !== -1 && mIdx <= latestMonthIdx;
@@ -3460,7 +3469,6 @@
 
             const rawTopPerformers = useMemo(() => {
                 const skuMap = {};
-                // Only consider months valid in 2026 AND selected in the filter
                 const valid2026MonthsData = salesData.filter(d => d.Year === '2026' && (isAllMonthsSelected || filterMonth.includes(d.Month?.substring(0,3))));
                 const valid2026Months = new Set(valid2026MonthsData.map(d => d.Month?.split('-')[0]));
 
@@ -3500,7 +3508,6 @@
 
             const rawTopCustomers = useMemo(() => {
                 const customerMap = {};
-                // Only consider months valid in 2026 AND selected in the filter
                 const valid2026MonthsData = salesData.filter(d => d.Year === '2026' && (isAllMonthsSelected || filterMonth.includes(d.Month?.substring(0,3))));
                 const valid2026Months = new Set(valid2026MonthsData.map(d => d.Month?.split('-')[0]));
 
@@ -3754,7 +3761,7 @@
                         </main>
                     </div>
 
-                    {/* Sync Modal Component (Unchanged logic, positioned relatively) */}
+                    {/* Sync Modal Component */}
                     {showUpload && (
                         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
                             <div className="bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20">
