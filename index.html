@@ -936,7 +936,10 @@
             }, [filteredData, activeName, drillDownPath, monthsList]);
 
             const yAxisTicks = useMemo(() => {
-                const maxVal = (chartData || []).reduce((max, d) => Math.max(max, d.sales25 || 0, d.sales26 || 0), 0);
+                const maxVal = (chartData || []).reduce((max, d) => {
+                    const val25 = show2025Trend ? (d.sales25 || 0) : 0;
+                    return Math.max(max, val25, d.sales26 || 0);
+                }, 0);
                 if (maxVal === 0) return [0, 1000000];
                 const targetMax = maxVal * 1.15;
                 const roughStep = targetMax / 4; 
@@ -948,7 +951,7 @@
                 const ticks = [];
                 for (let current = 0; current <= maxTick + (step * 0.1); current += step) ticks.push(current);
                 return ticks;
-            }, [chartData]);
+            }, [chartData, show2025Trend]);
 
             return (
                 <div className="bg-white p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col">
