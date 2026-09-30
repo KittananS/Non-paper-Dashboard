@@ -225,38 +225,50 @@
         const SafeWidget = memo(({ children }) => <ErrorBoundary>{children}</ErrorBoundary>);
 
         // --- Helpers ---
+        const normalizeTextCache = new Map();
+
         const normalizeText = (text, type = 'general') => {
             if (!text || text.toString().trim() === '') return 'Unknown';
             const str = text.toString().trim();
+            const cacheKey = `${type}:${str}`;
+            
+            if (normalizeTextCache.has(cacheKey)) return normalizeTextCache.get(cacheKey);
+
             const upper = str.toUpperCase();
+            let result = str;
 
-            if (upper === 'MT') return 'MT';
-            if (upper === 'GT') return 'GT';
-            if (upper === 'TT') return 'TT';
-            if (upper === 'OB') return 'OB';
-            if (upper === 'BJC') return 'BJC';
-            if (upper === 'CVS') return 'CVS';
-            if (upper === 'ONLINE') return 'Online';
-            if (upper === 'INTER COMPANY' || upper === 'INTERCOMPANY') return 'Inter Company';
-
-            if (type === 'channel' || type === 'customer') {
+            if (upper === 'MT') result = 'MT';
+            else if (upper === 'GT') result = 'GT';
+            else if (upper === 'TT') result = 'TT';
+            else if (upper === 'OB') result = 'OB';
+            else if (upper === 'BJC') result = 'BJC';
+            else if (upper === 'CVS') result = 'CVS';
+            else if (upper === 'ONLINE') result = 'Online';
+            else if (upper === 'INTER COMPANY' || upper === 'INTERCOMPANY') result = 'Inter Company';
+            else if (type === 'channel' || type === 'customer') {
                 let formatted = str.toLowerCase().replace(/(?:^|\s|-|\/)\S/g, match => match.toUpperCase());
                 PRECOMPILED_BRAND_REGEXES.forEach(({ regex, replacement }) => {
                     formatted = formatted.replace(regex, replacement);
                 });
-                return formatted;
+                result = formatted;
             }
-            
-            if (type === 'product' || type === 'sku' || type === 'subgroup') {
-                return upper;
+            else if (type === 'product' || type === 'sku' || type === 'subgroup') {
+                result = upper;
             }
-            return str;
+
+            normalizeTextCache.set(cacheKey, result);
+            return result;
         };
 
         const cleanCurrency = (val) => {
             if (typeof val === 'number') return val;
             if (!val) return 0;
-            return parseFloat(val.toString().replace(/[฿",]/g, '').trim()) || 0;
+            const strVal = typeof val === 'string' ? val : String(val);
+            // ข้ามการใช้ Regex ถ้ายอดเงินไม่มีสัญลักษณ์พิเศษ (ช่วยเพิ่มความเร็วในการวนลูป)
+            if (strVal.indexOf('฿') === -1 && strVal.indexOf(',') === -1 && strVal.indexOf('"') === -1) {
+                return parseFloat(strVal) || 0;
+            }
+            return parseFloat(strVal.replace(/[฿",]/g, '').trim()) || 0;
         };
 
         const isChainBasedChannel = (channel) => {
