@@ -516,6 +516,43 @@
             );
         });
 
+        const Sparkline = memo(({ data }) => {
+            if (!data || data.length === 0) return <div className="w-16 h-6" />;
+            
+            // Trim future empty months to only calculate trend for YTD actuals
+            let lastIndex = data.length - 1;
+            while(lastIndex >= 0 && data[lastIndex] === 0) {
+                lastIndex--;
+            }
+            if (lastIndex < 1) return <div className="w-16 h-6" />;
+            
+            const activeData = data.slice(0, lastIndex + 1);
+            const max = Math.max(...activeData);
+            const min = Math.min(...activeData);
+            const range = max - min || 1;
+            
+            // ใช้สีเทาเรียบๆ สบายตา ตามโทนของแอป (สามารถเปลี่ยนเป็น #0071e3 ถ้าต้องการให้เป็นสีฟ้า)
+            const color = '#86868b';
+
+            const width = 64;
+            const height = 24;
+
+            const points = activeData.map((val, i) => {
+                const x = (i / (activeData.length - 1)) * width;
+                const y = height - ((val - min) / range) * height;
+                return `${x},${y}`;
+            }).join(' ');
+
+            const lastY = height - ((activeData[activeData.length - 1] - min) / range) * height;
+
+            return (
+                <svg width={width} height={height} className="overflow-visible" style={{ minWidth: width }}>
+                    <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx={width} cy={lastY} r="2.5" fill={color} />
+                </svg>
+            );
+        });
+
         const SyncStatusSlot = memo(({ label, status }) => {
             let statusColor = 'bg-[#e5e5ea]';
             let statusText = 'Pending';
@@ -863,7 +900,7 @@
             const [healthFilter, setHealthFilter] = useState('all');
             const [show2025Trend, setShow2025Trend] = useState(true); // เพิ่ม State ควบคุมการแสดงเส้น 2025
 
-            const valid2026Months = useMemo(() => new Set((salesData || []).filter(d => d.Year === '2026').map(d => d.Month?.split('-')[0])), [salesData]);
+            const valid2026Months = useMemo(() => new Set((salesData || []).filter(d => d.Year === '2026').map(d => d.Month?.split('-')?.[0])), [salesData]);
 
             const currentList = useMemo(() => {
                 const map = {};
@@ -877,7 +914,7 @@
                     }
                     if (d.Year === '2026') {
                         map[key].s26 += (d.NetPrice || 0);
-                    } else if (d.Year === '2025' && valid2026Months.has(d.Month?.split('-')[0])) {
+                    } else if (d.Year === '2025' && valid2026Months.has(d.Month?.split('-')?.[0])) {
                         map[key].s25 += (d.NetPrice || 0);
                     }
                 });
@@ -927,7 +964,7 @@
                 const matchData = (filteredData || []).filter(d => isSkuView ? (d.GroupSKU || 'Unknown') === activeName : (d.SubProductGroup || 'Unknown') === activeName);
                 
                 const s26 = matchData.filter(d => d.Year === '2026').reduce((acc, curr) => acc + (curr.NetPrice || 0), 0);
-                const s25 = matchData.filter(d => d.Year === '2025' && valid2026Months.has(d.Month?.split('-')[0])).reduce((acc, curr) => acc + (curr.NetPrice || 0), 0);
+                const s25 = matchData.filter(d => d.Year === '2025' && valid2026Months.has(d.Month?.split('-')?.[0])).reduce((acc, curr) => acc + (curr.NetPrice || 0), 0);
                 const yoy = s25 > 0 ? ((s26 - s25) / s25) * 100 : null;
 
                 return { sales: s26, yoy };
@@ -1903,7 +1940,7 @@
 
                 data.forEach(d => {
                     const key = d[groupBy] || 'Unknown';
-                    if (!map[key]) map[key] = { name: key, totalSales: 0, validSales: 0, validCost: 0, fallbackMockMargin: 0.3 + (((d.ProductName || '').length || 10) % 40) / 100 };
+                    if (!map[key]) map[key] = { name: key, totalSales: 0, validSales: 0, validCost: 0, fallbackMockMargin: 0.3 + (((d.ProductName || '').length || 10) % 40) / 100, monthlySales: new Array(12).fill(0) };
                     
                     const sales = d.NetPrice || 0;
                     let cost = cleanCurrency(d.Cost || d.COGS || d['Standard Cost'] || d['Total Cost'] || d['Standard Price'] || 0);
@@ -1912,6 +1949,10 @@
                         const mockMargin = 0.3 + ((d.ProductName?.length || 10) % 40) / 100;
                         cost = sales * (1 - mockMargin);
                     }
+
+                    const mStr = d.Month ? d.Month.substring(0, 3) : null;
+                    const mIdx = mStr ? MONTH_MAP[mStr] - 1 : -1;
+                    if (mIdx >= 0) map[key].monthlySales[mIdx] += sales;
 
                     map[key].totalSales += sales;
                     overallTotalSales += sales;
@@ -1998,6 +2039,7 @@
                                 <tr>
                                     <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider w-16 text-center">Rank</th>
                                     <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider">{currentLevelName}</th>
+                                    <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider text-center w-24">Trend</th>
                                     <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider text-right w-40">Net Sales (฿)</th>
                                     <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider text-right w-40">Gross Profit (฿)</th>
                                     <th className="py-3 px-4 font-semibold text-[#86868b] text-xs uppercase tracking-wider text-right w-56">% Margin</th>
@@ -2011,6 +2053,9 @@
                                         <tr key={item.name} onClick={() => { if (canDrillDown) { setBreadcrumbs([...breadcrumbs, item.name]); setSearch(''); } }} className={`border-b border-[#e5e5ea]/50 transition-colors group relative ${canDrillDown ? 'cursor-pointer hover:bg-[#0071e3]/5' : ''}`}>
                                             <td className="py-4 px-4 text-center font-semibold text-[#86868b]">#{idx + 1}</td>
                                             <td className={`py-4 px-4 font-semibold text-[#1d1d1f] transition-colors truncate max-w-[250px] ${canDrillDown ? 'group-hover:text-[#0071e3]' : ''}`} title={item.name}>{item.name}</td>
+                                            <td className="py-4 px-4 text-center">
+                                                <div className="flex justify-center"><Sparkline data={item.monthlySales} /></div>
+                                            </td>
                                             <td className="py-4 px-4 text-right font-medium text-[#1d1d1f]">{(item.sales || 0).toLocaleString(undefined, {maximumFractionDigits:0})}</td>
                                             <td className="py-4 px-4 text-right font-medium text-[#34c759]">{(item.gp || 0).toLocaleString(undefined, {maximumFractionDigits:0})}</td>
                                             <td className="py-4 px-4 pr-10 relative">
@@ -2024,7 +2069,7 @@
                                         </tr>
                                     );
                                 }) : (
-                                    <tr><td colSpan="5" className="py-12 text-center text-[#86868b] font-medium"><Search className="w-8 h-8 opacity-20 mx-auto mb-2" />No records found</td></tr>
+                                    <tr><td colSpan="6" className="py-12 text-center text-[#86868b] font-medium"><Search className="w-8 h-8 opacity-20 mx-auto mb-2" />No records found</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -2057,6 +2102,7 @@
                             <tr>
                                 <th className="py-3 pl-3 w-16">Rank</th>
                                 <th className="py-3">Name</th>
+                                <th className="py-3 px-2 w-24 text-center">Trend</th>
                                 <th className="py-3 px-2 min-w-[200px]">Channels</th>
                                 <th className="py-3 text-right cursor-pointer" onClick={() => setTopPerfSortMode('sales')}>Sales {topPerfSortMode === 'sales' && <ArrowDown className="w-3 h-3 inline text-[#0071e3]" />}</th>
                                 <th className="py-3 pr-3 text-right cursor-pointer" onClick={() => setTopPerfSortMode('yoy')}>YoY {topPerfSortMode === 'yoy' && <ArrowDown className="w-3 h-3 inline text-[#0071e3]" />}</th>
@@ -2072,6 +2118,9 @@
                                         <tr key={idx} className="border-b border-[#e5e5ea]/50 hover:bg-[#f5f5f7]">
                                             <td className="py-4 pl-3 font-semibold text-[#86868b]">#{idx + 1}</td>
                                             <td className="py-4 font-medium text-[#1d1d1f]">{prod.name}</td>
+                                            <td className="py-4 px-2 text-center">
+                                                <div className="flex justify-center"><Sparkline data={prod.monthlySales} /></div>
+                                            </td>
                                             <td className="py-4 px-2">
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {(prod.topChannels || []).map(c => <span key={c.name} className="px-2 py-0.5 bg-white border border-black/5 text-[10px] rounded-md truncate max-w-[160px]">{c.name} ({c.pct}%)</span>)}
@@ -2100,6 +2149,9 @@
                                             <td className="py-4">
                                                 <div className="font-semibold text-[#1d1d1f] hover:text-[#0071e3]">{item.sku}</div>
                                                 <div className="text-xs text-[#86868b] truncate max-w-xs">{item.name}</div>
+                                            </td>
+                                            <td className="py-4 px-2 text-center">
+                                                <div className="flex justify-center"><Sparkline data={item.monthlySales} /></div>
                                             </td>
                                             <td className="py-4 px-2">
                                                 <div className="flex flex-wrap gap-1.5">
@@ -2551,6 +2603,7 @@
                                 <th className="py-3 px-4 w-16 text-center">Rank</th>
                                 <th className="py-3 px-4">{topCustomerDrillDown ? 'Product Name' : 'Sold-To Party / Chain'}</th>
                                 {!topCustomerDrillDown && <th className="py-3 px-4 w-24">Channel</th>}
+                                <th className="py-3 px-4 w-24 text-center">Trend</th>
                                 <th className="py-3 px-4 text-right cursor-pointer" onClick={() => setTopCustomerSortMode('sales')}>Sales {topCustomerSortMode === 'sales' && <ArrowDown className="w-3 h-3 inline text-[#0071e3]" />}</th>
                                 <th className="py-3 px-4 text-right cursor-pointer" onClick={() => setTopCustomerSortMode('yoy')}>YoY {topCustomerSortMode === 'yoy' && <ArrowDown className="w-3 h-3 inline text-[#0071e3]" />}</th>
                                 <th className="py-3 px-4 text-right">% Proportion</th>
@@ -2565,6 +2618,9 @@
                                         <tr key={idx} className="border-b border-[#e5e5ea]/50 hover:bg-[#f5f5f7]">
                                             <td className="py-4 px-4 text-center font-semibold text-[#86868b]">#{idx + 1}</td>
                                             <td className="py-4 px-4 font-medium text-[#1d1d1f]">{prod.name}</td>
+                                            <td className="py-4 px-4 text-center">
+                                                <div className="flex justify-center"><Sparkline data={prod.monthlySales} /></div>
+                                            </td>
                                             <td className="py-4 px-4 text-right font-semibold text-[#1d1d1f]">฿{(prod.value || 0).toLocaleString()}</td>
                                             <td className="py-4 px-4 text-right font-medium">{yoy !== null ? <span className={yoy >= 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'}>{yoy >= 0 ? '▲' : '▼'} {Math.abs(yoy).toFixed(1)}%</span> : <span className="text-[#86868b]">N/A</span>}</td>
                                             <td className="py-4 px-4 text-right font-semibold text-[#86868b]">{proportion}%</td>
@@ -2580,6 +2636,9 @@
                                             <td className="py-4 px-4 text-center font-semibold text-[#86868b]">#{idx + 1}</td>
                                             <td className="py-4 px-4 font-medium text-[#1d1d1f]">{item.name}</td>
                                             <td className="py-4 px-4"><span className="bg-[#e5e5ea] px-2.5 py-1 rounded-md text-[11px] font-semibold">{item.channel}</span></td>
+                                            <td className="py-4 px-4 text-center">
+                                                <div className="flex justify-center"><Sparkline data={item.monthlySales} /></div>
+                                            </td>
                                             <td className="py-4 px-4 text-right font-semibold text-[#1d1d1f]">฿{(item.totalSales26 || 0).toLocaleString()}</td>
                                             <td className="py-4 px-4 text-right font-medium">{yoy !== null ? <span className={yoy >= 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'}>{yoy >= 0 ? '▲' : '▼'} {Math.abs(yoy).toFixed(1)}%</span> : <span className="text-[#86868b]">N/A</span>}</td>
                                             <td className="py-4 px-4 text-right font-semibold text-[#86868b]">{proportion}%</td>
@@ -2636,8 +2695,11 @@
                     const map = {};
                     data.forEach(d => {
                         const key = d[groupBy] || 'Unknown';
-                        if (!map[key]) map[key] = { name: key, sales: 0, locations: new Set() };
+                        if (!map[key]) map[key] = { name: key, sales: 0, locations: new Set(), monthlySales: new Array(12).fill(0) };
                         map[key].sales += (d.NetPrice || 0);
+                        const mStr = d.Month ? d.Month.substring(0, 3) : null;
+                        const mIdx = mStr ? MONTH_MAP[mStr] - 1 : -1;
+                        if (mIdx >= 0) map[key].monthlySales[mIdx] += (d.NetPrice || 0);
                         const loc = ['MT', 'ONLINE'].includes(d.Channel?.toUpperCase() || '') ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
                         if (loc !== 'Unknown') map[key].locations.add(`${d.Channel}|${loc}`);
                     });
@@ -2687,6 +2749,7 @@
                                     <tr>
                                         <th className="py-3 px-4 w-16 text-center">Rank</th>
                                         <th className="py-3 px-4">{currentLevelName}</th>
+                                        <th className="py-3 px-4 w-24 text-center">Trend</th>
                                         <th className="py-3 px-4 text-right">Sales 2026</th>
                                         <th className="py-3 px-4 text-right">Active Locations</th>
                                     </tr>
@@ -2698,6 +2761,9 @@
                                             <tr key={item.name} onClick={() => { setBreadcrumbs([...breadcrumbs, item.name]); setSearch(''); }} className="border-b border-[#e5e5ea]/50 hover:bg-[#0071e3]/5 cursor-pointer">
                                                 <td className="py-4 px-4 text-center text-[#86868b]">#{idx + 1}</td>
                                                 <td className="py-4 px-4 font-semibold text-[#1d1d1f]">{item.name}</td>
+                                                <td className="py-4 px-4 text-center">
+                                                    <div className="flex justify-center"><Sparkline data={item.monthlySales} /></div>
+                                                </td>
                                                 <td className="py-4 px-4 text-right text-[#1d1d1f]">฿{(item.sales || 0).toLocaleString()}</td>
                                                 <td className="py-4 px-4 pr-10 text-right font-bold">
                                                     <div className="flex items-center justify-end gap-3">
@@ -2707,7 +2773,7 @@
                                                 </td>
                                             </tr>
                                         );
-                                    }) : <tr><td colSpan="4" className="py-12 text-center text-[#86868b]">No records found</td></tr>}
+                                    }) : <tr><td colSpan="5" className="py-12 text-center text-[#86868b]">No records found</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -3441,7 +3507,7 @@
 
             const kpi = useMemo(() => {
                 const valid2026MonthsData = salesData.filter(d => d.Year === '2026' && (isAllMonthsSelected || filterMonth.includes(d.Month?.substring(0,3))));
-                const valid2026Months = new Set(valid2026MonthsData.map(d => d.Month?.split('-')[0])); 
+                const valid2026Months = new Set(valid2026MonthsData.map(d => d.Month?.split('-')?.[0])); 
                 const monthsCount26 = valid2026Months.size || 1; 
                 
                 const data2026 = filteredData.filter(d => d.Year === '2026');
@@ -3614,22 +3680,29 @@
 
             const rawTopPerformers = useMemo(() => {
                 const skuMap = {};
+                // Only consider months valid in 2026 AND selected in the filter
                 const valid2026MonthsData = salesData.filter(d => d.Year === '2026' && (isAllMonthsSelected || filterMonth.includes(d.Month?.substring(0,3))));
-                const valid2026Months = new Set(valid2026MonthsData.map(d => d.Month?.split('-')[0]));
+                const valid2026Months = new Set(valid2026MonthsData.map(d => d.Month?.split('-')?.[0]));
 
                 filteredData.forEach(d => {
                     const key = d.GroupSKU || 'Unknown';
-                    if (!skuMap[key]) skuMap[key] = { totalSales26: 0, totalSales25: 0, products: {}, channels: {} };
+                    if (!skuMap[key]) skuMap[key] = { totalSales26: 0, totalSales25: 0, products: {}, channels: {}, monthlySales: new Array(12).fill(0) };
                     if (d.Year === '2026') {
                         skuMap[key].totalSales26 += (d.NetPrice || 0);
+                        const mStr = d.Month ? d.Month.substring(0, 3) : null;
+                        const mIdx = mStr ? MONTH_MAP[mStr] - 1 : -1;
+                        if (mIdx >= 0) skuMap[key].monthlySales[mIdx] += (d.NetPrice || 0);
+
                         const pName = d.ProductName || 'Unknown';
-                        if (!skuMap[key].products[pName]) skuMap[key].products[pName] = { val26: 0, val25: 0, channels: {} };
+                        if (!skuMap[key].products[pName]) skuMap[key].products[pName] = { val26: 0, val25: 0, channels: {}, monthlySales: new Array(12).fill(0) };
                         skuMap[key].products[pName].val26 += (d.NetPrice || 0);
+                        if (mIdx >= 0) skuMap[key].products[pName].monthlySales[mIdx] += (d.NetPrice || 0);
+                        
                         const channelName = isChainBasedChannel(d.Channel) ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
                         skuMap[key].channels[channelName] = (skuMap[key].channels[channelName] || 0) + (d.NetPrice || 0);
                         skuMap[key].products[pName].channels[channelName] = (skuMap[key].products[pName].channels[channelName] || 0) + (d.NetPrice || 0);
                     } else if (d.Year === '2025') {
-                        const monthPrefix = d.Month ? d.Month.split('-')[0] : '';
+                        const monthPrefix = d.Month ? d.Month.split('-')?.[0] : '';
                         if (valid2026Months.has(monthPrefix)) {
                             skuMap[key].totalSales25 += (d.NetPrice || 0);
                             const pName = d.ProductName || 'Unknown';
@@ -3639,8 +3712,8 @@
                     }
                 });
                 return Object.entries(skuMap).map(([sku, data]) => {
-                    const sortedProducts = Object.entries(data.products).map(([pName, pData]) => ({ name: pName, value: pData.val26, sales25: pData.val25, topChannels: getParetoTopItems(pData.channels) })).filter(p => p.value > 0 || p.sales25 > 0).sort((a, b) => b.value - a.value);
-                    return { sku, name: sortedProducts.length > 0 ? sortedProducts[0].name : sku, value: data.totalSales26, sales25: data.totalSales25, allProducts: sortedProducts, topChannels: getParetoTopItems(data.channels) };
+                    const sortedProducts = Object.entries(data.products).map(([pName, pData]) => ({ name: pName, value: pData.val26, sales25: pData.val25, monthlySales: pData.monthlySales, topChannels: getParetoTopItems(pData.channels) })).filter(p => p.value > 0 || p.sales25 > 0).sort((a, b) => b.value - a.value);
+                    return { sku, name: sortedProducts.length > 0 ? sortedProducts[0].name : sku, value: data.totalSales26, sales25: data.totalSales25, monthlySales: data.monthlySales, allProducts: sortedProducts, topChannels: getParetoTopItems(data.channels) };
                 }).filter(item => item.value > 0 || item.sales25 > 0);
             }, [filteredData, salesData, filterMonth]);
 
@@ -3653,24 +3726,32 @@
 
             const rawTopCustomers = useMemo(() => {
                 const customerMap = {};
+                // Only consider months valid in 2026 AND selected in the filter
                 const valid2026MonthsData = salesData.filter(d => d.Year === '2026' && (isAllMonthsSelected || filterMonth.includes(d.Month?.substring(0,3))));
-                const valid2026Months = new Set(valid2026MonthsData.map(d => d.Month?.split('-')[0]));
+                const valid2026Months = new Set(valid2026MonthsData.map(d => d.Month?.split('-')?.[0]));
 
                 filteredData.forEach(d => {
                     const customerName = ['MT', 'ONLINE'].includes(d.Channel?.toUpperCase() || '') ? (d.SubChannel || 'Unknown') : (d.SoldToParty || 'Unknown');
                     const key = `${customerName}|${d.Channel || 'Unknown'}`;
-                    if (!customerMap[key]) customerMap[key] = { name: customerName, channel: d.Channel || 'Unknown', totalSales26: 0, totalSales25: 0, products: {}, productDetails: {} };
+                    if (!customerMap[key]) customerMap[key] = { name: customerName, channel: d.Channel || 'Unknown', totalSales26: 0, totalSales25: 0, products: {}, productDetails: {}, monthlySales: new Array(12).fill(0) };
                     
                     const pName = d.ProductName || 'Unknown';
-                    if (!customerMap[key].productDetails[pName]) customerMap[key].productDetails[pName] = { val26: 0, val25: 0 };
+                    if (!customerMap[key].productDetails[pName]) customerMap[key].productDetails[pName] = { val26: 0, val25: 0, monthlySales: new Array(12).fill(0) };
 
                     if (d.Year === '2026') {
                         customerMap[key].totalSales26 += (d.NetPrice || 0);
+                        const mStr = d.Month ? d.Month.substring(0, 3) : null;
+                        const mIdx = mStr ? MONTH_MAP[mStr] - 1 : -1;
+                        if (mIdx >= 0) {
+                            customerMap[key].monthlySales[mIdx] += (d.NetPrice || 0);
+                            customerMap[key].productDetails[pName].monthlySales[mIdx] += (d.NetPrice || 0);
+                        }
+
                         const prodKey = d.GroupSKU || 'Unknown';
                         customerMap[key].products[prodKey] = (customerMap[key].products[prodKey] || 0) + (d.NetPrice || 0);
                         customerMap[key].productDetails[pName].val26 += (d.NetPrice || 0);
                     } else if (d.Year === '2025') {
-                        const monthPrefix = d.Month ? d.Month.split('-')[0] : '';
+                        const monthPrefix = d.Month ? d.Month.split('-')?.[0] : '';
                         if (valid2026Months.has(monthPrefix)) {
                             customerMap[key].totalSales25 += (d.NetPrice || 0);
                             customerMap[key].productDetails[pName].val25 += (d.NetPrice || 0);
@@ -3679,7 +3760,7 @@
                 });
                 
                 return Object.values(customerMap).filter(item => item.totalSales26 > 0 || item.totalSales25 > 0).map(item => {
-                    const allProducts = Object.entries(item.productDetails).map(([name, data]) => ({ name, value: data.val26, sales25: data.val25 })).filter(p => p.value > 0 || p.sales25 > 0).sort((a, b) => b.value - a.value);
+                    const allProducts = Object.entries(item.productDetails).map(([name, data]) => ({ name, value: data.val26, sales25: data.val25, monthlySales: data.monthlySales })).filter(p => p.value > 0 || p.sales25 > 0).sort((a, b) => b.value - a.value);
                     return { ...item, topProducts: getParetoTopItems(item.products), allProducts };
                 });
             }, [filteredData, salesData, filterMonth]);
