@@ -160,10 +160,21 @@
         // ============================================================================
         const UPDATE_LOGS = [
             {
+                version: 'v2.1.1',
+                date: '16 Oct 2026',
+                badge: 'Latest Patch',
+                badgeColor: 'bg-[#0071e3] text-white',
+                title: 'Tap for Insights: Sub-Channel Apple-to-Apple Comparison',
+                highlights: [
+                    '🎯 Sub-Channel Apple-to-Apple Matching: ปรับปรุงระบบคำนวณ Top 3 Channels ในหน้าต่าง TAP FOR INSIGHTS ของกราฟ Sales Trend 2025 vs 2026 ให้ดึงข้อมูลจากคอลัมน์ Sub-channel โดยตรงทั้งปี 2025 และ 2026 เพื่อเทียบยอดขายและ % YoY Growth แบบ Apple-to-Apple อย่างแม่นยำ',
+                    '🏷️ Main Channel Context Badge: แสดงป้ายกำกับ Channel หลักคู่กับชื่อ Sub-channel ในการ์ด Top 3 Sub-Channels เพื่อความชัดเจนในการวิเคราะห์'
+                ]
+            },
+            {
                 version: 'v2.1.0',
                 date: '15 Oct 2026',
-                badge: 'Latest Release',
-                badgeColor: 'bg-[#0071e3] text-white',
+                badge: 'Major Feature',
+                badgeColor: 'bg-[#af52de]/15 text-[#af52de]',
                 title: 'Thai Deep-Dive Executive Synthesis (6-Pillar Intelligence)',
                 highlights: [
                     '🧠 6-Pillar Executive Synthesis (ภาษาไทย): ยกระดับบทวิเคราะห์ผู้บริหารเป็นภาษาไทย ครอบคลุม 6 มิติเชิงลึก (Run-Rate & Pacing, YoY Momentum & 2027 Readiness, Margin & Cost Structure, Pareto SKU & Sub-Product Health, Channel Concentration & Customer Base, และ Actionable Strategic Playbook)',
@@ -2125,15 +2136,24 @@
                                         </div>
                                     </div>
                                     <div>
-                                        <h4 className="text-xs font-extrabold text-[#86868b] uppercase tracking-wider mb-3 flex items-center gap-2"><Store className="w-4 h-4"/> Top 3 Channels</h4>
+                                        <h4 className="text-xs font-extrabold text-[#86868b] uppercase tracking-wider mb-3 flex items-center gap-2"><Store className="w-4 h-4"/> Top 3 Sub-Channels</h4>
                                         <div className="space-y-3">
                                             {selectedInsight.topChannels.map((c, i) => (
                                                 <div key={i} className="bg-[#f5f5f7] p-3 rounded-xl border border-black/5 flex flex-col gap-2">
-                                                    <div className="font-semibold text-sm text-[#1d1d1f] truncate" title={c.name}>{c.name}</div>
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="font-semibold text-sm text-[#1d1d1f] truncate" title={c.name}>{c.name}</div>
+                                                        {c.parentChannel && (
+                                                            <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white text-[#86868b] border border-black/5 shrink-0">
+                                                                {c.parentChannel}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <div className="flex justify-between items-end border-t border-black/5 pt-2">
                                                         <div className="flex flex-col">
-                                                            <span className="text-[10px] text-[#86868b] font-medium">Sales</span>
-                                                            <span className="font-bold text-[#0071e3]">฿{(c.val26/1000000).toFixed(2)}M</span>
+                                                            <span className="text-[10px] text-[#86868b] font-medium">Sales 26 / 25</span>
+                                                            <span className="font-bold text-[#0071e3]">
+                                                                ฿{(c.val26/1000000).toFixed(2)}M <span className="text-[10px] font-normal text-[#86868b]">vs ฿{(c.val25/1000000).toFixed(2)}M</span>
+                                                            </span>
                                                         </div>
                                                         <div className="flex flex-col text-center">
                                                             <span className="text-[10px] text-[#86868b] font-medium">Mix</span>
@@ -2142,7 +2162,7 @@
                                                         <div className="flex flex-col text-right">
                                                             <span className="text-[10px] text-[#86868b] font-medium">YoY Grw.</span>
                                                             <span className={`font-bold ${c.yoy >= 0 ? 'text-[#34c759]' : (c.yoy === null ? 'text-[#86868b]' : 'text-[#ff3b30]')}`}>
-                                                                {c.yoy !== null ? (c.yoy >= 0 ? `▲ ${c.yoy.toFixed(1)}%` : `▼ ${Math.abs(c.yoy).toFixed(1)}%`) : 'N/A'}
+                                                                {c.yoy !== null ? (c.yoy >= 0 ? `▲ ${c.yoy.toFixed(1)}%` : `▼ ${Math.abs(c.yoy).toFixed(1)}%`) : 'New / N/A'}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -4464,44 +4484,64 @@
                     const latestData26 = rows26ByMonth[latestMonthIdx];
                     const latestData25 = rows25ByMonth[latestMonthIdx];
                     
-                    const prodMap26 = {}, prodMap25 = {}, chMap26 = {}, chMap25 = {};
+                    const prodMap26 = {}, prodMap25 = {}, chMap26 = {}, chMap25 = {}, subChParentMap = {};
                     
+                    // Strict Sub-channel normalization for Apple-to-Apple comparison between 2025 and 2026
+                    const resolveSubChannelKey = (row) => {
+                        const rawSub = row.SubChannel && row.SubChannel !== 'Unknown' ? row.SubChannel : (row.Channel || 'Unknown');
+                        return normalizeText(rawSub, 'channel');
+                    };
+
                     for (let i = 0; i < latestData26.length; i++) {
                         const d = latestData26[i];
                         const p = d.ProductName || 'Unknown';
-                        const c = isChainBasedChannel(d.Channel) ? (d.SubChannel || d.Channel || 'Unknown') : (d.Channel || 'Unknown');
+                        const subChKey = resolveSubChannelKey(d);
                         const val = Number(d.NetPrice) || 0;
                         prodMap26[p] = (prodMap26[p] || 0) + val;
-                        chMap26[c] = (chMap26[c] || 0) + val;
+                        chMap26[subChKey] = (chMap26[subChKey] || 0) + val;
+                        if (!subChParentMap[subChKey] && d.Channel && d.Channel !== 'Unknown') {
+                            subChParentMap[subChKey] = d.Channel;
+                        }
                     }
                     
                     for (let i = 0; i < latestData25.length; i++) {
                         const d = latestData25[i];
                         const p = d.ProductName || 'Unknown';
-                        const c = isChainBasedChannel(d.Channel) ? (d.SubChannel || d.Channel || 'Unknown') : (d.Channel || 'Unknown');
+                        const subChKey = resolveSubChannelKey(d);
                         const val = Number(d.NetPrice) || 0;
                         prodMap25[p] = (prodMap25[p] || 0) + val;
-                        chMap25[c] = (chMap25[c] || 0) + val;
+                        chMap25[subChKey] = (chMap25[subChKey] || 0) + val;
+                        if (!subChParentMap[subChKey] && d.Channel && d.Channel !== 'Unknown') {
+                            subChParentMap[subChKey] = d.Channel;
+                        }
                     }
                     
                     const totalMonthSales = monthly26Sales[latestMonthIdx];
 
-                    const formatTop = (map26, map25, total) => {
+                    const formatTop = (map26, map25, total, parentMap = null) => {
                         return Object.entries(map26)
+                            .filter(([name, val26]) => name !== 'Unknown' && val26 > 0)
                             .sort((a, b) => b[1] - a[1])
                             .slice(0, 3)
                             .map(([name, val26]) => {
                                 const val25 = map25[name] || 0;
                                 const pct = total > 0 ? (val26 / total) * 100 : 0;
                                 const yoy = val25 > 0 ? ((val26 - val25) / val25) * 100 : null;
-                                return { name, val26, val25, pct, yoy };
+                                return { 
+                                    name, 
+                                    val26, 
+                                    val25, 
+                                    pct, 
+                                    yoy,
+                                    parentChannel: parentMap ? (parentMap[name] || null) : null
+                                };
                             });
                     };
 
                     latestMonthInsights = {
                         month: MONTHS_LIST[latestMonthIdx],
                         topProducts: formatTop(prodMap26, prodMap25, totalMonthSales),
-                        topChannels: formatTop(chMap26, chMap25, totalMonthSales),
+                        topChannels: formatTop(chMap26, chMap25, totalMonthSales, subChParentMap),
                         sales: totalMonthSales
                     };
                 }
