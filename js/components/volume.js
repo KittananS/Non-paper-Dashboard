@@ -12,7 +12,7 @@
 
     const Icons = NPD.icons || NPD.createIconFactory(React);
     const { BarChart2, TrendingUp, Info, Box, Tag } = Icons;
-    const { SafeWidget, InfoPopover } = NPD.components;
+    const { SafeWidget, InfoPopover, ExportCSVButton } = NPD.components;
 
     const ValueVsVolumeWidget = memo(function ValueVsVolumeWidget({ data, monthsList, unit }) {
         const chartData = useMemo(() => {
@@ -162,7 +162,7 @@
     });
 
     const TopVolumeMoversWidget = memo(function TopVolumeMoversWidget({ data, unit }) {
-        const topMovers = useMemo(() => {
+        const allMovers = useMemo(() => {
             const map = {};
             const arr = data || [];
             for (let i = 0; i < arr.length; i++) {
@@ -174,16 +174,27 @@
                     map[name].sales += Number(d.NetPrice) || 0;
                 }
             }
-            return Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 10);
+            return Object.values(map).sort((a, b) => b.qty - a.qty);
         }, [data]);
+
+        const topMovers = useMemo(() => allMovers.slice(0, 10), [allMovers]);
+
+        const csvColumns = useMemo(() => [
+            { label: 'Rank', accessor: (_r, idx) => idx + 1 },
+            { label: 'Product Name', key: 'name' },
+            { label: 'Group SKU', key: 'sku' },
+            { label: 'Sales 2026 (THB)', accessor: (r) => Number((r.sales || 0).toFixed(2)) },
+            { label: `Volume (${unit || 'UNIT'})`, accessor: (r) => Number((r.qty || 0).toFixed(2)) }
+        ], [unit]);
 
         return h(
             'div',
             { className: 'bg-white p-5 sm:p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col h-full max-h-[420px]' },
             h(
                 'div',
-                { className: 'flex items-center justify-between mb-4' },
-                h('div', { className: 'flex items-center gap-2' }, h(Box, { className: 'w-5 h-5 text-[#34c759]' }), h('h3', { className: 'text-base font-bold text-[#1d1d1f]' }, 'Top Volume Movers'))
+                { className: 'flex items-center justify-between mb-4 gap-2' },
+                h('div', { className: 'flex items-center gap-2' }, h(Box, { className: 'w-5 h-5 text-[#34c759]' }), h('h3', { className: 'text-base font-bold text-[#1d1d1f]' }, 'Top Volume Movers')),
+                h(ExportCSVButton, { filename: `NPD_Volume_Movers_${unit || 'UNIT'}_2026.csv`, columns: csvColumns, rows: allMovers })
             ),
             h(
                 'div',
@@ -220,7 +231,7 @@
     });
 
     const GrossProfitPerUnitWidget = memo(function GrossProfitPerUnitWidget({ data, unit }) {
-        const gpData = useMemo(() => {
+        const allGpData = useMemo(() => {
             const map = {};
             const arr = data || [];
             for (let i = 0; i < arr.length; i++) {
@@ -240,16 +251,28 @@
                     const gpPerUnit = item.qty > 0 ? gp / item.qty : 0;
                     return { ...item, gp, gpPerUnit };
                 })
-                .sort((a, b) => b.gpPerUnit - a.gpPerUnit)
-                .slice(0, 10);
+                .sort((a, b) => b.gpPerUnit - a.gpPerUnit);
         }, [data]);
+
+        const gpData = useMemo(() => allGpData.slice(0, 10), [allGpData]);
+
+        const csvColumns = useMemo(() => [
+            { label: 'Rank', accessor: (_r, idx) => idx + 1 },
+            { label: 'Product Name', key: 'name' },
+            { label: 'Group SKU', key: 'sku' },
+            { label: 'Verified Sales 2026 (THB)', accessor: (r) => Number((r.sales || 0).toFixed(2)) },
+            { label: 'Verified Cost 2026 (THB)', accessor: (r) => Number((r.cost || 0).toFixed(2)) },
+            { label: 'Gross Profit (THB)', accessor: (r) => Number((r.gp || 0).toFixed(2)) },
+            { label: `Volume (${unit || 'UNIT'})`, accessor: (r) => Number((r.qty || 0).toFixed(2)) },
+            { label: `GP per ${unit || 'UNIT'} (THB)`, accessor: (r) => Number((r.gpPerUnit || 0).toFixed(2)) }
+        ], [unit]);
 
         return h(
             'div',
             { className: 'bg-white p-5 sm:p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col h-full max-h-[420px]' },
             h(
                 'div',
-                { className: 'flex items-center justify-between mb-4' },
+                { className: 'flex items-center justify-between mb-4 gap-2' },
                 h(
                     'div',
                     { className: 'flex items-center gap-2' },
@@ -261,7 +284,8 @@
                         h('span', { className: 'font-bold text-[#ff2d55]' }, 'Unit Margin Power: '),
                         `Ranking products by verified Gross Profit earned per 1 ${unit} sold (computed exclusively from records with actual Cost and Quantity).`
                     )
-                )
+                ),
+                h(ExportCSVButton, { filename: `NPD_GP_Per_Unit_${unit || 'UNIT'}_2026.csv`, columns: csvColumns, rows: allGpData })
             ),
             h(
                 'div',
@@ -347,7 +371,7 @@
                 availableUnits.length > 0
                     ? h(
                         'div',
-                        { className: 'flex items-center gap-3 w-full md:w-auto overflow-x-auto no-scrollbar' },
+                        { className: 'no-print flex items-center gap-3 w-full md:w-auto overflow-x-auto no-scrollbar' },
                         h('span', { className: 'text-xs font-bold text-[#86868b] uppercase tracking-wider shrink-0' }, 'Base Unit:'),
                         h(
                             'div',

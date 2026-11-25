@@ -6,13 +6,14 @@
     if (!React) return;
 
     const h = React.createElement;
-    const { useState, useEffect, useRef, Component, memo } = React;
+    const { useState, useEffect, useRef, useCallback, Component, memo } = React;
     const { GROUP_ORDER, GROUP_COLORS } = NPD.config;
-    const { getImgFilename } = NPD.utils;
+    const { getImgFilename, exportRowsToCSV } = NPD.utils;
     const Icons = NPD.icons || NPD.createIconFactory(React);
     const {
         AlertTriangle, Info, ChevronDown, Check, Filter, X,
-        ShoppingBag, Users, Calendar, RefreshCw, CheckCircle2, XCircle
+        ShoppingBag, Users, Store, Calendar, RefreshCw, CheckCircle2, XCircle,
+        Download, RotateCcw
     } = Icons;
 
     class ErrorBoundary extends Component {
@@ -53,7 +54,47 @@
         return h(ErrorBoundary, null, children);
     });
 
-    // Touch & Hover friendly Info Popover (fixed conflicting Tailwind left classes)
+    // Reusable 1-Click CSV Export Button (UTF-8 BOM safe for Thai Excel)
+    const ExportCSVButton = memo(function ExportCSVButton({ filename, columns, rows, label = 'Export CSV', disabled = false }) {
+        const [done, setDone] = useState(false);
+        const timerRef = useRef(null);
+
+        useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+        const handleExport = useCallback((e) => {
+            e.stopPropagation();
+            if (disabled || !rows || rows.length === 0) return;
+            const ok = exportRowsToCSV(filename, columns, rows);
+            if (ok) {
+                setDone(true);
+                if (timerRef.current) clearTimeout(timerRef.current);
+                timerRef.current = setTimeout(() => setDone(false), 1800);
+            }
+        }, [disabled, filename, columns, rows]);
+
+        const isDisabled = disabled || !rows || rows.length === 0;
+
+        return h(
+            'button',
+            {
+                type: 'button',
+                onClick: handleExport,
+                disabled: isDisabled,
+                title: isDisabled ? 'No rows to export' : `Download ${label} (.csv)`,
+                className: `no-print px-3.5 py-2.5 sm:py-2 min-h-[42px] sm:min-h-[38px] rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all border shrink-0 ${
+                    isDisabled
+                        ? 'bg-[#f5f5f7] text-[#d1d1d6] border-black/5 cursor-not-allowed'
+                        : (done
+                            ? 'bg-[#34c759]/10 text-[#34c759] border-[#34c759]/30 shadow-sm'
+                            : 'bg-white text-[#1d1d1f] border-black/10 hover:bg-[#f5f5f7] active:scale-95')
+                }`
+            },
+            done
+                ? h(React.Fragment, null, h(Check, { className: 'w-3.5 h-3.5' }), ' Exported')
+                : h(React.Fragment, null, h(Download, { className: 'w-3.5 h-3.5 text-[#0071e3]' }), ` ${label}`)
+        );
+    });
+
     const InfoPopover = memo(function InfoPopover({ children, align = 'left' }) {
         const [open, setOpen] = useState(false);
         const popRef = useRef(null);
@@ -80,7 +121,7 @@
             'div',
             {
                 ref: popRef,
-                className: 'relative inline-flex items-center group cursor-help',
+                className: 'no-print relative inline-flex items-center group cursor-help',
                 onClick: (e) => { e.stopPropagation(); setOpen((prev) => !prev); }
             },
             h(Info, { className: 'w-4 h-4 text-[#86868b] hover:text-[#0071e3] transition-colors flex-shrink-0' }),
@@ -120,20 +161,20 @@
 
         return h(
             'div',
-            { className: `relative ${fullWidth ? 'w-full' : ''}`, ref: dropdownRef },
+            { className: `no-print relative ${fullWidth ? 'w-full' : ''}`, ref: dropdownRef },
             h(
                 'button',
                 {
                     type: 'button',
                     onClick: handleToggle,
-                    className: `flex items-center gap-2 text-sm font-medium text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] px-4 py-2.5 sm:py-2 min-h-[42px] sm:min-h-[38px] rounded-xl transition-colors justify-between ${fullWidth ? 'w-full' : 'min-w-[150px] sm:min-w-[160px]'}`
+                    className: `flex items-center gap-2 text-sm font-medium text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] px-3.5 py-2.5 sm:py-2 min-h-[42px] sm:min-h-[38px] rounded-xl transition-colors justify-between ${fullWidth ? 'w-full' : 'min-w-[140px] sm:min-w-[148px]'}`
                 },
                 h(
                     'div',
                     { className: 'flex items-center gap-2 min-w-0' },
                     icon ? React.cloneElement(icon, { className: 'w-4 h-4 text-[#86868b] flex-shrink-0' }) : null,
                     h('span', { className: 'text-[#86868b] flex-shrink-0' }, `${label}:`),
-                    h('span', { className: 'font-semibold truncate max-w-[120px] sm:max-w-[100px] text-[#1d1d1f]' }, value || 'All')
+                    h('span', { className: 'font-semibold truncate max-w-[120px] sm:max-w-[96px] text-[#1d1d1f]' }, value || 'All')
                 ),
                 h(ChevronDown, { className: `w-4 h-4 text-[#86868b] flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}` })
             ),
@@ -230,20 +271,20 @@
 
         return h(
             'div',
-            { className: `relative ${fullWidth ? 'w-full' : ''}`, ref: dropdownRef },
+            { className: `no-print relative ${fullWidth ? 'w-full' : ''}`, ref: dropdownRef },
             h(
                 'button',
                 {
                     type: 'button',
                     onClick: handleToggle,
-                    className: `flex items-center gap-2 text-sm font-medium text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] px-4 py-2.5 sm:py-2 min-h-[42px] sm:min-h-[38px] rounded-xl transition-colors justify-between ${fullWidth ? 'w-full' : 'min-w-[150px] sm:min-w-[160px]'}`
+                    className: `flex items-center gap-2 text-sm font-medium text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] px-3.5 py-2.5 sm:py-2 min-h-[42px] sm:min-h-[38px] rounded-xl transition-colors justify-between ${fullWidth ? 'w-full' : 'min-w-[140px] sm:min-w-[148px]'}`
                 },
                 h(
                     'div',
                     { className: 'flex items-center gap-2 min-w-0' },
                     icon ? React.cloneElement(icon, { className: 'w-4 h-4 text-[#86868b] flex-shrink-0' }) : null,
                     h('span', { className: 'text-[#86868b] flex-shrink-0' }, `${label}:`),
-                    h('span', { className: 'font-semibold truncate max-w-[120px] sm:max-w-[100px] text-[#1d1d1f]', title: safeSelected.join(', ') }, displayValue)
+                    h('span', { className: 'font-semibold truncate max-w-[120px] sm:max-w-[96px] text-[#1d1d1f]', title: safeSelected.join(', ') }, displayValue)
                 ),
                 h(ChevronDown, { className: `w-4 h-4 text-[#86868b] flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}` })
             ),
@@ -307,7 +348,9 @@
         isOpen, onClose,
         filterSubProduct, setFilterSubProduct, availableSubProducts,
         filterChannel, setFilterChannel, availableChannels,
+        filterSubChannel, setFilterSubChannel, availableSubChannels,
         filterMonth, setFilterMonth, monthsList,
+        excludeReturns, setExcludeReturns,
         selectedGroups, toggleGroup, onResetAll
     }) {
         if (!isOpen) return null;
@@ -315,7 +358,7 @@
         return h(
             'div',
             {
-                className: 'fixed inset-0 z-50 md:hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm animate-in fade-in duration-200',
+                className: 'no-print fixed inset-0 z-50 md:hidden flex flex-col justify-end bg-black/40 backdrop-blur-sm animate-in fade-in duration-200',
                 onClick: (e) => { if (e.target === e.currentTarget) onClose(); }
             },
             h(
@@ -362,7 +405,18 @@
                     h('label', { className: 'text-[11px] font-extrabold text-[#86868b] uppercase tracking-wider block' }, 'Granular Filters'),
                     h(FilterDropdown, { fullWidth: true, label: 'Product', value: filterSubProduct, options: [{ val: 'All', group: null }, ...availableSubProducts], onChange: setFilterSubProduct, icon: h(ShoppingBag) }),
                     h(FilterDropdown, { fullWidth: true, label: 'Channel', value: filterChannel, options: ['All', ...availableChannels], onChange: setFilterChannel, icon: h(Users) }),
-                    h(MultiSelectDropdown, { fullWidth: true, label: 'Month', selectedValues: filterMonth, options: monthsList, onChange: setFilterMonth, icon: h(Calendar) })
+                    h(FilterDropdown, { fullWidth: true, label: 'Sub-Channel', value: filterSubChannel, options: ['All', ...(availableSubChannels || [])], onChange: setFilterSubChannel, icon: h(Store) }),
+                    h(MultiSelectDropdown, { fullWidth: true, label: 'Month', selectedValues: filterMonth, options: monthsList, onChange: setFilterMonth, icon: h(Calendar) }),
+                    h(
+                        'button',
+                        {
+                            type: 'button',
+                            onClick: () => setExcludeReturns(!excludeReturns),
+                            className: `w-full px-4 py-2.5 min-h-[42px] rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${excludeReturns ? 'bg-[#ff9500]/15 text-[#d49b00] border-[#ff9500]/30' : 'bg-[#e8e8ed] text-[#1d1d1f] border-transparent'}`
+                        },
+                        h('span', { className: 'flex items-center gap-2' }, h(RotateCcw, { className: 'w-4 h-4' }), 'Exclude Returns (Gross Demand)'),
+                        h('span', { className: `px-2 py-0.5 rounded-md text-[10px] uppercase ${excludeReturns ? 'bg-[#ff9500] text-white' : 'bg-white text-[#86868b]'}` }, excludeReturns ? 'ON' : 'OFF')
+                    )
                 ),
                 h(
                     'div',
@@ -507,7 +561,6 @@
         );
     });
 
-    // Progressive WebP + PNG fallback with lazy decoding
     const ImageWithFallback = memo(function ImageWithFallback({ groupName, src, alt, className = '', onClick, title }) {
         const [error, setError] = useState(false);
         const pngSrc = src || getImgFilename(groupName || alt, 'png');
@@ -561,6 +614,7 @@
     Object.assign(NPD.components, {
         ErrorBoundary,
         SafeWidget,
+        ExportCSVButton,
         InfoPopover,
         FilterDropdown,
         MultiSelectDropdown,

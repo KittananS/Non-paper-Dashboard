@@ -44,7 +44,8 @@
         UPDATE_LOGS, GROUP_ORDER, MONTHS_LIST, DATA_SOURCES, FETCH_CONCURRENCY
     } = NPD.config;
     const {
-        sanitizeSalesRow, sanitizeBudgetRow, computeNiceYAxisTicks,
+        sanitizeSalesRow, sanitizeBudgetRow, computeNiceYAxisTicks, copyTextToClipboard,
+        parseUrlViewState, syncUrlViewState, loadCachedDataset, saveCachedDataset, formatSyncTimestamp,
         verifyVolumePin, fetchCSV, clearRequestCache, processRowsInChunks, runWithConcurrency
     } = NPD.utils;
     const {
@@ -55,7 +56,7 @@
     const {
         LayoutDashboard, Package, MapPin, Sparkles, Box, Activity, X, RefreshCw,
         History, ChevronRight, Menu, SlidersHorizontal, Filter, ShoppingBag,
-        Users, Calendar, AlertTriangle
+        Users, Store, Calendar, AlertTriangle, RotateCcw, Share2, Printer, Check, Clock
     } = Icons;
 
     const {
@@ -65,7 +66,7 @@
         TrendChartWidget, ChannelMixWidget, CategoryTrendWidget, SubProductAnalysisWidget,
         NewAcquisitionWidget, ExecutiveSummaryWidget,
         PortfolioMixWidget, ProductProfitabilityWidget, TopPerformersWidget, SkuHealthWidget,
-        TopCustomersWidget, ProductPresenceWidget, WhiteSpaceWidget,
+        TopCustomersWidget, ChurnDropoffWidget, ProductPresenceWidget, WhiteSpaceWidget,
         NPDVitalityWidget, TopNPDWidget, NPDTrajectoryWidget,
         VolumeDashboardView
     } = NPD.components;
@@ -79,13 +80,20 @@
     };
 
     function Dashboard() {
-        const [activeTab, setActiveTab] = useState('Overview');
+        const initialViewRef = useRef(null);
+        if (!initialViewRef.current) {
+            initialViewRef.current = parseUrlViewState();
+        }
+        const initialView = initialViewRef.current;
+
+        const [activeTab, setActiveTab] = useState(() => initialView.activeTab);
         const [isSidebarOpen, setIsSidebarOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 1024 : true));
         const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
         const [isPending, startTransition] = useTransition();
 
         const syncLockRef = useRef(false);
         const syncModalTimerRef = useRef(null);
+        const copyLinkTimerRef = useRef(null);
         const isMountedRef = useRef(true);
 
         useEffect(() => {
@@ -102,6 +110,7 @@
                 isMountedRef.current = false;
                 clearTimeout(resizeTimer);
                 if (syncModalTimerRef.current) clearTimeout(syncModalTimerRef.current);
+                if (copyLinkTimerRef.current) clearTimeout(copyLinkTimerRef.current);
                 window.removeEventListener('resize', handleResize);
             };
         }, []);
@@ -151,13 +160,16 @@
         const [budgetChannel, setBudgetChannel] = useState([]);
         const [budgetProduct, setBudgetProduct] = useState([]);
 
-        const [selectedGroups, setSelectedGroups] = useState(['ALL']);
+        const [selectedGroups, setSelectedGroups] = useState(() => initialView.selectedGroups);
         const [showUpload, setShowUpload] = useState(false);
         const [isSyncing, setIsSyncing] = useState(false);
+        const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+        const [lastSyncedAt, setLastSyncedAt] = useState(null);
         const [syncErrorGroups, setSyncErrorGroups] = useState([]);
         const [dismissedSyncWarning, setDismissedSyncWarning] = useState(false);
         const [show2025Trend, setShow2025Trend] = useState(true);
         const [showForecast, setShowForecast] = useState(false);
+        const [copiedLink, setCopiedLink] = useState(false);
 
         const [topPerfSearch, setTopPerfSearch] = useState('');
         const [whiteSpaceSearch, setWhiteSpaceSearch] = useState('');
@@ -170,9 +182,11 @@
         const [topPerfSortMode, setTopPerfSortMode] = useState('sales');
         const [topCustomerSortMode, setTopCustomerSortMode] = useState('sales');
 
-        const [filterSubProduct, setFilterSubProduct] = useState('All');
-        const [filterChannel, setFilterChannel] = useState('All');
-        const [filterMonth, setFilterMonth] = useState(MONTHS_LIST);
+        const [filterSubProduct, setFilterSubProduct] = useState(() => initialView.filterSubProduct);
+        const [filterChannel, setFilterChannel] = useState(() => initialView.filterChannel);
+        const [filterSubChannel, setFilterSubChannel] = useState(() => initialView.filterSubChannel);
+        const [filterMonth, setFilterMonth] = useState(() => initialView.filterMonth);
+        const [excludeReturns, setExcludeReturns] = useState(() => initialView.excludeReturns);
 
         // Key-based drill-down state (prevents stale snapshot bug when filters change)
         const [topPerfDrillSku, setTopPerfDrillSku] = useState(null);
@@ -182,7 +196,21 @@
         const [uploadTab, setUploadTab] = useState('DACARE');
         const [isDataReady, setIsDataReady] = useState(false);
 
-        const syncAllData = useCallback(async () => {
+        // Keep URL query parameters synchronized with active filters & tab (Shareable View Links)
+        useEffect(() => {
+            syncUrlViewState({
+                activeTab,
+                selectedGroups,
+                filterSubProduct,
+                filterChannel,
+                filterSubChannel,
+                filterMonth,
+                excludeReturns
+            });
+        }, [activeTab, selectedGroups, filterSubProduct, filterChannel, filterSubChannel, filterMonth, excludeReturns]);
+
+        const syncAllData = useCallback(async (options = {}) => {
+            const isSilent = Boolean(options && options.silent === true);
             if (syncLockRef.current) return;
             syncLockRef.current = true;
             if (syncModalTimerRef.current) {
@@ -190,11 +218,15 @@
                 syncModalTimerRef.current = null;
             }
 
-            setIsSyncing(true);
-            setShowUpload(true);
+            if (isSilent) {
+                setIsBackgroundRefreshing(true);
+            } else {
+                setIsSyncing(true);
+                setShowUpload(true);
+                setFilesStatus(buildInitialFilesStatus('loading'));
+            }
             setSyncErrorGroups([]);
             setDismissedSyncWarning(false);
-            setFilesStatus(buildInitialFilesStatus('loading'));
 
             clearRequestCache();
 
@@ -275,24 +307,67 @@
             const failedGroups = GROUP_ORDER.filter((g) => failedSet.has(g));
             setSyncErrorGroups(failedGroups);
 
-            startTransition(() => {
-                setSalesData(finalSales);
-                setBudgetChannel(finalBudgetChannel);
-                setBudgetProduct(finalBudgetProduct);
-                setIsDataReady(true);
-            });
-            setIsSyncing(false);
+            const nowTs = Date.now();
+            // Defensive Stale-While-Revalidate: never wipe out a healthy cached snapshot if a silent background refresh fails
+            const shouldApplyFreshData = !isSilent || (failedGroups.length === 0 && finalSales.length > 0);
 
-            if (failedGroups.length > 0) {
-                setUploadTab(failedGroups[0]);
-            } else {
-                syncModalTimerRef.current = setTimeout(() => {
-                    if (isMountedRef.current) setShowUpload(false);
-                }, 900);
+            if (shouldApplyFreshData) {
+                startTransition(() => {
+                    setSalesData(finalSales);
+                    setBudgetChannel(finalBudgetChannel);
+                    setBudgetProduct(finalBudgetProduct);
+                    setIsDataReady(true);
+                });
+                if (finalSales.length > 0) {
+                    setLastSyncedAt(nowTs);
+                }
+            }
+
+            if (failedGroups.length === 0 && finalSales.length > 0) {
+                saveCachedDataset({
+                    salesData: finalSales,
+                    budgetChannel: finalBudgetChannel,
+                    budgetProduct: finalBudgetProduct,
+                    syncedAt: nowTs
+                });
+            }
+
+            setIsSyncing(false);
+            setIsBackgroundRefreshing(false);
+
+            if (!isSilent) {
+                if (failedGroups.length > 0) {
+                    setUploadTab(failedGroups[0]);
+                } else {
+                    syncModalTimerRef.current = setTimeout(() => {
+                        if (isMountedRef.current) setShowUpload(false);
+                    }, 900);
+                }
             }
         }, []);
 
-        useEffect(() => { syncAllData(); }, [syncAllData]);
+        // Stale-While-Revalidate Startup: hydrate instantly from IndexedDB if available, then refresh silently
+        useEffect(() => {
+            let cancelled = false;
+            (async () => {
+                const cached = await loadCachedDataset();
+                if (cancelled || !isMountedRef.current) return;
+                if (cached && Array.isArray(cached.salesData) && cached.salesData.length > 0) {
+                    startTransition(() => {
+                        setSalesData(cached.salesData);
+                        setBudgetChannel(cached.budgetChannel || []);
+                        setBudgetProduct(cached.budgetProduct || []);
+                        setLastSyncedAt(cached.syncedAt || null);
+                        setFilesStatus(buildInitialFilesStatus('success'));
+                        setIsDataReady(true);
+                    });
+                    syncAllData({ silent: true });
+                } else {
+                    syncAllData({ silent: false });
+                }
+            })();
+            return () => { cancelled = true; };
+        }, [syncAllData]);
 
         const toggleGroup = useCallback((group) => {
             startTransition(() => {
@@ -321,14 +396,52 @@
                 setSelectedGroups(['ALL']);
                 setFilterSubProduct('All');
                 setFilterChannel('All');
+                setFilterSubChannel('All');
                 setFilterMonth(MONTHS_LIST);
+                setExcludeReturns(false);
             });
         }, []);
 
-        const { availableSubProducts, availableChannels } = useMemo(
-            () => extractFilterOptions(salesData, selectedGroups),
-            [salesData, selectedGroups]
+        const handleShareView = useCallback(async () => {
+            if (typeof window === 'undefined') return;
+            syncUrlViewState({
+                activeTab,
+                selectedGroups,
+                filterSubProduct,
+                filterChannel,
+                filterSubChannel,
+                filterMonth,
+                excludeReturns
+            });
+            const ok = await copyTextToClipboard(window.location.href);
+            if (ok && isMountedRef.current) {
+                setCopiedLink(true);
+                if (copyLinkTimerRef.current) clearTimeout(copyLinkTimerRef.current);
+                copyLinkTimerRef.current = setTimeout(() => {
+                    if (isMountedRef.current) setCopiedLink(false);
+                }, 2000);
+            }
+        }, [activeTab, selectedGroups, filterSubProduct, filterChannel, filterSubChannel, filterMonth, excludeReturns]);
+
+        const handlePrintReport = useCallback(() => {
+            if (typeof window === 'undefined') return;
+            window.dispatchEvent(new Event('npd:expand-for-print'));
+            setTimeout(() => {
+                window.print();
+            }, 120);
+        }, []);
+
+        const { availableSubProducts, availableChannels, availableSubChannels } = useMemo(
+            () => extractFilterOptions(salesData, selectedGroups, filterChannel),
+            [salesData, selectedGroups, filterChannel]
         );
+
+        // Auto-reset Sub-Channel if parent Channel or Product Group changes and invalidates the selection
+        useEffect(() => {
+            if (salesData.length > 0 && filterSubChannel !== 'All' && !availableSubChannels.includes(filterSubChannel)) {
+                setFilterSubChannel('All');
+            }
+        }, [salesData.length, availableSubChannels, filterSubChannel]);
 
         const isAllMonthsSelected = useMemo(() => filterMonth.length === MONTHS_LIST.length, [filterMonth]);
 
@@ -337,21 +450,36 @@
             if (!selectedGroups.includes('ALL')) count++;
             if (filterSubProduct !== 'All') count++;
             if (filterChannel !== 'All') count++;
+            if (filterSubChannel !== 'All') count++;
             if (!isAllMonthsSelected) count++;
+            if (excludeReturns) count++;
             return count;
-        }, [selectedGroups, filterSubProduct, filterChannel, isAllMonthsSelected]);
+        }, [selectedGroups, filterSubProduct, filterChannel, filterSubChannel, isAllMonthsSelected, excludeReturns]);
 
         const coreEngine = useMemo(
-            () => computeCoreEngine(salesData, { selectedGroups, filterSubProduct, filterChannel, filterMonth }),
-            [salesData, selectedGroups, filterSubProduct, filterChannel, filterMonth]
+            () => computeCoreEngine(salesData, {
+                selectedGroups,
+                filterSubProduct,
+                filterChannel,
+                filterSubChannel,
+                filterMonth,
+                excludeReturns
+            }),
+            [salesData, selectedGroups, filterSubProduct, filterChannel, filterSubChannel, filterMonth, excludeReturns]
         );
 
         const filteredData = coreEngine.filteredData;
         const channelMix = coreEngine.channelMix;
 
         const kpi = useMemo(
-            () => computeKPIs(coreEngine, budgetChannel, budgetProduct, { selectedGroups, filterSubProduct, filterChannel, filterMonth }),
-            [coreEngine, budgetChannel, budgetProduct, selectedGroups, filterSubProduct, filterChannel, filterMonth]
+            () => computeKPIs(coreEngine, budgetChannel, budgetProduct, {
+                selectedGroups,
+                filterSubProduct,
+                filterChannel,
+                filterSubChannel,
+                filterMonth
+            }),
+            [coreEngine, budgetChannel, budgetProduct, selectedGroups, filterSubProduct, filterChannel, filterSubChannel, filterMonth]
         );
 
         const trendChartData = useMemo(
@@ -427,18 +555,19 @@
         }, [activeTab, salesData, filteredData, kpi, selectedGroups]);
 
         const activeTabMeta = tabs.find((t) => t.id === activeTab);
+        const formattedLastSync = useMemo(() => formatSyncTimestamp(lastSyncedAt), [lastSyncedAt]);
 
         return h(
             'div',
-            { className: 'flex h-screen bg-[#f5f5f7] w-full font-sans overflow-hidden text-[#1d1d1f]' },
+            { className: 'app-shell flex h-screen bg-[#f5f5f7] w-full font-sans overflow-hidden text-[#1d1d1f]' },
             isSidebarOpen && h('div', {
-                className: 'fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-200',
+                className: 'no-print fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-200',
                 onClick: () => setIsSidebarOpen(false)
             }),
             // Adaptive Left Sidebar
             h(
                 'aside',
-                { className: `fixed lg:relative inset-y-0 left-0 w-[280px] bg-white/95 backdrop-blur-xl border-r border-black/5 flex flex-col justify-between shrink-0 z-50 lg:z-40 shadow-[4px_0_24px_rgba(0,0,0,0.06)] lg:shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0 lg:ml-0' : '-translate-x-full lg:-ml-[280px]'}` },
+                { className: `no-print fixed lg:relative inset-y-0 left-0 w-[280px] bg-white/95 backdrop-blur-xl border-r border-black/5 flex flex-col justify-between shrink-0 z-50 lg:z-40 shadow-[4px_0_24px_rgba(0,0,0,0.06)] lg:shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0 lg:ml-0' : '-translate-x-full lg:-ml-[280px]'}` },
                 h(
                     'div',
                     { className: 'flex flex-col h-full' },
@@ -489,12 +618,19 @@
                             'button',
                             {
                                 type: 'button',
-                                onClick: syncAllData,
-                                disabled: isSyncing,
-                                className: `w-full flex justify-center items-center gap-2 text-white px-5 py-3.5 min-h-[46px] rounded-[14px] text-sm font-bold transition-all shadow-md group ${isSyncing ? 'bg-[#0071e3]/70 cursor-not-allowed' : 'bg-[#1d1d1f] hover:bg-black active:scale-95'}`
+                                onClick: () => syncAllData({ silent: false }),
+                                disabled: isSyncing || isBackgroundRefreshing,
+                                className: `w-full flex justify-center items-center gap-2 text-white px-5 py-3.5 min-h-[46px] rounded-[14px] text-sm font-bold transition-all shadow-md group ${(isSyncing || isBackgroundRefreshing) ? 'bg-[#0071e3]/70 cursor-not-allowed' : 'bg-[#1d1d1f] hover:bg-black active:scale-95'}`
                             },
-                            h(RefreshCw, { className: `w-4 h-4 ${isSyncing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}` }),
-                            isSyncing ? 'Syncing Data...' : 'Sync Data'
+                            h(RefreshCw, { className: `w-4 h-4 ${(isSyncing || isBackgroundRefreshing) ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}` }),
+                            isSyncing ? 'Syncing Data...' : (isBackgroundRefreshing ? 'Refreshing Live...' : 'Sync Data')
+                        ),
+                        (formattedLastSync || isBackgroundRefreshing) && h(
+                            'div',
+                            { className: 'flex items-center justify-center gap-1.5 text-[11px] text-[#86868b] font-medium px-2.5 py-1.5 rounded-[10px] bg-white/80 border border-black/5' },
+                            isBackgroundRefreshing
+                                ? h(React.Fragment, null, h(RefreshCw, { className: 'w-3 h-3 text-[#0071e3] animate-spin shrink-0' }), h('span', { className: 'text-[#0071e3] font-semibold truncate' }, 'Updating in background...'))
+                                : h(React.Fragment, null, h(Clock, { className: 'w-3 h-3 text-[#34c759] shrink-0' }), h('span', { className: 'truncate' }, `Synced: ${formattedLastSync}`))
                         ),
                         h(
                             'button',
@@ -513,10 +649,10 @@
             // Main Content Area
             h(
                 'div',
-                { className: 'flex-1 flex flex-col min-w-0 overflow-hidden bg-[#f5f5f7] relative' },
+                { className: 'app-main-wrapper flex-1 flex flex-col min-w-0 overflow-hidden bg-[#f5f5f7] relative' },
                 h(
                     'header',
-                    { className: 'bg-white/85 backdrop-blur-xl border-b border-black/5 sticky top-0 z-30 shadow-[0_4px_24px_rgba(0,0,0,0.02)] shrink-0 transition-opacity duration-300' },
+                    { className: 'no-print bg-white/85 backdrop-blur-xl border-b border-black/5 sticky top-0 z-30 shadow-[0_4px_24px_rgba(0,0,0,0.02)] shrink-0 transition-opacity duration-300' },
                     h(
                         'div',
                         { className: 'px-4 sm:px-6 lg:px-8 py-3 sm:py-4 lg:py-5 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-3 sm:gap-4' },
@@ -549,7 +685,17 @@
                             ),
                             h(
                                 'div',
-                                { className: 'flex items-center gap-2 md:hidden shrink-0' },
+                                { className: 'flex items-center gap-1.5 md:hidden shrink-0' },
+                                h(
+                                    'button',
+                                    {
+                                        type: 'button',
+                                        onClick: handleShareView,
+                                        title: 'Copy Shareable View Link',
+                                        className: `p-2.5 min-h-[42px] rounded-xl text-xs font-bold flex items-center justify-center transition-colors ${copiedLink ? 'bg-[#34c759]/15 text-[#34c759]' : 'bg-[#e8e8ed] text-[#1d1d1f]'}`
+                                    },
+                                    copiedLink ? h(Check, { className: 'w-4 h-4' }) : h(Share2, { className: 'w-4 h-4' })
+                                ),
                                 activeFilterCount > 0 && h(
                                     'button',
                                     { type: 'button', onClick: handleResetAllFilters, className: 'p-2.5 min-h-[42px] rounded-xl bg-[#ff3b30]/10 text-[#ff3b30] text-xs font-bold flex items-center justify-center', title: 'Reset Filters' },
@@ -585,16 +731,65 @@
                     ),
                     h(
                         'div',
-                        { className: `hidden md:flex bg-[#f5f5f7]/60 border-t border-black/5 py-3 px-6 lg:px-8 flex-wrap gap-3 lg:gap-4 items-center transition-opacity duration-300 ${isPending ? 'opacity-50' : 'opacity-100'}` },
-                        h('span', { className: 'text-xs font-extrabold text-[#86868b] flex items-center gap-1.5 tracking-wider mr-1' }, h(Filter, { className: 'w-4 h-4' }), ' FILTERS:'),
+                        { className: `hidden md:flex bg-[#f5f5f7]/60 border-t border-black/5 py-3 px-6 lg:px-8 flex-wrap gap-2.5 lg:gap-3 items-center transition-opacity duration-300 ${isPending ? 'opacity-50' : 'opacity-100'}` },
+                        h('span', { className: 'text-xs font-extrabold text-[#86868b] flex items-center gap-1.5 tracking-wider mr-0.5' }, h(Filter, { className: 'w-4 h-4' }), ' FILTERS:'),
                         h(FilterDropdown, { label: 'Product', value: filterSubProduct, options: [{ val: 'All', group: null }, ...availableSubProducts], onChange: handleFilterChange(setFilterSubProduct), icon: h(ShoppingBag) }),
                         h(FilterDropdown, { label: 'Channel', value: filterChannel, options: ['All', ...availableChannels], onChange: handleFilterChange(setFilterChannel), icon: h(Users) }),
+                        h(FilterDropdown, { label: 'Sub-Ch', value: filterSubChannel, options: ['All', ...availableSubChannels], onChange: handleFilterChange(setFilterSubChannel), icon: h(Store) }),
                         h(MultiSelectDropdown, { label: 'Month', selectedValues: filterMonth, options: MONTHS_LIST, onChange: handleFilterChange(setFilterMonth), icon: h(Calendar) }),
+                        h(
+                            'button',
+                            {
+                                type: 'button',
+                                onClick: () => startTransition(() => setExcludeReturns((prev) => !prev)),
+                                title: excludeReturns
+                                    ? `Gross Sales Mode: Excluding ฿${((coreEngine.excludedReturns26 || 0) / 1000000).toFixed(2)}M of 2026 returns`
+                                    : 'Toggle ON to exclude negative return rows (Gross Demand view)',
+                                className: `flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 min-h-[38px] rounded-xl border transition-all ${
+                                    excludeReturns
+                                        ? 'bg-[#ff9500]/15 text-[#d49b00] border-[#ff9500]/30 shadow-sm'
+                                        : 'bg-[#e8e8ed] hover:bg-[#d1d1d6] text-[#86868b] hover:text-[#1d1d1f] border-transparent'
+                                }`
+                            },
+                            h(RotateCcw, { className: 'w-3.5 h-3.5' }),
+                            excludeReturns ? 'Gross Sales (No Returns)' : 'Exclude Returns'
+                        ),
                         activeFilterCount > 0 && h(
                             'button',
-                            { type: 'button', onClick: handleResetAllFilters, className: 'text-xs text-[#ff3b30] hover:text-white font-bold ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#ff3b30]/10 hover:bg-[#ff3b30] transition-colors shadow-sm' },
+                            { type: 'button', onClick: handleResetAllFilters, className: 'text-xs text-[#ff3b30] hover:text-white font-bold flex items-center gap-1 px-3 py-2 min-h-[38px] rounded-xl bg-[#ff3b30]/10 hover:bg-[#ff3b30] transition-colors shadow-sm' },
                             h(X, { className: 'w-3.5 h-3.5' }),
-                            ' Clear All Filters'
+                            ' Clear'
+                        ),
+                        h(
+                            'div',
+                            { className: 'ml-auto flex items-center gap-2' },
+                            h(
+                                'button',
+                                {
+                                    type: 'button',
+                                    onClick: handleShareView,
+                                    title: 'Copy shareable link with current tab & filters',
+                                    className: `flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 min-h-[38px] rounded-xl border transition-all ${
+                                        copiedLink
+                                            ? 'bg-[#34c759]/15 text-[#34c759] border-[#34c759]/30 shadow-sm'
+                                            : 'bg-white hover:bg-[#e8e8ed] text-[#1d1d1f] border-black/10 shadow-sm active:scale-95'
+                                    }`
+                                },
+                                copiedLink
+                                    ? h(React.Fragment, null, h(Check, { className: 'w-3.5 h-3.5' }), ' Copied Link')
+                                    : h(React.Fragment, null, h(Share2, { className: 'w-3.5 h-3.5 text-[#0071e3]' }), ' Share View')
+                            ),
+                            h(
+                                'button',
+                                {
+                                    type: 'button',
+                                    onClick: handlePrintReport,
+                                    title: 'Print or Save Executive A4 Landscape PDF',
+                                    className: 'flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 min-h-[38px] rounded-xl bg-white hover:bg-[#e8e8ed] text-[#1d1d1f] border border-black/10 shadow-sm transition-all active:scale-95'
+                                },
+                                h(Printer, { className: 'w-3.5 h-3.5 text-[#1d1d1f]' }),
+                                ' Print / PDF'
+                            )
                         )
                     )
                 ),
@@ -607,23 +802,54 @@
                     filterChannel,
                     setFilterChannel: handleFilterChange(setFilterChannel),
                     availableChannels,
+                    filterSubChannel,
+                    setFilterSubChannel: handleFilterChange(setFilterSubChannel),
+                    availableSubChannels,
                     filterMonth,
                     setFilterMonth: handleFilterChange(setFilterMonth),
                     monthsList: MONTHS_LIST,
+                    excludeReturns,
+                    setExcludeReturns: handleFilterChange(setExcludeReturns),
                     selectedGroups,
                     toggleGroup,
                     onResetAll: handleResetAllFilters
                 }),
                 h(
                     'main',
-                    { className: 'flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8' },
+                    { className: 'app-main-scroll flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8' },
                     h(
                         'div',
                         { className: `transition-opacity duration-300 w-full max-w-[1600px] mx-auto ${isPending ? 'opacity-40' : 'opacity-100'}` },
+                        // Print-Only Executive Report Masthead
+                        h(
+                            'div',
+                            { className: 'print-only mb-6 pb-4 border-b-2 border-[#1d1d1f]' },
+                            h(
+                                'div',
+                                { className: 'flex justify-between items-start gap-4' },
+                                h(
+                                    'div',
+                                    null,
+                                    h('div', { className: 'text-[10px] font-extrabold text-[#0071e3] uppercase tracking-wider' }, 'Non-paper Performance Dashboard 2026 • Executive Report'),
+                                    h('h1', { className: 'text-xl font-extrabold text-[#1d1d1f] mt-0.5' }, activeTabMeta?.label || activeTab),
+                                    h(
+                                        'p',
+                                        { className: 'text-xs text-[#86868b] font-medium mt-1' },
+                                        `Groups: ${selectedGroups.includes('ALL') ? 'ALL Portfolios' : selectedGroups.join(', ')}  |  Product: ${filterSubProduct}  |  Channel: ${filterChannel}  |  Sub-Channel: ${filterSubChannel}  |  Months: ${isAllMonthsSelected ? 'Jan–Dec (Full)' : (filterMonth.join(', ') || 'None')}  |  Basis: ${excludeReturns ? 'Gross Sales (Returns Excluded)' : 'Net Sales'}`
+                                    )
+                                ),
+                                h(
+                                    'div',
+                                    { className: 'text-right text-[11px] text-[#86868b] font-medium shrink-0' },
+                                    formattedLastSync && h('div', null, `Data Synced: ${formattedLastSync}`),
+                                    h('div', null, `Build: ${UPDATE_LOGS[0].version}`)
+                                )
+                            )
+                        ),
                         // Persistent partial-sync error warning banner (Defensive Programming)
                         syncErrorGroups.length > 0 && !dismissedSyncWarning && h(
                             'div',
-                            { className: 'mb-5 p-4 rounded-[18px] bg-[#ff3b30]/10 border border-[#ff3b30]/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200' },
+                            { className: 'no-print mb-5 p-4 rounded-[18px] bg-[#ff3b30]/10 border border-[#ff3b30]/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200' },
                             h(
                                 'div',
                                 { className: 'flex items-start gap-2.5 text-xs sm:text-sm text-[#1d1d1f]' },
@@ -634,7 +860,7 @@
                                     h('span', { className: 'font-bold text-[#ff3b30]' }, 'Partial Data Sync Warning: '),
                                     `ไม่สามารถดึงข้อมูลบางชีตของกลุ่ม `,
                                     h('strong', null, syncErrorGroups.join(', ')),
-                                    ' ได้ ยอดรวมปัจจุบันอาจไม่ครบถ้วน กรุณากดลองใหม่อีกครั้ง'
+                                    ' ได้ กรุณากดลองใหม่อีกครั้ง'
                                 )
                             ),
                             h(
@@ -642,7 +868,7 @@
                                 { className: 'flex items-center gap-2 self-end sm:self-center shrink-0' },
                                 h(
                                     'button',
-                                    { type: 'button', onClick: syncAllData, disabled: isSyncing, className: 'px-3.5 py-1.5 rounded-xl bg-[#ff3b30] hover:bg-[#d63026] text-white text-xs font-bold shadow-sm transition-colors' },
+                                    { type: 'button', onClick: () => syncAllData({ silent: false }), disabled: isSyncing, className: 'px-3.5 py-1.5 rounded-xl bg-[#ff3b30] hover:bg-[#d63026] text-white text-xs font-bold shadow-sm transition-colors' },
                                     'Retry Sync'
                                 ),
                                 h(
@@ -650,6 +876,29 @@
                                     { type: 'button', onClick: () => setDismissedSyncWarning(true), className: 'p-1.5 rounded-lg text-[#86868b] hover:text-[#1d1d1f]' },
                                     h(X, { className: 'w-4 h-4' })
                                 )
+                            )
+                        ),
+                        // Active Gross Sales (Exclude Returns) Notice Banner
+                        excludeReturns && isDataReady && h(
+                            'div',
+                            { className: 'mb-5 px-4 py-2.5 rounded-[14px] bg-[#ff9500]/10 border border-[#ff9500]/25 flex items-center justify-between gap-3 text-xs font-medium text-[#1d1d1f]' },
+                            h(
+                                'div',
+                                { className: 'flex items-center gap-2' },
+                                h(RotateCcw, { className: 'w-4 h-4 text-[#d49b00] shrink-0' }),
+                                h(
+                                    'span',
+                                    null,
+                                    h('strong', { className: 'text-[#d49b00]' }, 'Gross Sales Mode Active: '),
+                                    `ตัดรายการรับคืนสินค้าติดลบออกชั่วคราว (มูลค่าคืนสินค้าปี 2026 ที่ถูกกรองออก: `,
+                                    h('strong', null, `฿${((coreEngine.excludedReturns26 || 0) / 1000000).toFixed(2)}M`),
+                                    ') เพื่อวิเคราะห์ Gross Demand แท้จริง'
+                                )
+                            ),
+                            h(
+                                'button',
+                                { type: 'button', onClick: () => startTransition(() => setExcludeReturns(false)), className: 'no-print text-[11px] font-bold text-[#d49b00] hover:underline shrink-0' },
+                                'Switch to Net Sales'
                             )
                         ),
                         !isDataReady
@@ -686,7 +935,7 @@
                                     h('div', { className: 'grid grid-cols-1 gap-5 sm:gap-6' }, h(SafeWidget, null, h(PortfolioMixWidget, { filteredData, monthsList: MONTHS_LIST }))),
                                     h(SafeWidget, null, h(ProductProfitabilityWidget, { filteredData })),
                                     h(SafeWidget, null, h(TopPerformersWidget, { topPerformers, topPerfDrillDown, setTopPerfDrillSku, topPerfSearch, setTopPerfSearch, topPerfSortMode, setTopPerfSortMode, kpi })),
-                                    h(SafeWidget, null, h(SkuHealthWidget, { filteredData }))
+                                    h(SafeWidget, null, h(SkuHealthWidget, { filteredData: coreEngine.filteredDataWithReturns }))
                                 ),
                                 activeTab === 'Innovation' && h(
                                     'div',
@@ -703,6 +952,7 @@
                                     'div',
                                     { className: 'space-y-5 sm:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both' },
                                     h(SafeWidget, null, h(TopCustomersWidget, { topCustomers, uniqueCustomersCount, customerSearch, setCustomerSearch, topCustomerSortMode, setTopCustomerSortMode, kpi, topCustomerDrillDown, setTopCustomerDrillKey })),
+                                    h(SafeWidget, null, h(ChurnDropoffWidget, { filteredData, valid2026Months: coreEngine.valid2026Months })),
                                     h(SafeWidget, null, h(ProductPresenceWidget, { filteredData })),
                                     h(SafeWidget, null, h(WhiteSpaceWidget, { filteredData, searchStr: whiteSpaceSearch, setSearchStr: setWhiteSpaceSearch, debouncedSearch: debouncedWhiteSpaceSearch }))
                                 ),
@@ -715,7 +965,7 @@
             // Sync Modal
             showUpload && h(
                 'div',
-                { className: 'fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200' },
+                { className: 'no-print fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200' },
                 h(
                     'div',
                     { className: 'bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20' },
@@ -765,7 +1015,7 @@
                             { className: 'flex gap-3' },
                             syncErrorGroups.length > 0 && !isSyncing && h(
                                 'button',
-                                { type: 'button', onClick: syncAllData, className: 'flex-1 bg-[#1d1d1f] hover:bg-black text-white px-5 py-3 rounded-[14px] text-sm font-semibold shadow-md active:scale-95 transition-transform' },
+                                { type: 'button', onClick: () => syncAllData({ silent: false }), className: 'flex-1 bg-[#1d1d1f] hover:bg-black text-white px-5 py-3 rounded-[14px] text-sm font-semibold shadow-md active:scale-95 transition-transform' },
                                 'Retry Failed'
                             ),
                             h(
@@ -780,7 +1030,7 @@
             // Password Modal
             showPasswordModal && h(
                 'div',
-                { className: 'fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200' },
+                { className: 'no-print fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200' },
                 h(
                     'div',
                     { className: 'bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-sm overflow-hidden border border-white/20' },
@@ -817,7 +1067,7 @@
             showUpdateLog && h(
                 'div',
                 {
-                    className: 'fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200',
+                    className: 'no-print fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200',
                     onClick: (e) => { if (e.target === e.currentTarget) setShowUpdateLog(false); }
                 },
                 h(

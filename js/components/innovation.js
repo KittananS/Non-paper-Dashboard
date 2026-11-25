@@ -14,7 +14,7 @@
     const { computeNPDTrajectory } = NPD.engine;
     const Icons = NPD.icons || NPD.createIconFactory(React);
     const { Lightbulb, Sparkles, Package, TrendingUp, Trophy, Activity } = Icons;
-    const { InfoPopover } = NPD.components;
+    const { InfoPopover, ExportCSVButton } = NPD.components;
 
     const formatAbsMonthLabel = (absMonth) => {
         if (!absMonth || absMonth <= 0) return '';
@@ -69,19 +69,33 @@
 
     const TopNPDWidget = memo(function TopNPDWidget({ npdData }) {
         const list = npdData.topNPDs || [];
+        const totalNpd26 = npdData.totalNPDSales26 || 0;
+
+        const csvColumns = useMemo(() => [
+            { label: 'Rank', accessor: (_r, idx) => idx + 1 },
+            { label: 'Product Name', key: 'name' },
+            { label: 'Sales 2026 (THB)', accessor: (r) => Number((r.sales26 || 0).toFixed(2)) },
+            { label: 'Share of NPD (%)', accessor: (r) => totalNpd26 > 0 ? Number(((r.sales26 / totalNpd26) * 100).toFixed(2)) : 0 }
+        ], [totalNpd26]);
+
         return h(
             'div',
             { className: 'bg-white p-5 sm:p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] lg:col-span-2 flex flex-col' },
             h(
                 'div',
-                { className: 'flex justify-between items-center mb-5 sm:mb-6 gap-2' },
+                { className: 'flex flex-wrap justify-between items-center mb-5 sm:mb-6 gap-2' },
                 h(
                     'div',
                     { className: 'flex items-center gap-2' },
                     h(Sparkles, { className: 'w-5 h-5 text-indigo-500 shrink-0' }),
                     h('h3', { className: 'text-base font-extrabold text-slate-800' }, 'Top Performing NPDs (2026)')
                 ),
-                h('span', { className: 'text-xs font-semibold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full shrink-0' }, `${list.length} New Products`)
+                h(
+                    'div',
+                    { className: 'flex items-center gap-2 shrink-0' },
+                    h('span', { className: 'text-xs font-semibold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full shrink-0' }, `${list.length} New Products`),
+                    h(ExportCSVButton, { filename: 'NPD_Top_New_Products_2026.csv', columns: csvColumns, rows: list })
+                )
             ),
             h(
                 'div',
@@ -106,7 +120,7 @@
                             'tbody',
                             null,
                             list.slice(0, 10).map((prod, idx) => {
-                                const share = npdData.totalNPDSales26 > 0 ? ((prod.sales26 / npdData.totalNPDSales26) * 100).toFixed(1) : '0.0';
+                                const share = totalNpd26 > 0 ? ((prod.sales26 / totalNpd26) * 100).toFixed(1) : '0.0';
                                 return h(
                                     'tr',
                                     { key: prod.name, className: 'border-b border-slate-50 hover:bg-indigo-50/40' },
@@ -156,7 +170,7 @@
                 ),
                 h(
                     'div',
-                    { className: 'flex bg-[#e3e3e8] p-1 rounded-xl shrink-0 w-full sm:w-auto' },
+                    { className: 'no-print flex bg-[#e3e3e8] p-1 rounded-xl shrink-0 w-full sm:w-auto' },
                     h('button', { type: 'button', onClick: () => setViewMode('monthly'), className: `flex-1 sm:flex-initial px-4 py-1.5 text-xs font-semibold rounded-[8px] transition-all ${viewMode === 'monthly' ? 'bg-white text-[#1d1d1f] shadow-[0_1px_4px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f]'}` }, 'Monthly Sales'),
                     h('button', { type: 'button', onClick: () => setViewMode('cumulative'), className: `flex-1 sm:flex-initial px-4 py-1.5 text-xs font-semibold rounded-[8px] transition-all ${viewMode === 'cumulative' ? 'bg-white text-[#1d1d1f] shadow-[0_1px_4px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f]'}` }, 'Cumulative')
                 )

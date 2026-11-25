@@ -97,10 +97,23 @@
 
     const UPDATE_LOGS = [
         {
+            version: 'v2.3.0',
+            date: '25 Nov 2026',
+            badge: 'Commercial Suite',
+            badgeColor: 'bg-[#0071e3] text-white',
+            title: 'Commercial Intelligence Suite: Churn Radar, Instant Cache, Sub-Channel & Export',
+            highlights: [
+                '📉 Churn & Drop-off Radar: เพิ่มระบบตรวจจับลูกค้าเสี่ยง/หยุดซื้อในแท็บ Distribution แยกสถานะ Lost in 2026, Dormant (ห่างหาย ≥ 3 เดือน) และ Sharp Drop (ยอดหดตัว > 30% YoY) พร้อมส่งออกรายชื่อให้ทีมขายติดตามทันที',
+                '🎯 YTD Target Pacing & Gross/Net Return Toggle: เพิ่มตัวชี้วัด Ahead/Behind YTD Pace (ถ่วงน้ำหนักตามฤดูกาล) บนการ์ด Target 2026 พร้อมสวิตช์ Exclude Returns เพื่อเทียบยอดขาย Gross Demand แยกจากยอดรับคืนสินค้าฝากขาย',
+                '🎛️ Global Sub-Channel Filter & Shareable URL: เพิ่มตัวกรองระดับ Sub-Channel (เช่น B2S, OFM, Lotus\'s, Shopee, Lazada) และซิงก์สถานะตัวกรองไว้ในลิงก์ URL พร้อมปุ่ม Share View ส่งต่อให้ทีมเปิดดูหน้าเดียวกันได้ทันที',
+                '⚡ Instant IndexedDB Cache, CSV Export & PDF Print: แสดงผลทันทีจากแคชในเครื่องพร้อมอัปเดตเบื้องหลัง (Stale-While-Revalidate), เพิ่มปุ่ม Export CSV (รองรับภาษาไทย Excel) ทุกตารางหลัก และโหมดพิมพ์รายงาน A4 แนวนอน (Print / PDF)'
+            ]
+        },
+        {
             version: 'v2.2.0',
             date: '24 Nov 2026',
             badge: 'Reliability & Speed',
-            badgeColor: 'bg-[#0071e3] text-white',
+            badgeColor: 'bg-[#34c759]/15 text-[#34c759]',
             title: 'Zero-Babel Modular Engine, Authentic GP Accounting & Defensive Resilience',
             highlights: [
                 '⚡ Zero Runtime Compilation & WebP Assets: ถอด @babel/standalone, Tailwind Play CDN และ Lucide UMD ออกทั้งหมด แยกสถาปัตยกรรมเป็นโมดูล พร้อมบีบอัดรูปภาพเป็น WebP ลดขนาดโหลดเริ่มต้นลงกว่า 95%',
@@ -199,6 +212,9 @@
         VOLUME_PIN_SHA256,
         FETCH_TIMEOUT_MS: 20000,
         FETCH_CONCURRENCY: 6,
-        MAX_TEXT_CACHE_SIZE: 25000
+        MAX_TEXT_CACHE_SIZE: 25000,
+        CACHE_DB_NAME: 'npd_dashboard_cache_v2',
+        CACHE_STORE_NAME: 'snapshots',
+        CACHE_KEY: 'dataset_v2_3'
     };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

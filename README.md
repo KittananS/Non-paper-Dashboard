@@ -20,10 +20,19 @@ Executive analytics dashboard for tracking Non-paper portfolio sales, profitabil
         ├── common.js           # ErrorBoundary, dropdowns, mobile drawer, shared UI primitives
         ├── overview.js         # Executive Overview KPIs, trends, acquisition & 6-pillar synthesis
         ├── portfolio.js        # Portfolio mix, authentic profitability, top performers & return health
-        ├── distribution.js     # Top accounts, product presence & white space gap matrix
+        ├── distribution.js     # Top accounts, churn/drop-off radar, presence & white space matrix
         ├── innovation.js       # Dynamic 12-month NPD vitality index & M1–M12 launch trajectory
         └── volume.js           # Unit economics, ASP tracker, volume movers & verified GP/unit
 ```
+
+## Key Capabilities (`v2.3.0`)
+
+- **Stale-While-Revalidate Local Cache (`IndexedDB`)**: Hydrates sanitized datasets immediately on repeat visits (`<0.15s`) while silently refreshing live Google Sheets CSVs in the background, displaying a live `Synced` timestamp.
+- **Granular Global Filtering**: Filter across `Product Group`, `Sub-Product`, `Channel`, `Sub-Channel` (e.g., `B2S`, `OFM`, `Lotus's`, `Shopee`, `Lazada`), `Month`, plus a 1-click **Exclude Returns (Gross Sales)** mode while keeping Return Diagnostics intact.
+- **YTD Target Pacing Benchmark**: Seasonality-weighted (or linear fallback) expected YTD target marker and `Ahead / Behind YTD Pace` variance on the 2026 Target card.
+- **Churn & Drop-off Radar**: Automatically flags `Lost in 2026`, `Dormant (≥3M)`, and `Sharp Drop (>30% YoY)` accounts with 1-click Win-Back List copy and CSV export.
+- **1-Click CSV Export (UTF-8 BOM)**: Every analytical table across all 5 tabs exports clean, formula-injection-safe `.csv` files that render Thai characters properly in Microsoft Excel.
+- **Shareable View Links & Executive Print / PDF Mode**: URL query parameters (`?tab=...&groups=...&ch=...&subCh=...`) auto-sync via `Share View`, and `Print / PDF` formats a clean A4 landscape executive report.
 
 ## Local Preview
 

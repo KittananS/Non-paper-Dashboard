@@ -22,7 +22,7 @@
         PieIcon, Activity, Layers, ArrowLeft, ShoppingBag, ChevronRight,
         UserPlus, UserCheck, Copy, Check, Zap, Banknote, Crosshair
     } = Icons;
-    const { InfoPopover, FilterDropdown, ImageWithFallback, renderCustomLabel } = NPD.components;
+    const { InfoPopover, FilterDropdown, ExportCSVButton, ImageWithFallback, renderCustomLabel } = NPD.components;
 
     const PortfolioSummaryWidget = memo(function PortfolioSummaryWidget({ selectedGroups, toggleGroup }) {
         return h(
@@ -81,14 +81,31 @@
         );
     });
 
+    // Upgraded KPITargetWidget with Seasonality/Elapsed YTD Target Pacing Benchmark & Progress Marker
     const KPITargetWidget = memo(function KPITargetWidget({ kpi }) {
+        const hasPace = kpi.target26 > 0 && kpi.ytdTargetBenchmark !== null;
+        const isAhead = (kpi.ytdPaceDiff || 0) >= 0;
+
         return h(
             'div',
             { className: `bg-white p-5 sm:p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col justify-between h-full transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] animate-in fade-in zoom-in-95 duration-500 delay-100 ${kpi.target26 === null ? 'opacity-60 grayscale' : ''}` },
             h(
                 'div',
                 { className: 'flex justify-between items-start mb-1' },
-                h('span', { className: 'text-xs font-semibold text-[#86868b] uppercase tracking-wider' }, 'Target 2026'),
+                h(
+                    'div',
+                    { className: 'flex items-center gap-1.5' },
+                    h('span', { className: 'text-xs font-semibold text-[#86868b] uppercase tracking-wider' }, 'Target 2026'),
+                    hasPace && h(
+                        InfoPopover,
+                        null,
+                        h('span', { className: 'font-semibold text-[#af52de]' }, 'YTD Pace Benchmark:'),
+                        h('br'),
+                        kpi.paceBasis === 'seasonal'
+                            ? 'คำนวณเป้าสะสมที่ควรทำได้ ณ เดือนปัจจุบัน โดยถ่วงน้ำหนักตามสัดส่วนฤดูกาลจริงของปี 2025 (Seasonality-Weighted YTD Target)'
+                            : 'คำนวณเป้าสะสมตามสัดส่วนจำนวนเดือนที่ผ่านไป (Linear Time-Elapsed Target)'
+                    )
+                ),
                 h('div', { className: 'bg-[#af52de]/10 p-2 rounded-full' }, h(Target, { className: 'w-4 h-4 text-[#af52de]' }))
             ),
             h(
@@ -100,17 +117,36 @@
                         null,
                         h(
                             'div',
-                            { className: 'flex justify-between items-end mb-2 gap-2' },
+                            { className: 'flex justify-between items-end mb-1.5 gap-2' },
                             h('h3', { className: 'text-[26px] sm:text-[32px] leading-tight font-bold text-[#1d1d1f] tracking-tight truncate' }, kpi.target26 === 0 ? 'TBC' : `฿${(kpi.target26 || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`),
                             kpi.target26 > 0 && h('span', { className: `text-xs sm:text-sm font-semibold mb-1 shrink-0 ${kpi.progress >= 100 ? 'text-[#34c759]' : 'text-[#0071e3]'}` }, `${(kpi.progress || 0).toFixed(1)}%`)
                         ),
                         kpi.target26 > 0 && h(
                             'div',
-                            { className: 'w-full bg-[#f5f5f7] rounded-full h-2.5 overflow-hidden' },
+                            { className: 'relative w-full bg-[#f5f5f7] rounded-full h-2.5 overflow-hidden' },
                             h('div', {
-                                className: `h-full rounded-full transition-all duration-700 ease-out ${kpi.progress >= 100 ? 'bg-[#34c759]' : 'bg-[#0071e3]'}`,
+                                className: `h-full rounded-full transition-all duration-700 ease-out ${kpi.progress >= 100 ? 'bg-[#34c759]' : (hasPace && !isAhead ? 'bg-[#ff9500]' : 'bg-[#0071e3]')}`,
                                 style: { width: `${Math.min(kpi.progress || 0, 100)}%` }
+                            }),
+                            hasPace && kpi.expectedSharePct > 0 && kpi.expectedSharePct < 100 && h('div', {
+                                className: 'absolute top-0 bottom-0 w-0.5 bg-[#1d1d1f]/60',
+                                style: { left: `${Math.min(99, Math.max(1, kpi.expectedSharePct))}%` },
+                                title: `Expected YTD Benchmark: ${kpi.expectedSharePct.toFixed(1)}% (฿${(kpi.ytdTargetBenchmark / 1000000).toFixed(2)}M)`
                             })
+                        ),
+                        hasPace && h(
+                            'div',
+                            { className: 'mt-1.5 flex items-center justify-between gap-1 text-[11px] font-semibold' },
+                            h(
+                                'span',
+                                { className: isAhead ? 'text-[#34c759] truncate' : 'text-[#ff9500] truncate' },
+                                `${isAhead ? '▲ +' : '▼ '}${(kpi.ytdPacePct || 0).toFixed(1)}% vs YTD Pace`
+                            ),
+                            h(
+                                'span',
+                                { className: 'text-[#86868b] shrink-0', title: 'Expected YTD Target Benchmark' },
+                                `Pace: ฿${(kpi.ytdTargetBenchmark / 1000000).toFixed(2)}M`
+                            )
                         )
                     )
                     : h('div', { className: 'h-full flex items-center justify-center text-[#86868b] font-medium text-sm italic py-2' }, 'N/A')
@@ -145,7 +181,7 @@
                     {
                         type: 'button',
                         onClick: () => setShowForecast(!showForecast),
-                        className: 'text-[#86868b] hover:text-[#0071e3] transition-colors bg-[#f5f5f7] hover:bg-[#0071e3]/10 p-2 rounded-full'
+                        className: 'no-print text-[#86868b] hover:text-[#0071e3] transition-colors bg-[#f5f5f7] hover:bg-[#0071e3]/10 p-2 rounded-full'
                     },
                     showForecast ? h(EyeOff, { className: 'w-4 h-4' }) : h(Eye, { className: 'w-4 h-4' })
                 )
@@ -187,7 +223,7 @@
                                 {
                                     type: 'button',
                                     onClick: () => setShowForecast(true),
-                                    className: 'flex items-center justify-center gap-2 text-sm font-medium text-[#86868b] hover:text-[#1d1d1f] transition-colors bg-[#f5f5f7] hover:bg-[#e8e8ed] px-4 py-2.5 rounded-[12px] w-full shadow-sm'
+                                    className: 'no-print flex items-center justify-center gap-2 text-sm font-medium text-[#86868b] hover:text-[#1d1d1f] transition-colors bg-[#f5f5f7] hover:bg-[#e8e8ed] px-4 py-2.5 rounded-[12px] w-full shadow-sm'
                                 },
                                 h(Eye, { className: 'w-4 h-4' }),
                                 ' Tap to reveal'
@@ -248,9 +284,9 @@
             { className: 'animate-in fade-in zoom-in duration-500 delay-500 fill-mode-both cursor-pointer', onClick: () => onInsightClick && onInsightClick(pointData.insights) },
             h('text', { x: cx, y: cy - 5, fill: '#0071e3', textAnchor: 'middle', fontSize: 12, fontWeight: 800 }, formatted),
             h('circle', { cx: cx, cy: cy + 10, r: 5, fill: '#fff', stroke: '#0071e3', strokeWidth: 2.5 }),
-            h('circle', { cx: cx, cy: cy + 10, r: 14, fill: '#0071e3', opacity: 0.3, className: 'animate-ping', style: { transformOrigin: `${cx}px ${cy + 10}px`, animationDuration: '2s' } }),
-            h('rect', { x: cx - 45, y: cy - 35, width: 90, height: 16, rx: 8, fill: '#ff9500', opacity: 0.9 }),
-            h('text', { x: cx, y: cy - 24, fill: '#fff', textAnchor: 'middle', fontSize: 8, fontWeight: 700, style: { pointerEvents: 'none' } }, 'TAP FOR INSIGHTS')
+            h('circle', { cx: cx, cy: cy + 10, r: 14, fill: '#0071e3', opacity: 0.3, className: 'no-print animate-ping', style: { transformOrigin: `${cx}px ${cy + 10}px`, animationDuration: '2s' } }),
+            h('rect', { x: cx - 45, y: cy - 35, width: 90, height: 16, rx: 8, fill: '#ff9500', opacity: 0.9, className: 'no-print' }),
+            h('text', { x: cx, y: cy - 24, fill: '#fff', textAnchor: 'middle', fontSize: 8, fontWeight: 700, className: 'no-print', style: { pointerEvents: 'none' } }, 'TAP FOR INSIGHTS')
         );
     });
 
@@ -275,7 +311,7 @@
                     ),
                     h(
                         'div',
-                        { className: 'flex items-center gap-2 sm:gap-3 flex-wrap' },
+                        { className: 'no-print flex items-center gap-2 sm:gap-3 flex-wrap' },
                         h(
                             'button',
                             {
@@ -346,7 +382,7 @@
             selectedInsight && h(
                 'div',
                 {
-                    className: 'fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200',
+                    className: 'no-print fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200',
                     onClick: (e) => { if (e.target === e.currentTarget) setSelectedInsight(null); }
                 },
                 h(
@@ -794,7 +830,7 @@
                         ),
                         h(
                             'div',
-                            { className: 'flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5' },
+                            { className: 'no-print flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5' },
                             h('button', { type: 'button', onClick: () => setHealthFilter('all'), className: `px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors shrink-0 ${healthFilter === 'all' ? 'bg-[#1d1d1f] text-white' : 'bg-[#f5f5f7] text-[#86868b] hover:bg-[#e8e8ed]'}` }, 'All'),
                             h('button', { type: 'button', onClick: () => setHealthFilter('healthy'), className: `px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors flex items-center gap-1.5 shrink-0 ${healthFilter === 'healthy' ? 'bg-[#34c759]/20 text-[#34c759]' : 'bg-[#f5f5f7] text-[#86868b] hover:bg-[#e8e8ed]'}` }, h('div', { className: 'w-1.5 h-1.5 rounded-full bg-[#34c759]' }), `Healthy (${currentList.counts?.healthy || 0})`),
                             h('button', { type: 'button', onClick: () => setHealthFilter('watch'), className: `px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors flex items-center gap-1.5 shrink-0 ${healthFilter === 'watch' ? 'bg-[#ff9500]/20 text-[#ff9500]' : 'bg-[#f5f5f7] text-[#86868b] hover:bg-[#e8e8ed]'}` }, h('div', { className: 'w-1.5 h-1.5 rounded-full bg-[#ff9500]' }), `Watch (${currentList.counts?.watch || 0})`),
@@ -845,7 +881,7 @@
                                             {
                                                 type: 'button',
                                                 onClick: (e) => { e.stopPropagation(); setDrillDownPath(item.name); },
-                                                className: 'ml-1 flex items-center gap-1 bg-[#30b0c7] text-white text-[10px] px-2.5 py-1 rounded-md hover:bg-[#2898ac] transition-colors shadow-sm active:scale-95'
+                                                className: 'no-print ml-1 flex items-center gap-1 bg-[#30b0c7] text-white text-[10px] px-2.5 py-1 rounded-md hover:bg-[#2898ac] transition-colors shadow-sm active:scale-95'
                                             },
                                             'SKUs ',
                                             h(ChevronRight, { className: 'w-3 h-3' })
@@ -888,7 +924,7 @@
                             h('div', { className: 'h-6 w-px bg-black/10' }),
                             h(
                                 'div',
-                                { className: 'flex items-center gap-2 sm:gap-3' },
+                                { className: 'no-print flex items-center gap-2 sm:gap-3' },
                                 h('div', { className: 'flex items-center gap-1.5 text-[10px] font-bold text-[#86868b] uppercase tracking-wider' }, h('div', { className: 'w-3 h-1 rounded-sm bg-[#30b0c7]' }), ' 2026'),
                                 h(
                                     'button',
@@ -976,6 +1012,16 @@
             [list, filterType]
         );
 
+        const csvColumns = useMemo(() => [
+            { label: 'No.', accessor: (_r, idx) => idx + 1 },
+            { label: 'Customer / Chain', key: 'name' },
+            { label: 'Channel', key: 'channel' },
+            { label: 'Acquisition Type', key: 'type' },
+            { label: 'Top Sub-Product', key: 'topSubGroup' },
+            { label: 'Top Product', key: 'topProduct' },
+            { label: 'Sales 2026 (THB)', accessor: (r) => Number((r.sales26 || 0).toFixed(2)) }
+        ], []);
+
         const handleCopy = useCallback(async () => {
             if (!displayList || displayList.length === 0) return;
             const textToCopy = `New Acquisition List (${filterType === 'All' ? 'All Types' : filterType} - ${subGroupFilter})\n\n` +
@@ -1026,7 +1072,7 @@
                 ),
                 h(
                     'div',
-                    { className: 'flex flex-col lg:flex-row gap-3 w-full xl:w-auto items-stretch lg:items-center' },
+                    { className: 'no-print flex flex-col lg:flex-row gap-3 w-full xl:w-auto items-stretch lg:items-center' },
                     h(
                         'div',
                         { className: 'flex items-center gap-2 flex-wrap sm:flex-nowrap' },
@@ -1040,7 +1086,13 @@
                                 title: 'Copy target list to clipboard'
                             },
                             isCopied ? h(React.Fragment, null, h(Check, { className: 'w-3.5 h-3.5' }), ' Copied') : h(React.Fragment, null, h(Copy, { className: 'w-3.5 h-3.5' }), ' Copy List')
-                        )
+                        ),
+                        h(ExportCSVButton, {
+                            filename: `New_Acquisition_2026_${filterType}.csv`,
+                            columns: csvColumns,
+                            rows: displayList,
+                            label: 'CSV'
+                        })
                     ),
                     h(
                         'div',
@@ -1109,7 +1161,7 @@
                 ),
                 displayList.length > visibleLimit && h(
                     'div',
-                    { className: 'p-3 bg-[#f5f5f7]/60 text-center border-t border-black/5' },
+                    { className: 'no-print p-3 bg-[#f5f5f7]/60 text-center border-t border-black/5' },
                     h(
                         'button',
                         { type: 'button', onClick: () => setVisibleLimit((prev) => prev + 50), className: 'px-4 py-2 bg-white text-[#0071e3] text-xs font-bold rounded-xl border border-black/5 shadow-sm hover:bg-[#f5f5f7]' },
@@ -1122,6 +1174,18 @@
 
     const ExecutiveSummaryWidget = memo(function ExecutiveSummaryWidget({ kpi, filteredData, channelMix, valid2026Months }) {
         const [isExpanded, setIsExpanded] = useState(false);
+
+        // Auto-expand synthesis when printing executive PDF reports
+        useEffect(() => {
+            if (typeof window === 'undefined') return undefined;
+            const handleExpandForPrint = () => setIsExpanded(true);
+            window.addEventListener('beforeprint', handleExpandForPrint);
+            window.addEventListener('npd:expand-for-print', handleExpandForPrint);
+            return () => {
+                window.removeEventListener('beforeprint', handleExpandForPrint);
+                window.removeEventListener('npd:expand-for-print', handleExpandForPrint);
+            };
+        }, []);
 
         const deepMetrics = useMemo(() => {
             if (!isExpanded || !filteredData) return null;
@@ -1152,7 +1216,7 @@
                 'div',
                 {
                     onClick: () => setIsExpanded(true),
-                    className: 'bg-white p-4 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex justify-center items-center cursor-pointer hover:bg-[#f5f5f7] transition-colors group relative overflow-hidden h-16 sm:h-20'
+                    className: 'no-print bg-white p-4 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex justify-center items-center cursor-pointer hover:bg-[#f5f5f7] transition-colors group relative overflow-hidden h-16 sm:h-20'
                 },
                 h('div', { className: 'absolute inset-0 bg-gradient-to-r from-[#af52de]/5 via-transparent to-[#0071e3]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500' }),
                 h(
@@ -1192,7 +1256,7 @@
                     ),
                     h(
                         'button',
-                        { type: 'button', onClick: () => setIsExpanded(false), className: 'text-[#86868b] hover:text-[#1d1d1f] bg-[#f5f5f7] hover:bg-[#e8e8ed] p-2 rounded-full transition-colors', title: 'ซ่อนบทวิเคราะห์' },
+                        { type: 'button', onClick: () => setIsExpanded(false), className: 'no-print text-[#86868b] hover:text-[#1d1d1f] bg-[#f5f5f7] hover:bg-[#e8e8ed] p-2 rounded-full transition-colors', title: 'ซ่อนบทวิเคราะห์' },
                         h(X, { className: 'w-4 h-4' })
                     )
                 )
@@ -1266,7 +1330,7 @@
                         h('span', { className: 'font-bold text-[#1d1d1f]' }, plan27 ? `฿${(plan27 / 1000000).toFixed(2)}M (${growthPlan >= 0 ? '+' : ''}${(growthPlan || 0).toFixed(1)}% vs เป้า 26)` : 'N/A')
                     )
                 ),
-                // Pillar 3 (Authentic Cost Margin!)
+                // Pillar 3
                 h(
                     'div',
                     { className: 'flex flex-col justify-between bg-[#f5f5f7]/80 p-4 rounded-[18px] border border-black/5' },
@@ -1403,7 +1467,7 @@
                                 'li',
                                 { className: 'flex items-start gap-1.5' },
                                 h('span', { className: 'text-[#34c759] font-bold' }, '①'),
-                                h('span', null, isTrackingBehind ? `เร่งปิดช่องว่าง ฿${(gapToTarget / 1000000).toFixed(2)}M โดยใช้ตาราง White Space Matrix เจาะลูกค้าที่ยังไม่ได้สั่งซื้อสินค้า Hero SKU ในช่องทาง ${deepMetrics?.topChannel?.name || 'หลัก'}` : `รักษามาตรฐานการจัดส่งและสต็อกของกลุ่ม Top 5 SKUs (${deepMetrics?.top5SkuShare.toFixed(0)}% ของพอร์ต) ไม่ให้เกิด Out-of-Stock`)
+                                h('span', null, isTrackingBehind ? `เร่งปิดช่องว่าง ฿${(gapToTarget / 1000000).toFixed(2)}M โดยใช้ตาราง White Space Matrix และ Churn Radar เจาะลูกค้าเป้าหมายในช่องทาง ${deepMetrics?.topChannel?.name || 'หลัก'}` : `รักษามาตรฐานการจัดส่งและสต็อกของกลุ่ม Top 5 SKUs (${deepMetrics?.top5SkuShare.toFixed(0)}% ของพอร์ต) ไม่ให้เกิด Out-of-Stock`)
                             ),
                             h(
                                 'li',

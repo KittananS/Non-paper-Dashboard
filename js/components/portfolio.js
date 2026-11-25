@@ -16,7 +16,7 @@
     const {
         Layers, Banknote, Search, LayoutList, ChevronRight, Trophy, ArrowLeft, ArrowDown, AlertCircle, X
     } = Icons;
-    const { InfoPopover, Sparkline } = NPD.components;
+    const { InfoPopover, Sparkline, ExportCSVButton } = NPD.components;
 
     const PortfolioMixWidget = memo(function PortfolioMixWidget({ filteredData, monthsList }) {
         const [mixLevel, setMixLevel] = useState('ProductGroup');
@@ -131,7 +131,7 @@
                 ),
                 h(
                     'div',
-                    { className: 'flex bg-[#e3e3e8] p-1 rounded-xl w-full sm:w-auto overflow-x-auto no-scrollbar' },
+                    { className: 'no-print flex bg-[#e3e3e8] p-1 rounded-xl w-full sm:w-auto overflow-x-auto no-scrollbar' },
                     h('button', { type: 'button', onClick: () => setMixLevel('ProductGroup'), className: `flex-1 sm:flex-initial px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-[8px] transition-all whitespace-nowrap ${mixLevel === 'ProductGroup' ? 'bg-white text-[#1d1d1f] shadow-[0_1px_4px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f]'}` }, 'Product Group'),
                     h('button', { type: 'button', onClick: () => setMixLevel('SubProduct'), className: `flex-1 sm:flex-initial px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-[8px] transition-all whitespace-nowrap ${mixLevel === 'SubProduct' ? 'bg-white text-[#1d1d1f] shadow-[0_1px_4px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f]'}` }, 'Sub-Product'),
                     h('button', { type: 'button', onClick: () => setMixLevel('GroupSKU'), className: `flex-1 sm:flex-initial px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-[8px] transition-all whitespace-nowrap ${mixLevel === 'GroupSKU' ? 'bg-white text-[#1d1d1f] shadow-[0_1px_4px_rgba(0,0,0,0.12)]' : 'text-[#86868b] hover:text-[#1d1d1f]'}` }, 'Group SKU')
@@ -192,6 +192,15 @@
             return { list: arr, summary: rawData.summary };
         }, [rawData, deferredSearch]);
 
+        const csvColumns = useMemo(() => [
+            { label: 'Rank', accessor: (_r, idx) => idx + 1 },
+            { label: currentLevelName, key: 'name' },
+            { label: 'Net Sales 2026 (THB)', accessor: (r) => Number((r.sales || 0).toFixed(2)) },
+            { label: 'Gross Profit (THB)', accessor: (r) => (r.gp === null ? 'N/A' : Number(r.gp.toFixed(2))) },
+            { label: 'Margin (%)', accessor: (r) => (r.margin === null ? 'N/A' : Number(r.margin.toFixed(2))) },
+            { label: 'Cost Coverage (%)', accessor: (r) => Number((r.costCoverage || 0).toFixed(1)) }
+        ], [currentLevelName]);
+
         const slicedList = useMemo(() => (list || []).slice(0, visibleLimit), [list, visibleLimit]);
 
         return h(
@@ -227,17 +236,27 @@
                         h('p', { className: 'text-xs text-[#86868b] font-medium mt-0.5' }, 'Executive Summary: Weighted Gross Profit Margin')
                     )
                 ),
-                breadcrumbs.length < 4 && h(
+                h(
                     'div',
-                    { className: 'relative w-full md:w-64' },
-                    h('input', {
-                        type: 'text',
-                        placeholder: `Search ${currentLevelName}...`,
-                        className: 'w-full pl-9 pr-3 py-2.5 bg-[#f5f5f7] border border-transparent focus:border-[#0071e3]/30 focus:bg-white focus:ring-4 focus:ring-[#0071e3]/10 rounded-[12px] text-sm font-medium transition-all outline-none',
-                        value: search,
-                        onChange: (e) => setSearch(e.target.value)
-                    }),
-                    h(Search, { className: 'w-4 h-4 text-[#86868b] absolute left-3 top-3' })
+                    { className: 'no-print flex items-center gap-2 w-full md:w-auto' },
+                    breadcrumbs.length < 4 && h(
+                        'div',
+                        { className: 'relative flex-1 md:w-60' },
+                        h('input', {
+                            type: 'text',
+                            placeholder: `Search ${currentLevelName}...`,
+                            className: 'w-full pl-9 pr-3 py-2 bg-[#f5f5f7] border border-transparent focus:border-[#0071e3]/30 focus:bg-white focus:ring-4 focus:ring-[#0071e3]/10 rounded-[12px] text-sm font-medium transition-all outline-none',
+                            value: search,
+                            onChange: (e) => setSearch(e.target.value)
+                        }),
+                        h(Search, { className: 'w-4 h-4 text-[#86868b] absolute left-3 top-2.5' })
+                    ),
+                    h(ExportCSVButton, {
+                        filename: `Profitability_2026_${currentLevelName.replace(/\s+/g, '_')}.csv`,
+                        columns: csvColumns,
+                        rows: list,
+                        label: 'CSV'
+                    })
                 )
             ),
             h(
@@ -345,7 +364,7 @@
                 ),
                 list.length > visibleLimit && h(
                     'div',
-                    { className: 'p-3 bg-[#f5f5f7]/60 text-center border-t border-black/5' },
+                    { className: 'no-print p-3 bg-[#f5f5f7]/60 text-center border-t border-black/5' },
                     h(
                         'button',
                         { type: 'button', onClick: () => setVisibleLimit((prev) => prev + 50), className: 'px-4 py-2 bg-white text-[#0071e3] text-xs font-bold rounded-xl border border-black/5 shadow-sm hover:bg-[#f5f5f7]' },
@@ -360,6 +379,29 @@
         topPerformers, topPerfDrillDown, setTopPerfDrillSku,
         topPerfSearch, setTopPerfSearch, topPerfSortMode, setTopPerfSortMode, kpi
     }) {
+        const exportRows = topPerfDrillDown ? (topPerfDrillDown.allProducts || []) : (topPerformers || []);
+        const csvColumns = useMemo(() => (topPerfDrillDown
+            ? [
+                { label: 'Rank', accessor: (_r, idx) => idx + 1 },
+                { label: 'Group SKU', accessor: () => topPerfDrillDown.sku },
+                { label: 'Product Name', key: 'name' },
+                { label: 'Sales 2026 (THB)', accessor: (r) => Number((r.value || 0).toFixed(2)) },
+                { label: 'Sales 2025 YTD (THB)', accessor: (r) => Number((r.sales25 || 0).toFixed(2)) },
+                { label: 'YoY (%)', accessor: (r) => (r.sales25 > 0 ? Number((((r.value - r.sales25) / r.sales25) * 100).toFixed(1)) : 'N/A') },
+                { label: 'Proportion (%)', accessor: (r) => (kpi.s26 > 0 ? Number(((r.value / kpi.s26) * 100).toFixed(1)) : 0) },
+                { label: 'Top Channels', accessor: (r) => (r.topChannels || []).map((c) => `${c.name} (${c.pct}%)`).join('; ') }
+            ]
+            : [
+                { label: 'Rank', accessor: (_r, idx) => idx + 1 },
+                { label: 'Group SKU', key: 'sku' },
+                { label: 'Lead Product', key: 'name' },
+                { label: 'Sales 2026 (THB)', accessor: (r) => Number((r.value || 0).toFixed(2)) },
+                { label: 'Sales 2025 YTD (THB)', accessor: (r) => Number((r.sales25 || 0).toFixed(2)) },
+                { label: 'YoY (%)', accessor: (r) => (r.sales25 > 0 ? Number((((r.value - r.sales25) / r.sales25) * 100).toFixed(1)) : 'N/A') },
+                { label: 'Proportion (%)', accessor: (r) => (kpi.s26 > 0 ? Number(((r.value / kpi.s26) * 100).toFixed(1)) : 0) },
+                { label: 'Top Channels', accessor: (r) => (r.topChannels || []).map((c) => `${c.name} (${c.pct}%)`).join('; ') }
+            ]), [topPerfDrillDown, kpi.s26]);
+
         return h(
             'div',
             { className: 'bg-white p-5 sm:p-6 rounded-[24px] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-black/[0.04] flex flex-col' },
@@ -374,7 +416,7 @@
                 ),
                 h(
                     'div',
-                    { className: 'flex items-center gap-3 w-full md:w-auto' },
+                    { className: 'no-print flex items-center gap-2 w-full md:w-auto' },
                     topPerfDrillDown
                         ? h(
                             'button',
@@ -384,16 +426,22 @@
                         )
                         : h(
                             'div',
-                            { className: 'relative w-full md:w-64' },
+                            { className: 'relative flex-1 md:w-60' },
                             h('input', {
                                 type: 'text',
                                 placeholder: 'Search SKU...',
-                                className: 'w-full pl-9 pr-3 py-2.5 sm:py-2 bg-[#f5f5f7] border-0 rounded-[12px] text-sm focus:outline-none',
+                                className: 'w-full pl-9 pr-3 py-2 bg-[#f5f5f7] border-0 rounded-[12px] text-sm focus:outline-none',
                                 value: topPerfSearch,
                                 onChange: (e) => setTopPerfSearch(e.target.value)
                             }),
-                            h(Search, { className: 'w-4 h-4 text-[#86868b] absolute left-3 top-3 sm:top-2.5' })
-                        )
+                            h(Search, { className: 'w-4 h-4 text-[#86868b] absolute left-3 top-2.5' })
+                        ),
+                    h(ExportCSVButton, {
+                        filename: topPerfDrillDown ? `Top_Products_${topPerfDrillDown.sku}.csv` : 'Top_Performers_2026.csv',
+                        columns: csvColumns,
+                        rows: exportRows,
+                        label: 'CSV'
+                    })
                 )
             ),
             h(
@@ -507,6 +555,16 @@
             return list;
         }, [returnData.topReturns, deferredHealthSearch]);
 
+        const csvColumns = useMemo(() => [
+            { label: 'Rank', accessor: (_r, idx) => idx + 1 },
+            { label: 'Group SKU', key: 'sku' },
+            { label: 'Product Name', key: 'name' },
+            { label: 'Return Value 2026 (THB)', accessor: (r) => Number((r.returns || 0).toFixed(2)) },
+            { label: 'Gross Sales 2026 (THB)', accessor: (r) => Number((r.gross26 || 0).toFixed(2)) },
+            { label: '2026 Return Rate (%)', accessor: (r) => Number((r.rate || 0).toFixed(2)) },
+            { label: 'Primary Return Channel', key: 'topChannel' }
+        ], []);
+
         const slicedReturnList = useMemo(() => (filteredReturnList || []).slice(0, visibleLimit), [filteredReturnList, visibleLimit]);
 
         return h(
@@ -539,22 +597,32 @@
                 ),
                 h(
                     'div',
-                    { className: 'flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full xl:w-auto' },
+                    { className: 'flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-3 w-full xl:w-auto' },
                     h(
                         'div',
-                        { className: 'relative w-full sm:w-64' },
-                        h('input', {
-                            type: 'text',
-                            placeholder: 'Search SKU...',
-                            className: 'w-full pl-9 pr-3 py-2.5 bg-[#f5f5f7] border-0 rounded-[12px] text-sm outline-none',
-                            value: healthSearch,
-                            onChange: (e) => setHealthSearch(e.target.value)
-                        }),
-                        h(Search, { className: 'w-4 h-4 text-[#86868b] absolute left-3 top-3' })
+                        { className: 'no-print flex items-center gap-2 w-full sm:w-auto' },
+                        h(
+                            'div',
+                            { className: 'relative flex-1 sm:w-56' },
+                            h('input', {
+                                type: 'text',
+                                placeholder: 'Search SKU...',
+                                className: 'w-full pl-9 pr-3 py-2 bg-[#f5f5f7] border-0 rounded-[12px] text-sm outline-none',
+                                value: healthSearch,
+                                onChange: (e) => setHealthSearch(e.target.value)
+                            }),
+                            h(Search, { className: 'w-4 h-4 text-[#86868b] absolute left-3 top-2.5' })
+                        ),
+                        h(ExportCSVButton, {
+                            filename: 'SKU_Return_Diagnostics_2026.csv',
+                            columns: csvColumns,
+                            rows: filteredReturnList,
+                            label: 'CSV'
+                        })
                     ),
                     h(
                         'div',
-                        { className: 'flex items-center justify-around sm:justify-start gap-4 bg-[#f5f5f7] px-4 py-2.5 rounded-[16px] border border-black/5 shrink-0' },
+                        { className: 'flex items-center justify-around sm:justify-start gap-4 bg-[#f5f5f7] px-4 py-2 rounded-[16px] border border-black/5 shrink-0' },
                         h('div', { className: 'flex flex-col' }, h('span', { className: 'text-[10px] font-bold text-[#86868b] uppercase tracking-wider' }, 'Total Returns'), h('span', { className: 'text-sm font-bold text-[#1d1d1f]' }, `฿${(returnData.totalReturns || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`)),
                         h('div', { className: 'w-px h-8 bg-black/10' }),
                         h('div', { className: 'flex flex-col' }, h('span', { className: 'text-[10px] font-bold text-[#86868b] uppercase tracking-wider' }, '2026 Return Rate'), h('span', { className: `text-sm font-bold ${(returnData.overallRate || 0) > 3 ? 'text-[#ff3b30]' : 'text-[#34c759]'}` }, `${(returnData.overallRate || 0).toFixed(2)}%`))
@@ -570,7 +638,7 @@
                     h('h4', { className: 'font-bold text-sm truncate' }, 'Channel Breakdown: ', h('span', { className: 'text-[#0071e3]' }, selectedSku.name)),
                     h(
                         'button',
-                        { type: 'button', onClick: () => setSelectedSkuKey(null), className: 'text-xs text-[#86868b] hover:text-[#1d1d1f] flex items-center gap-1 shrink-0 bg-white px-2.5 py-1 rounded-lg border border-black/5' },
+                        { type: 'button', onClick: () => setSelectedSkuKey(null), className: 'no-print text-xs text-[#86868b] hover:text-[#1d1d1f] flex items-center gap-1 shrink-0 bg-white px-2.5 py-1 rounded-lg border border-black/5' },
                         h(X, { className: 'w-3 h-3' }),
                         'Close'
                     )
@@ -634,7 +702,7 @@
                 ),
                 filteredReturnList.length > visibleLimit && h(
                     'div',
-                    { className: 'p-3 bg-[#f5f5f7]/60 text-center border-t border-black/5' },
+                    { className: 'no-print p-3 bg-[#f5f5f7]/60 text-center border-t border-black/5' },
                     h(
                         'button',
                         { type: 'button', onClick: () => setVisibleLimit((prev) => prev + 50), className: 'px-4 py-2 bg-white text-[#0071e3] text-xs font-bold rounded-xl border border-black/5 shadow-sm hover:bg-[#f5f5f7]' },

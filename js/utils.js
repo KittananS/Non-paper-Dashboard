@@ -3,17 +3,20 @@
 
     const NPD = root.NPD = root.NPD || {};
     const {
+        GROUP_ORDER,
         MONTHS_LIST,
         MONTH_MAP,
         PRECOMPILED_BRAND_REGEXES,
         VOLUME_PIN_SHA256,
         FETCH_TIMEOUT_MS,
-        MAX_TEXT_CACHE_SIZE
+        MAX_TEXT_CACHE_SIZE,
+        CACHE_DB_NAME,
+        CACHE_STORE_NAME,
+        CACHE_KEY
     } = NPD.config;
 
     // Bounded text normalization cache (prevents unbounded memory growth)
     const normalizeTextCache = new Map();
-
     const clearNormalizeCache = () => normalizeTextCache.clear();
 
     const normalizeText = (text, type = 'general') => {
@@ -81,14 +84,12 @@
         const str = String(rawMonth).trim();
         if (!str) return { MonthShort: 'Unk', MonthIndex: -1 };
 
-        // 1. Standard 3-letter English month prefix (e.g. "Jan-26", "Jan 2026", "January")
         const firstThree = str.slice(0, 3);
         const capThree = firstThree.charAt(0).toUpperCase() + firstThree.slice(1).toLowerCase();
         if (MONTH_MAP[capThree]) {
             return { MonthShort: capThree, MonthIndex: MONTH_MAP[capThree] };
         }
 
-        // 2. ISO / YYYY-MM or YYYY/MM format (e.g. "2026-01", "2026-10-01")
         const isoMatch = str.match(/^(?:20\d{2})[-/.](\d{1,2})(?:[-/.]\d{1,2})?$/);
         if (isoMatch) {
             const idx = parseInt(isoMatch[1], 10);
@@ -97,7 +98,6 @@
             }
         }
 
-        // 3. MM/YYYY or DD-MMM-YY format
         const tokenMatch = str.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b/i);
         if (tokenMatch) {
             const mShort = tokenMatch[1].charAt(0).toUpperCase() + tokenMatch[1].slice(1, 3).toLowerCase();
@@ -106,7 +106,6 @@
             }
         }
 
-        // 4. Excel / Google Sheets numeric serial date (e.g. "46023" or "46023.0")
         if (/^\d{5}(?:\.\d+)?$/.test(str)) {
             const serial = Math.floor(parseFloat(str));
             if (serial >= 40000 && serial <= 60000) {
@@ -193,15 +192,11 @@
         return { ...base, SubProductGroup: normalizeText(row['Sub-product Group'] || row['Sub-Product Group'], 'subgroup') };
     };
 
-    // Chain-based channels for channel mix / return breakdown badges
     const isChainBasedChannel = (channel) => {
         const upper = String(channel || '').toUpperCase();
         return upper === 'MT' || upper === 'INTER COMPANY' || upper === 'ONLINE' || upper === 'BJC';
     };
 
-    // Unified account/outlet resolver:
-    // For MT & Online, SubChannel holds the retail banner/platform (e.g. B2S, OFM, Shopee, Lazada)
-    // while SoldToParty holds branch/cash-sale placeholders. For TT, OB, Inter Company, SoldToParty holds the company/dealer name.
     const resolveAccountName = (row) => {
         if (!row) return 'Unknown';
         const upperCh = String(row.Channel || '').toUpperCase();
@@ -278,7 +273,253 @@
         return ok;
     };
 
-    // Pure-JS SHA-256 fallback when Web Crypto SubtleCrypto is unavailable (e.g. non-HTTPS local IP)
+    // Defensive CSV String Builder & UTF-8 BOM Exporter (Thai Excel safe + formula-injection safe)
+    const escapeCSVCell = (rawVal) => {
+        if (rawVal === null || rawVal === undefined) return '';
+        if (typeof rawVal === 'number') {
+            return Number.isFinite(rawVal) ? String(rawVal) : '';
+        }
+        let str = String(rawVal);
+        // Prevent spreadsheet formula injection on string cells starting with =, +, -, @
+        if (/^[=+\-@]/.test(str) && !/^-[0-9]/.test(str)) {
+            str = `'${str}`;
+        }
+        if (/[",\r\n]/.test(str)) {
+            return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+    };
+
+    const buildCSVContent = (columns, rows) => {
+        const cols = columns || [];
+        const headerLine = cols.map((c) => escapeCSVCell(c.label)).join(',');
+        const bodyLines = (rows || []).map((row, idx) =>
+            cols.map((c) => {
+                const val = typeof c.accessor === 'function' ? c.accessor(row, idx) : row[c.key];
+                return escapeCSVCell(val);
+            }).join(',')
+        );
+        return '\uFEFF' + [headerLine, ...bodyLines].join('\r\n');
+    };
+
+    const exportRowsToCSV = (filename, columns, rows) => {
+        if (!rows || rows.length === 0) return false;
+        const csvContent = buildCSVContent(columns, rows);
+        if (typeof document === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined') {
+            return csvContent;
+        }
+        const safeName = String(filename || 'export.csv').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const finalName = safeName.endsWith('.csv') ? safeName : `${safeName}.csv`;
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', finalName);
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return true;
+    };
+
+    // Shareable URL Query State Parser & Synchronizer
+    const VALID_URL_TABS = new Set(['Overview', 'Core', 'Distribution', 'Innovation']);
+
+    const parseUrlViewState = (searchStr) => {
+        const rawSearch = typeof searchStr === 'string'
+            ? searchStr
+            : (typeof window !== 'undefined' && window.location ? window.location.search : '');
+        const defaults = {
+            activeTab: 'Overview',
+            selectedGroups: ['ALL'],
+            filterSubProduct: 'All',
+            filterChannel: 'All',
+            filterSubChannel: 'All',
+            filterMonth: [...MONTHS_LIST],
+            excludeReturns: false
+        };
+        if (!rawSearch) return defaults;
+
+        try {
+            const params = new URLSearchParams(rawSearch);
+            const tab = params.get('tab');
+            if (tab && VALID_URL_TABS.has(tab)) defaults.activeTab = tab;
+
+            const grpParam = params.get('groups');
+            if (grpParam && grpParam !== 'ALL') {
+                const validGrps = grpParam
+                    .split(',')
+                    .map((g) => g.trim().toUpperCase())
+                    .filter((g) => GROUP_ORDER.includes(g));
+                if (validGrps.length > 0 && validGrps.length < GROUP_ORDER.length) {
+                    validGrps.sort((a, b) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b));
+                    defaults.selectedGroups = validGrps;
+                }
+            }
+
+            const sub = params.get('sub');
+            if (sub && sub.trim()) defaults.filterSubProduct = sub.trim();
+
+            const ch = params.get('ch');
+            if (ch && ch.trim()) defaults.filterChannel = ch.trim();
+
+            const subCh = params.get('subCh');
+            if (subCh && subCh.trim()) defaults.filterSubChannel = subCh.trim();
+
+            const mParam = params.get('months');
+            if (mParam) {
+                if (mParam === 'NONE') {
+                    defaults.filterMonth = [];
+                } else {
+                    const validMonths = mParam
+                        .split(',')
+                        .map((m) => m.trim())
+                        .filter((m) => MONTHS_LIST.includes(m));
+                    if (validMonths.length > 0 && validMonths.length < MONTHS_LIST.length) {
+                        defaults.filterMonth = MONTHS_LIST.filter((m) => validMonths.includes(m));
+                    }
+                }
+            }
+
+            if (params.get('exclRet') === '1') {
+                defaults.excludeReturns = true;
+            }
+        } catch (_) {
+            // Ignore malformed URL query strings
+        }
+        return defaults;
+    };
+
+    const buildViewQueryString = (state) => {
+        if (!state) return '';
+        const params = new URLSearchParams();
+        if (state.activeTab && state.activeTab !== 'Overview' && VALID_URL_TABS.has(state.activeTab)) {
+            params.set('tab', state.activeTab);
+        }
+        if (Array.isArray(state.selectedGroups) && !state.selectedGroups.includes('ALL') && state.selectedGroups.length > 0) {
+            params.set('groups', state.selectedGroups.join(','));
+        }
+        if (state.filterSubProduct && state.filterSubProduct !== 'All') {
+            params.set('sub', state.filterSubProduct);
+        }
+        if (state.filterChannel && state.filterChannel !== 'All') {
+            params.set('ch', state.filterChannel);
+        }
+        if (state.filterSubChannel && state.filterSubChannel !== 'All') {
+            params.set('subCh', state.filterSubChannel);
+        }
+        if (Array.isArray(state.filterMonth) && state.filterMonth.length < MONTHS_LIST.length) {
+            params.set('months', state.filterMonth.length === 0 ? 'NONE' : state.filterMonth.join(','));
+        }
+        if (state.excludeReturns) {
+            params.set('exclRet', '1');
+        }
+        const qs = params.toString();
+        return qs ? `?${qs}` : '';
+    };
+
+    const syncUrlViewState = (state) => {
+        if (typeof window === 'undefined' || !window.history || typeof window.history.replaceState !== 'function') {
+            return;
+        }
+        try {
+            const qs = buildViewQueryString(state);
+            const nextUrl = `${window.location.pathname}${qs}${window.location.hash || ''}`;
+            if (`${window.location.pathname}${window.location.search}${window.location.hash || ''}` !== nextUrl) {
+                window.history.replaceState(null, '', nextUrl);
+            }
+        } catch (_) {
+            // Safely ignore sandboxed iframe history restrictions
+        }
+    };
+
+    // Defensive IndexedDB Snapshot Cache for Stale-While-Revalidate instant startup
+    const openCacheDB = () => new Promise((resolve, reject) => {
+        if (typeof indexedDB === 'undefined') {
+            reject(new Error('IndexedDB unavailable'));
+            return;
+        }
+        try {
+            const req = indexedDB.open(CACHE_DB_NAME, 1);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(CACHE_STORE_NAME)) {
+                    db.createObjectStore(CACHE_STORE_NAME);
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error || new Error('IndexedDB open error'));
+        } catch (err) {
+            reject(err);
+        }
+    });
+
+    const loadCachedDataset = async () => {
+        let db = null;
+        try {
+            db = await openCacheDB();
+            return await new Promise((resolve) => {
+                const tx = db.transaction(CACHE_STORE_NAME, 'readonly');
+                const store = tx.objectStore(CACHE_STORE_NAME);
+                const req = store.get(CACHE_KEY);
+                req.onsuccess = () => {
+                    const val = req.result;
+                    if (val && Array.isArray(val.salesData) && val.salesData.length > 0) {
+                        // Restore Set/Typed fields if needed (plain objects serialize cleanly)
+                        resolve(val);
+                    } else {
+                        resolve(null);
+                    }
+                };
+                req.onerror = () => resolve(null);
+            });
+        } catch (_) {
+            return null;
+        } finally {
+            if (db) {
+                try { db.close(); } catch (_) {}
+            }
+        }
+    };
+
+    const saveCachedDataset = async (payload) => {
+        let db = null;
+        try {
+            db = await openCacheDB();
+            await new Promise((resolve) => {
+                const tx = db.transaction(CACHE_STORE_NAME, 'readwrite');
+                const store = tx.objectStore(CACHE_STORE_NAME);
+                store.put(payload, CACHE_KEY);
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => resolve(false);
+            });
+            return true;
+        } catch (_) {
+            return false;
+        } finally {
+            if (db) {
+                try { db.close(); } catch (_) {}
+            }
+        }
+    };
+
+    const formatSyncTimestamp = (ts) => {
+        if (!ts) return null;
+        try {
+            const d = new Date(ts);
+            if (Number.isNaN(d.getTime())) return null;
+            const day = d.getDate();
+            const mon = MONTHS_LIST[d.getMonth()] || '';
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            return `${day} ${mon}, ${hh}:${mm}`;
+        } catch (_) {
+            return null;
+        }
+    };
+
+    // Pure-JS SHA-256 fallback when Web Crypto SubtleCrypto is unavailable
     const sha256FallbackHex = (ascii) => {
         const rightRotate = (value, amount) => (value >>> amount) | (value << (32 - amount));
         const mathPow = Math.pow;
@@ -365,7 +606,6 @@
         return digest === VOLUME_PIN_SHA256;
     };
 
-    // Transient deduplication cache used ONLY during an active sync cycle, then cleared to free RAM
     const requestCache = new Map();
     const clearRequestCache = () => requestCache.clear();
 
@@ -452,7 +692,6 @@
         }
     };
 
-    // Bounded-concurrency runner to avoid 24 simultaneous large CSV parses freezing mobile devices
     const runWithConcurrency = async (taskFns, concurrency = 6) => {
         const results = new Array(taskFns.length);
         let nextIndex = 0;
@@ -483,6 +722,15 @@
         getParetoTopItems,
         computeNiceYAxisTicks,
         copyTextToClipboard,
+        escapeCSVCell,
+        buildCSVContent,
+        exportRowsToCSV,
+        parseUrlViewState,
+        buildViewQueryString,
+        syncUrlViewState,
+        loadCachedDataset,
+        saveCachedDataset,
+        formatSyncTimestamp,
         sha256Hex,
         verifyVolumePin,
         parseCSVText,

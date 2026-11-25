@@ -30,25 +30,41 @@
         return { forecast26, forecastStatus: { percent, isMissing } };
     };
 
-    const extractFilterOptions = (salesData, selectedGroups) => {
+    const extractFilterOptions = (salesData, selectedGroups, filterChannel = 'All') => {
         if (!salesData || salesData.length === 0) {
-            return { availableSubProducts: [], availableChannels: [] };
+            return { availableSubProducts: [], availableChannels: [], availableSubChannels: [] };
         }
         const isAll = selectedGroups.includes('ALL');
         const groupSet = isAll ? null : new Set(selectedGroups);
         const subProdMap = new Map();
         const channelSalesMap = {};
+        const subChannelSalesMap = {};
 
         for (let i = 0; i < salesData.length; i++) {
             const d = salesData[i];
             if (!d) continue;
             if (!isAll && !groupSet.has(d.ProductGroup)) continue;
 
-            if (d.SubProductGroup && !subProdMap.has(d.SubProductGroup)) {
+            if (d.SubProductGroup && d.SubProductGroup !== 'Unknown' && !subProdMap.has(d.SubProductGroup)) {
                 subProdMap.set(d.SubProductGroup, d.ProductGroup);
             }
-            if (d.Channel && d.Year === '2026') {
-                channelSalesMap[d.Channel] = (channelSalesMap[d.Channel] || 0) + (Number(d.NetPrice) || 0);
+
+            const val = Number(d.NetPrice) || 0;
+            if (d.Channel && d.Channel !== 'Unknown' && d.Year === '2026') {
+                channelSalesMap[d.Channel] = (channelSalesMap[d.Channel] || 0) + val;
+            }
+
+            if (
+                d.SubChannel &&
+                d.SubChannel !== 'Unknown' &&
+                (filterChannel === 'All' || d.Channel === filterChannel)
+            ) {
+                if (subChannelSalesMap[d.SubChannel] === undefined) {
+                    subChannelSalesMap[d.SubChannel] = 0;
+                }
+                if (d.Year === '2026') {
+                    subChannelSalesMap[d.SubChannel] += val;
+                }
             }
         }
 
@@ -64,16 +80,27 @@
             .sort((a, b) => b[1] - a[1])
             .map((item) => item[0]);
 
-        return { availableSubProducts: subList, availableChannels: chList };
+        const subChList = Object.entries(subChannelSalesMap)
+            .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))
+            .map((item) => item[0]);
+
+        return { availableSubProducts: subList, availableChannels: chList, availableSubChannels: subChList };
     };
 
     // Unified Core Engine:
-    // - Scopes valid2026Months strictly to the active Group + Sub-Product + Channel filters (Apple-to-Apple YTD!)
-    // - Preserves full-year monthly25Unfiltered & monthly26Unfiltered series so Trend Projection & Annual Forecast
-    //   never collapse to 0 when the user filters a subset of months.
-    const computeCoreEngine = (salesData, { selectedGroups, filterSubProduct, filterChannel, filterMonth }) => {
+    // - Supports Group, Sub-Product, Channel, Sub-Channel, Multi-Month, and Exclude Returns filters
+    // - Preserves filteredDataWithReturns so Return Diagnostics remains accurate even when Gross Sales mode is toggled
+    const computeCoreEngine = (salesData, {
+        selectedGroups,
+        filterSubProduct,
+        filterChannel,
+        filterSubChannel = 'All',
+        filterMonth,
+        excludeReturns = false
+    }) => {
         const emptyResult = {
             filteredData: [],
+            filteredDataWithReturns: [],
             valid2026Months: new Set(),
             unfiltered2026Months: new Set(),
             monthly25Unfiltered: new Array(12).fill(0),
@@ -83,6 +110,7 @@
             s26_FullYTD: 0,
             s25_FullYTD: 0,
             fy25: 0,
+            excludedReturns26: 0,
             channelMix: []
         };
 
@@ -100,7 +128,6 @@
         const monthly26Unfiltered = new Array(12).fill(0);
         let fy25 = 0;
 
-        // Pass 1: Filter by Group + SubProduct + Channel, collect full-year monthly baselines & exact active 2026 months
         for (let i = 0; i < salesData.length; i++) {
             const d = salesData[i];
             if (!d) continue;
@@ -108,12 +135,14 @@
             if (!isAllGroups && !groupSet.has(d.ProductGroup)) continue;
             if (filterSubProduct !== 'All' && d.SubProductGroup !== filterSubProduct) continue;
             if (filterChannel !== 'All' && d.Channel !== filterChannel) continue;
+            if (filterSubChannel !== 'All' && d.SubChannel !== filterSubChannel) continue;
 
             scopeRows.push(d);
 
             const val = Number(d.NetPrice) || 0;
-            const mIdx = d.MonthIndex;
+            if (excludeReturns && val < 0) continue;
 
+            const mIdx = d.MonthIndex;
             if (d.Year === '2026') {
                 if (mIdx >= 1 && mIdx <= 12) {
                     monthly26Unfiltered[mIdx - 1] += val;
@@ -130,7 +159,6 @@
             }
         }
 
-        // Fallback if selected group has 0 rows in 2026 (e.g. discontinued sub-product): compare against portfolio's active 2026 months
         if (unfiltered2026Months.size === 0) {
             for (let i = 0; i < salesData.length; i++) {
                 const d = salesData[i];
@@ -143,26 +171,37 @@
             }
         }
 
-        // Pass 2: Accumulate month-filtered KPIs + full-YTD baseline for annual forecast
         const filtered = [];
+        const filteredWithReturns = [];
         let s26 = 0;
         let s25_YTD = 0;
         let s26_FullYTD = 0;
         let s25_FullYTD = 0;
+        let excludedReturns26 = 0;
         const chMap = {};
 
         for (let i = 0; i < scopeRows.length; i++) {
             const d = scopeRows[i];
             const val = Number(d.NetPrice) || 0;
             const mIdx = d.MonthIndex;
+            const isReturnRow = val < 0;
 
-            if (d.Year === '2026') {
-                s26_FullYTD += val;
-            } else if (d.Year === '2025' && unfiltered2026Months.has(mIdx)) {
-                s25_FullYTD += val;
+            if (!(excludeReturns && isReturnRow)) {
+                if (d.Year === '2026') {
+                    s26_FullYTD += val;
+                } else if (d.Year === '2025' && unfiltered2026Months.has(mIdx)) {
+                    s25_FullYTD += val;
+                }
             }
 
             if (!isAllMonthsSelected && !monthSet.has(d.MonthShort)) continue;
+
+            filteredWithReturns.push(d);
+
+            if (excludeReturns && isReturnRow) {
+                if (d.Year === '2026') excludedReturns26 += Math.abs(val);
+                continue;
+            }
 
             filtered.push(d);
 
@@ -181,6 +220,7 @@
 
         return {
             filteredData: filtered,
+            filteredDataWithReturns: filteredWithReturns,
             valid2026Months,
             unfiltered2026Months,
             monthly25Unfiltered,
@@ -190,11 +230,18 @@
             s26_FullYTD,
             s25_FullYTD,
             fy25,
+            excludedReturns26,
             channelMix
         };
     };
 
-    const computeKPIs = (coreEngine, budgetChannel, budgetProduct, { selectedGroups, filterSubProduct, filterChannel, filterMonth }) => {
+    const computeKPIs = (coreEngine, budgetChannel, budgetProduct, {
+        selectedGroups,
+        filterSubProduct,
+        filterChannel,
+        filterSubChannel = 'All',
+        filterMonth
+    }) => {
         const {
             s26,
             s25_YTD,
@@ -213,11 +260,13 @@
 
         const isSubFiltered = filterSubProduct !== 'All';
         const isChannelFiltered = filterChannel !== 'All';
+        const isSubChannelFiltered = filterSubChannel !== 'All';
         const isAllGroups = selectedGroups.includes('ALL');
         const groupSet = isAllGroups ? null : new Set(selectedGroups);
 
         let relevantBudgets = [];
-        if (!(isSubFiltered && isChannelFiltered)) {
+        // Budgets are defined at Group+Channel or Group+SubProduct level (not Sub-Channel or cross-dimension)
+        if (!isSubChannelFiltered && !(isSubFiltered && isChannelFiltered)) {
             if (isSubFiltered) {
                 relevantBudgets = (budgetProduct || []).filter(
                     (b) => b && (isAllGroups || groupSet.has(b.ProductGroup)) && b.SubProductGroup === filterSubProduct
@@ -240,7 +289,6 @@
             ? relevantBudgets.reduce((a, b) => a + (Number(b.Plan2027) || 0), 0)
             : null;
 
-        // Annual Forecast 2026 always projects full-year performance from full-year YTD seasonality baseline
         const { forecast26, forecastStatus } = calculateDynamicForecast(
             s26_FullYTD,
             s25_FullYTD,
@@ -251,6 +299,28 @@
 
         const progress = target26 && target26 > 0 ? (s26 / target26) * 100 : 0;
         const growthPlan = target26 && plan27 && target26 > 0 ? ((plan27 - target26) / target26) * 100 : 0;
+
+        // YTD Target Pacing Benchmark (Seasonality-weighted if 2025 history exists, else Linear M/12)
+        let ytdTargetBenchmark = null;
+        let ytdPaceDiff = null;
+        let ytdPacePct = null;
+        let expectedSharePct = null;
+        let paceBasis = 'seasonal';
+
+        if (target26 && target26 > 0 && filterMonth.length > 0) {
+            let expectedShare = 0;
+            if (fy25 > 0 && s25_YTD > 0) {
+                expectedShare = Math.min(1, Math.max(0.01, s25_YTD / fy25));
+                paceBasis = 'seasonal';
+            } else {
+                expectedShare = Math.min(1, Math.max(1 / 12, monthsCount26 / 12));
+                paceBasis = 'linear';
+            }
+            ytdTargetBenchmark = target26 * expectedShare;
+            ytdPaceDiff = s26 - ytdTargetBenchmark;
+            ytdPacePct = ytdTargetBenchmark > 0 ? (ytdPaceDiff / ytdTargetBenchmark) * 100 : 0;
+            expectedSharePct = expectedShare * 100;
+        }
 
         return {
             s26,
@@ -266,7 +336,12 @@
             growthPlan,
             monthsCount26,
             fullMonthsCount26,
-            isPartialMonthFilter
+            isPartialMonthFilter,
+            ytdTargetBenchmark,
+            ytdPaceDiff,
+            ytdPacePct,
+            expectedSharePct,
+            paceBasis
         };
     };
 
@@ -294,13 +369,11 @@
             }
         }
 
-        // Determine latest visible 2026 month for TAP FOR INSIGHTS badge
         let latestVisibleIdx = -1;
         for (let idx = 0; idx < 12; idx++) {
             if (monthly26Sales[idx] > 0) latestVisibleIdx = idx;
         }
 
-        // Determine latest overall 2026 month in scope for full-year projection curve
         const full25 = coreEngine.monthly25Unfiltered || monthly25Sales;
         const full26 = coreEngine.monthly26Unfiltered || monthly26Sales;
         let latestFullIdx = -1;
@@ -373,7 +446,6 @@
             };
         }
 
-        // Use full-year unfiltered series for seasonal projection so filtering months doesn't break future projection
         const fy25Total = full25.reduce((s, v) => s + v, 0);
         const validFullMonthsCount = latestFullIdx + 1;
         const ytd26Full = full26.slice(0, validFullMonthsCount).reduce((s, v) => s + v, 0);
@@ -411,7 +483,7 @@
         });
     };
 
-    // Stack-safe O(1) Customer Acquisition Engine (shared by NewAcquisitionWidget & ExecutiveSummaryWidget)
+    // Stack-safe O(1) Customer Acquisition Engine
     const computeCustomerAcquisition = (filteredData, subGroupFilter = 'All', includeList = true) => {
         const customerMap = {};
         const arr = filteredData || [];
@@ -526,7 +598,148 @@
         };
     };
 
-    // Authentic Cost & Margin Profitability Engine (Zero mockMargin fabrication!)
+    // Churn & Drop-off Radar Engine (identifies Lost in 2026, Dormant >= 3M, and Sharp YoY Drop > 30%)
+    const computeChurnRadar = (filteredData, valid2026Months, subGroupFilter = 'All') => {
+        const customerMap = {};
+        const arr = filteredData || [];
+
+        let latestMonth26 = 0;
+        if (valid2026Months && valid2026Months.size > 0) {
+            valid2026Months.forEach((m) => { if (m > latestMonth26) latestMonth26 = m; });
+        }
+
+        for (let i = 0; i < arr.length; i++) {
+            const d = arr[i];
+            if (!d) continue;
+            if (subGroupFilter !== 'All' && d.SubProductGroup !== subGroupFilter) continue;
+
+            const customerName = resolveAccountName(d);
+            if (!customerName || customerName === 'Unknown') continue;
+
+            const ch = d.Channel || 'Unknown';
+            const key = `${customerName}|${ch}`;
+            let entry = customerMap[key];
+            if (!entry) {
+                entry = {
+                    key,
+                    name: customerName,
+                    channel: ch,
+                    sales25_FY: 0,
+                    sales25_YTD: 0,
+                    sales26: 0,
+                    lastMonth25: 0,
+                    lastMonth26: 0,
+                    products: {},
+                    subGroups: {}
+                };
+                customerMap[key] = entry;
+            }
+
+            const val = Number(d.NetPrice) || 0;
+            const mIdx = d.MonthIndex;
+            if (mIdx < 1 || mIdx > 12) continue;
+
+            const pName = d.ProductName || 'Unknown';
+            const sgName = d.SubProductGroup || 'Unknown';
+
+            if (d.Year === '2025') {
+                entry.sales25_FY += val;
+                if (valid2026Months && valid2026Months.has(mIdx)) {
+                    entry.sales25_YTD += val;
+                }
+                if (val > 0 && mIdx > entry.lastMonth25) entry.lastMonth25 = mIdx;
+                if (val > 0) {
+                    entry.products[pName] = (entry.products[pName] || 0) + val;
+                    entry.subGroups[sgName] = (entry.subGroups[sgName] || 0) + val;
+                }
+            } else if (d.Year === '2026') {
+                entry.sales26 += val;
+                if (val > 0 && mIdx > entry.lastMonth26) {
+                    entry.lastMonth26 = mIdx;
+                    if (mIdx > latestMonth26) latestMonth26 = mIdx;
+                }
+                if (val > 0) {
+                    entry.products[pName] = (entry.products[pName] || 0) + val;
+                    entry.subGroups[sgName] = (entry.subGroups[sgName] || 0) + val;
+                }
+            }
+        }
+
+        const alertList = [];
+        let lostCount = 0, lostVal25 = 0;
+        let dormantCount = 0, dormantVal = 0;
+        let dropCount = 0, dropVal = 0;
+
+        const entries = Object.values(customerMap);
+        for (let i = 0; i < entries.length; i++) {
+            const c = entries[i];
+            let status = null;
+            let impactVal = 0;
+            let yoy = c.sales25_YTD > 0 ? ((c.sales26 - c.sales25_YTD) / c.sales25_YTD) * 100 : null;
+            let lastOrderLabel = '-';
+            let inactiveMonths = 0;
+
+            if (c.sales25_FY > 0 && c.sales26 <= 0) {
+                status = 'Lost in 2026';
+                impactVal = c.sales25_FY;
+                lostCount++;
+                lostVal25 += c.sales25_FY;
+                lastOrderLabel = c.lastMonth25 > 0 ? `${MONTHS_LIST[c.lastMonth25 - 1]} 25` : '2025';
+                inactiveMonths = latestMonth26 + (12 - (c.lastMonth25 || 12));
+            } else if (c.sales26 > 0 && c.lastMonth26 > 0 && latestMonth26 - c.lastMonth26 >= 3) {
+                status = 'Dormant';
+                impactVal = c.sales25_YTD > c.sales26 ? (c.sales25_YTD - c.sales26) : c.sales26;
+                dormantCount++;
+                dormantVal += impactVal;
+                inactiveMonths = latestMonth26 - c.lastMonth26;
+                lastOrderLabel = `${MONTHS_LIST[c.lastMonth26 - 1]} 26 (${inactiveMonths}M ago)`;
+            } else if (c.sales26 > 0 && c.sales25_YTD >= 5000 && yoy !== null && yoy <= -30) {
+                status = 'Sharp Drop';
+                impactVal = c.sales25_YTD - c.sales26;
+                dropCount++;
+                dropVal += impactVal;
+                lastOrderLabel = c.lastMonth26 > 0 ? `${MONTHS_LIST[c.lastMonth26 - 1]} 26` : '2026';
+            }
+
+            if (status) {
+                const topProduct = Object.entries(c.products).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+                const topSubGroup = Object.entries(c.subGroups).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+                alertList.push({
+                    key: c.key,
+                    name: c.name,
+                    channel: c.channel,
+                    status,
+                    sales25_FY: c.sales25_FY,
+                    sales25_YTD: c.sales25_YTD,
+                    sales26: c.sales26,
+                    impactVal,
+                    yoy,
+                    lastOrderLabel,
+                    inactiveMonths,
+                    topProduct,
+                    topSubGroup
+                });
+            }
+        }
+
+        alertList.sort((a, b) => b.impactVal - a.impactVal);
+
+        return {
+            summary: {
+                lostCount,
+                lostVal25,
+                dormantCount,
+                dormantVal,
+                dropCount,
+                dropVal,
+                totalAlerts: lostCount + dormantCount + dropCount,
+                latestMonthLabel: latestMonth26 > 0 ? MONTHS_LIST[latestMonth26 - 1] : '-'
+            },
+            list: alertList
+        };
+    };
+
+    // Authentic Cost & Margin Profitability Engine
     const computeProfitability = (filteredData, breadcrumbs = []) => {
         let groupBy = 'ProductGroup';
         if (breadcrumbs.length === 1) groupBy = 'SubProductGroup';
@@ -619,7 +832,7 @@
         };
     };
 
-    // Unified 2026 Return Diagnostics (matches ExecutiveSummaryWidget denominator 100%)
+    // Unified 2026 Return Diagnostics
     const computeReturnDiagnostics = (filteredData) => {
         let grossSales26 = 0;
         let totalReturns26 = 0;
@@ -666,6 +879,7 @@
                     key: `${data.sku}::${data.name}`,
                     sku: data.sku,
                     name: data.name,
+                    gross26: data.gross26,
                     returns: data.returns26,
                     rate,
                     topChannel,
@@ -726,7 +940,6 @@
         const costCoverage = grossPositiveSales26 > 0 ? (validCostSales26 / grossPositiveSales26) * 100 : 0;
         const returnRate = grossPositiveSales26 > 0 ? (totalReturns26 / grossPositiveSales26) * 100 : 0;
 
-        // Pareto Top 5 SKUs
         const sortedSkus = Object.entries(skuSales)
             .filter(([, v]) => v > 0)
             .sort((a, b) => b[1] - a[1]);
@@ -735,7 +948,6 @@
         const topSkuName = sortedSkus[0]?.[0] || '-';
         const topSkuShare = totalSales26 > 0 && sortedSkus[0] ? (sortedSkus[0][1] / totalSales26) * 100 : 0;
 
-        // Sub-Product Health Check
         let healthyCnt = 0, watchCnt = 0, riskCnt = 0;
         let topRiskItem = null;
         let topGrowthItem = null;
@@ -755,13 +967,11 @@
             }
         });
 
-        // Channel Concentration
         const topChannel = channelMix && channelMix.length > 0 ? channelMix[0] : null;
         const secondChannel = channelMix && channelMix.length > 1 ? channelMix[1] : null;
         const topChannelShare = topChannel && totalSales26 > 0 ? (topChannel.value / totalSales26) * 100 : 0;
         const secondChannelShare = secondChannel && totalSales26 > 0 ? (secondChannel.value / totalSales26) * 100 : 0;
 
-        // Reuse stack-safe O(1) Customer Acquisition Engine
         const acq = computeCustomerAcquisition(filteredData, 'All', false);
         const acqSales26 = acq.summary.acqSales26;
         const acqShare = totalSales26 > 0 ? (acqSales26 / totalSales26) * 100 : 0;
@@ -934,7 +1144,6 @@
         return { rawTopCustomers: list, uniqueCustomersCount: unique.size };
     };
 
-    // Dynamic 12-Rolling-Month NPD Vitality Engine (replaces hardcoded maxAbsMonth = 16)
     const computeNPDMetrics = (salesData, filteredData, kpi, selectedGroups = ['ALL']) => {
         if (!salesData || !filteredData || salesData.length === 0) {
             return { totalNPDSales26: 0, topNPDs: [], vitalityIndex: 0, latestAbsMonth: 0 };
@@ -1107,6 +1316,7 @@
         computeKPIs,
         computeTrendChartData,
         computeCustomerAcquisition,
+        computeChurnRadar,
         computeProfitability,
         computeReturnDiagnostics,
         computeExecutiveDeepMetrics,
