@@ -14,7 +14,7 @@
         Store, ArrowLeft, Search, ArrowDown, MapPin, Crosshair, Layers, X, Users, Check, Copy,
         UserMinus, Clock, TrendingDown
     } = Icons;
-    const { FilterDropdown, Sparkline, InfoPopover, ExportCSVButton } = NPD.components;
+    const { ModalPortal, FilterDropdown, Sparkline, InfoPopover, ExportCSVButton } = NPD.components;
 
     const TopCustomersWidget = memo(function TopCustomersWidget({
         topCustomers, uniqueCustomersCount, customerSearch, setCustomerSearch,
@@ -787,67 +787,71 @@
                 )
             ),
             selectedGap && h(
-                'div',
-                {
-                    className: 'no-print fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200',
-                    onClick: (e) => { if (e.target === e.currentTarget) setSelectedGap(null); }
-                },
+                ModalPortal,
+                null,
                 h(
                     'div',
-                    { className: 'bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 flex flex-col max-h-[85vh]' },
+                    {
+                        className: 'no-print fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200',
+                        onClick: (e) => { if (e.target === e.currentTarget) setSelectedGap(null); }
+                    },
                     h(
                         'div',
-                        { className: 'p-5 border-b border-black/5 flex justify-between items-start bg-[#f5f5f7]/50' },
+                        { className: 'bg-white rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden border border-black/10 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200' },
                         h(
                             'div',
-                            null,
-                            h('h3', { className: 'text-[10px] font-bold text-[#ff2d55] uppercase tracking-wider mb-1' }, 'Actionable Insight'),
-                            h('h2', { className: 'text-lg font-bold text-[#1d1d1f] leading-tight' }, 'Target List for Sales Team'),
-                            h('p', { className: 'text-xs text-[#86868b] mt-1 font-medium' }, selectedGap.sku, h('span', { className: 'mx-1' }, '•'), selectedGap.subCh)
-                        ),
-                        h(
-                            'button',
-                            { type: 'button', onClick: () => setSelectedGap(null), className: 'text-[#86868b] hover:text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] p-2 rounded-full transition-colors' },
-                            h(X, { className: 'w-4 h-4' })
-                        )
-                    ),
-                    h(
-                        'div',
-                        { className: 'p-5 overflow-y-auto custom-scrollbar flex-1 bg-white flex flex-col gap-5' },
-                        h(
-                            'div',
-                            null,
-                            h('div', { className: 'text-xs font-bold text-[#1d1d1f] mb-3 flex items-center gap-2' }, h(Users, { className: 'w-4 h-4 text-[#86868b]' }), ` ${selectedGap.missed.length} Missed Customers`),
+                            { className: 'p-5 border-b border-black/5 flex justify-between items-start bg-[#f5f5f7]/50' },
                             h(
-                                'ul',
-                                { className: 'space-y-2 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2' },
-                                selectedGap.missed.map((cust) => h(
-                                    'li',
-                                    { key: cust, className: 'text-sm text-[#1d1d1f] flex items-center gap-2 p-2.5 bg-[#f5f5f7] hover:bg-[#e8e8ed] transition-colors rounded-lg border border-black/5' },
-                                    h('div', { className: 'w-1.5 h-1.5 rounded-full bg-[#ff2d55] flex-shrink-0' }),
-                                    h('span', { className: 'truncate font-medium' }, cust)
-                                ))
+                                'div',
+                                null,
+                                h('h3', { className: 'text-[10px] font-bold text-[#ff2d55] uppercase tracking-wider mb-1' }, 'Actionable Insight'),
+                                h('h2', { className: 'text-lg font-bold text-[#1d1d1f] leading-tight' }, 'Target List for Sales Team'),
+                                h('p', { className: 'text-xs text-[#86868b] mt-1 font-medium' }, selectedGap.sku, h('span', { className: 'mx-1' }, '•'), selectedGap.subCh)
+                            ),
+                            h(
+                                'button',
+                                { type: 'button', onClick: () => setSelectedGap(null), className: 'text-[#86868b] hover:text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] p-2 rounded-full transition-colors' },
+                                h(X, { className: 'w-4 h-4' })
                             )
-                        )
-                    ),
-                    h(
-                        'div',
-                        { className: 'p-4 bg-white border-t border-black/5 flex gap-3' },
-                        h(
-                            'button',
-                            {
-                                type: 'button',
-                                onClick: handleCopy,
-                                className: `flex-1 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${isCopied ? 'bg-[#34c759] text-white shadow-[0_0_10px_rgba(52,199,89,0.3)]' : 'bg-[#1d1d1f] hover:bg-black text-white shadow-md hover:shadow-lg'}`
-                            },
-                            isCopied ? h(React.Fragment, null, h(Check, { className: 'w-4 h-4' }), ' Copied!') : h(React.Fragment, null, h(Copy, { className: 'w-4 h-4' }), ' Copy Target List')
                         ),
-                        h(ExportCSVButton, {
-                            filename: `Missed_Targets_${selectedGap.sku}_${selectedGap.subCh}.csv`,
-                            columns: gapModalCsvColumns,
-                            rows: selectedGap.missed,
-                            label: 'Export CSV'
-                        })
+                        h(
+                            'div',
+                            { className: 'p-5 overflow-y-auto custom-scrollbar flex-1 bg-white flex flex-col gap-5' },
+                            h(
+                                'div',
+                                null,
+                                h('div', { className: 'text-xs font-bold text-[#1d1d1f] mb-3 flex items-center gap-2' }, h(Users, { className: 'w-4 h-4 text-[#86868b]' }), ` ${selectedGap.missed.length} Missed Customers`),
+                                h(
+                                    'ul',
+                                    { className: 'space-y-2 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2' },
+                                    selectedGap.missed.map((cust) => h(
+                                        'li',
+                                        { key: cust, className: 'text-sm text-[#1d1d1f] flex items-center gap-2 p-2.5 bg-[#f5f5f7] hover:bg-[#e8e8ed] transition-colors rounded-lg border border-black/5' },
+                                        h('div', { className: 'w-1.5 h-1.5 rounded-full bg-[#ff2d55] flex-shrink-0' }),
+                                        h('span', { className: 'truncate font-medium' }, cust)
+                                    ))
+                                )
+                            )
+                        ),
+                        h(
+                            'div',
+                            { className: 'p-4 bg-white border-t border-black/5 flex gap-3' },
+                            h(
+                                'button',
+                                {
+                                    type: 'button',
+                                    onClick: handleCopy,
+                                    className: `flex-1 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all ${isCopied ? 'bg-[#34c759] text-white shadow-[0_0_10px_rgba(52,199,89,0.3)]' : 'bg-[#1d1d1f] hover:bg-black text-white shadow-md hover:shadow-lg'}`
+                                },
+                                isCopied ? h(React.Fragment, null, h(Check, { className: 'w-4 h-4' }), ' Copied!') : h(React.Fragment, null, h(Copy, { className: 'w-4 h-4' }), ' Copy Target List')
+                            ),
+                            h(ExportCSVButton, {
+                                filename: `Missed_Targets_${selectedGap.sku}_${selectedGap.subCh}.csv`,
+                                columns: gapModalCsvColumns,
+                                rows: selectedGap.missed,
+                                label: 'Export CSV'
+                            })
+                        )
                     )
                 )
             )

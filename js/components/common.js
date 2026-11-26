@@ -54,6 +54,21 @@
         return h(ErrorBoundary, null, children);
     });
 
+    // Portal wrapper ensuring modals always mount on document.body (immune to parent CSS transforms/animations)
+    const ModalPortal = function ModalPortal({ children }) {
+        if (!children) return null;
+        const ReactDOMGlobal = root.ReactDOM;
+        if (
+            ReactDOMGlobal &&
+            typeof ReactDOMGlobal.createPortal === 'function' &&
+            typeof document !== 'undefined' &&
+            document.body
+        ) {
+            return ReactDOMGlobal.createPortal(children, document.body);
+        }
+        return children;
+    };
+
     // Reusable 1-Click CSV Export Button (UTF-8 BOM safe for Thai Excel)
     const ExportCSVButton = memo(function ExportCSVButton({ filename, columns, rows, label = 'Export CSV', disabled = false }) {
         const [done, setDone] = useState(false);
@@ -614,6 +629,7 @@
     Object.assign(NPD.components, {
         ErrorBoundary,
         SafeWidget,
+        ModalPortal,
         ExportCSVButton,
         InfoPopover,
         FilterDropdown,
