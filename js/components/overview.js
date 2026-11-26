@@ -22,7 +22,7 @@
         PieIcon, Activity, Layers, ArrowLeft, ShoppingBag, ChevronRight,
         UserPlus, UserCheck, Copy, Check, Zap, Banknote, Crosshair
     } = Icons;
-    const { InfoPopover, FilterDropdown, ExportCSVButton, ImageWithFallback, renderCustomLabel } = NPD.components;
+    const { ModalPortal, InfoPopover, FilterDropdown, ExportCSVButton, ImageWithFallback, renderCustomLabel } = NPD.components;
 
     const PortfolioSummaryWidget = memo(function PortfolioSummaryWidget({ selectedGroups, toggleGroup }) {
         return h(
@@ -279,13 +279,19 @@
             return h('text', { x: cx, y: cy, fill: '#86868b', textAnchor: 'middle', fontSize: 10, fontWeight: 600 }, formatted);
         }
 
+        const handleOpen = (e) => {
+            if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+            if (onInsightClick) onInsightClick(pointData.insights);
+        };
+
         return h(
             'g',
-            { className: 'animate-in fade-in zoom-in duration-500 delay-500 fill-mode-both cursor-pointer', onClick: () => onInsightClick && onInsightClick(pointData.insights) },
+            { className: 'cursor-pointer', onClick: handleOpen },
+            h('rect', { x: cx - 48, y: cy - 38, width: 96, height: 58, fill: 'transparent' }),
             h('text', { x: cx, y: cy - 5, fill: '#0071e3', textAnchor: 'middle', fontSize: 12, fontWeight: 800 }, formatted),
             h('circle', { cx: cx, cy: cy + 10, r: 5, fill: '#fff', stroke: '#0071e3', strokeWidth: 2.5 }),
             h('circle', { cx: cx, cy: cy + 10, r: 14, fill: '#0071e3', opacity: 0.3, className: 'no-print animate-ping', style: { transformOrigin: `${cx}px ${cy + 10}px`, animationDuration: '2s' } }),
-            h('rect', { x: cx - 45, y: cy - 35, width: 90, height: 16, rx: 8, fill: '#ff9500', opacity: 0.9, className: 'no-print' }),
+            h('rect', { x: cx - 45, y: cy - 35, width: 90, height: 16, rx: 8, fill: '#ff9500', opacity: 0.95, className: 'no-print' }),
             h('text', { x: cx, y: cy - 24, fill: '#fff', textAnchor: 'middle', fontSize: 8, fontWeight: 700, className: 'no-print', style: { pointerEvents: 'none' } }, 'TAP FOR INSIGHTS')
         );
     });
@@ -293,6 +299,23 @@
     const TrendChartWidget = memo(function TrendChartWidget({ trendChartData, show2025Trend, setShow2025Trend, yAxisTicks }) {
         const [selectedInsight, setSelectedInsight] = useState(null);
         const [showProjection, setShowProjection] = useState(true);
+
+        const latestInsight = useMemo(() => {
+            const pt = (trendChartData || []).find((d) => d && d.isLatest && d.insights);
+            return pt ? pt.insights : null;
+        }, [trendChartData]);
+
+        useEffect(() => {
+            if (!selectedInsight || typeof window === 'undefined') return undefined;
+            const handleKeyDown = (e) => {
+                if (e.key === 'Escape') setSelectedInsight(null);
+            };
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+        }, [selectedInsight]);
+
+        const topProducts = selectedInsight?.topProducts || [];
+        const topChannels = selectedInsight?.topChannels || [];
 
         return h(
             React.Fragment,
@@ -311,7 +334,17 @@
                     ),
                     h(
                         'div',
-                        { className: 'no-print flex items-center gap-2 sm:gap-3 flex-wrap' },
+                        { className: 'no-print flex items-center gap-2 sm:gap-2.5 flex-wrap' },
+                        latestInsight && h(
+                            'button',
+                            {
+                                type: 'button',
+                                onClick: () => setSelectedInsight(latestInsight),
+                                className: 'flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-full bg-[#ff9500]/15 text-[#d49b00] border border-[#ff9500]/30 hover:bg-[#ff9500] hover:text-white transition-colors shadow-sm active:scale-95'
+                            },
+                            h(Sparkles, { className: 'w-3.5 h-3.5' }),
+                            `${latestInsight.month} Insights`
+                        ),
                         h(
                             'button',
                             {
@@ -369,111 +402,128 @@
                             }),
                             h(Legend, { wrapperStyle: { fontSize: '12px', fontWeight: '500', color: '#86868b' } }),
                             show2025Trend && h(Line, { type: 'monotone', dataKey: 'sales25', name: '2025 Actual', stroke: '#86868b', strokeWidth: 2, strokeDasharray: '5 5', dot: { r: 2, fill: '#86868b' }, activeDot: { r: 4, strokeWidth: 0 } }),
+                            showProjection && h(Line, { type: 'monotone', dataKey: 'proj26', name: '2026 Projection', stroke: '#ff9500', strokeWidth: 2.5, strokeDasharray: '6 4', dot: { r: 2, fill: '#ff9500' }, activeDot: { r: 4, strokeWidth: 0 } }),
                             h(
                                 Area,
                                 { type: 'monotone', dataKey: 'sales26', name: '2026 Actual', stroke: '#0071e3', strokeWidth: 3, fillOpacity: 1, fill: 'url(#color26)', dot: { r: 3, fill: '#0071e3' }, activeDot: { r: 5, strokeWidth: 0 } },
                                 h(LabelList, { dataKey: 'sales26', position: 'top', content: (props) => h(TrendInsightAnnotation, { ...props, data: trendChartData, onInsightClick: setSelectedInsight }) })
-                            ),
-                            showProjection && h(Line, { type: 'monotone', dataKey: 'proj26', name: '2026 Projection', stroke: '#ff9500', strokeWidth: 2.5, strokeDasharray: '6 4', dot: { r: 2, fill: '#ff9500' }, activeDot: { r: 4, strokeWidth: 0 } })
+                            )
                         )
                     )
                 )
             ),
             selectedInsight && h(
-                'div',
-                {
-                    className: 'no-print fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200',
-                    onClick: (e) => { if (e.target === e.currentTarget) setSelectedInsight(null); }
-                },
+                ModalPortal,
+                null,
                 h(
                     'div',
-                    { className: 'bg-white/95 backdrop-blur-xl rounded-[24px] shadow-2xl w-full max-w-2xl overflow-hidden border border-white/20 flex flex-col' },
+                    {
+                        className: 'no-print fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200',
+                        onClick: (e) => { if (e.target === e.currentTarget) setSelectedInsight(null); }
+                    },
                     h(
                         'div',
-                        { className: 'p-5 border-b border-black/5 flex justify-between items-start bg-[#f5f5f7]/50' },
+                        { className: 'bg-white rounded-[24px] shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-black/10 flex flex-col animate-in zoom-in-95 duration-200' },
                         h(
                             'div',
-                            null,
-                            h('h3', { className: 'text-[10px] font-bold text-[#0071e3] uppercase tracking-wider mb-1' }, 'Monthly Highlights'),
-                            h('h2', { className: 'text-lg font-bold text-[#1d1d1f] leading-tight' }, `${selectedInsight.month} Performance Drivers`)
-                        ),
-                        h(
-                            'button',
-                            { type: 'button', onClick: () => setSelectedInsight(null), className: 'text-[#86868b] hover:text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] p-2 rounded-full transition-colors' },
-                            h(X, { className: 'w-4 h-4' })
-                        )
-                    ),
-                    h(
-                        'div',
-                        { className: 'p-5 overflow-y-auto max-h-[70vh] custom-scrollbar grid grid-cols-1 md:grid-cols-2 gap-6' },
-                        h(
-                            'div',
-                            null,
-                            h('h4', { className: 'text-xs font-extrabold text-[#86868b] uppercase tracking-wider mb-3 flex items-center gap-2' }, h(Package, { className: 'w-4 h-4' }), ' Top 3 Products'),
+                            { className: 'p-5 border-b border-black/5 flex justify-between items-start bg-[#f5f5f7]/60' },
                             h(
                                 'div',
-                                { className: 'space-y-3' },
-                                selectedInsight.topProducts.map((p) => h(
+                                null,
+                                h('h3', { className: 'text-[10px] font-bold text-[#0071e3] uppercase tracking-wider mb-1' }, 'Monthly Highlights'),
+                                h(
                                     'div',
-                                    { key: p.name, className: 'bg-[#f5f5f7] p-3 rounded-xl border border-black/5 flex flex-col gap-2' },
-                                    h('div', { className: 'font-semibold text-sm text-[#1d1d1f] truncate', title: p.name }, p.name),
-                                    h(
-                                        'div',
-                                        { className: 'flex justify-between items-end border-t border-black/5 pt-2' },
-                                        h('div', { className: 'flex flex-col' }, h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'Sales'), h('span', { className: 'font-bold text-[#34c759]' }, `฿${(p.val26 / 1000000).toFixed(2)}M`)),
-                                        h('div', { className: 'flex flex-col text-center' }, h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'Mix'), h('span', { className: 'font-bold text-[#1d1d1f]' }, `${p.pct.toFixed(1)}%`)),
-                                        h(
-                                            'div',
-                                            { className: 'flex flex-col text-right' },
-                                            h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'YoY Grw.'),
-                                            h(
-                                                'span',
-                                                { className: `font-bold ${p.yoy >= 0 ? 'text-[#34c759]' : (p.yoy === null ? 'text-[#86868b]' : 'text-[#ff3b30]')}` },
-                                                p.yoy !== null ? (p.yoy >= 0 ? `▲ ${p.yoy.toFixed(1)}%` : `▼ ${Math.abs(p.yoy).toFixed(1)}%`) : 'N/A'
-                                            )
-                                        )
+                                    { className: 'flex flex-wrap items-center gap-2.5' },
+                                    h('h2', { className: 'text-lg font-extrabold text-[#1d1d1f] leading-tight' }, `${selectedInsight.month} Performance Drivers`),
+                                    selectedInsight.sales > 0 && h(
+                                        'span',
+                                        { className: 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#0071e3]/10 text-[#0071e3]' },
+                                        `Total: ฿${(selectedInsight.sales / 1000000).toFixed(2)}M`
                                     )
-                                ))
+                                )
+                            ),
+                            h(
+                                'button',
+                                { type: 'button', onClick: () => setSelectedInsight(null), className: 'text-[#86868b] hover:text-[#1d1d1f] bg-[#e8e8ed] hover:bg-[#d1d1d6] p-2 rounded-full transition-colors' },
+                                h(X, { className: 'w-4 h-4' })
                             )
                         ),
                         h(
                             'div',
-                            null,
-                            h('h4', { className: 'text-xs font-extrabold text-[#86868b] uppercase tracking-wider mb-3 flex items-center gap-2' }, h(Store, { className: 'w-4 h-4' }), ' Top 3 Sub-Channels'),
+                            { className: 'p-5 overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-2 gap-6 bg-white' },
                             h(
                                 'div',
-                                { className: 'space-y-3' },
-                                selectedInsight.topChannels.map((c) => h(
+                                null,
+                                h('h4', { className: 'text-xs font-extrabold text-[#86868b] uppercase tracking-wider mb-3 flex items-center gap-2' }, h(Package, { className: 'w-4 h-4 text-[#34c759]' }), ' Top 3 Products'),
+                                h(
                                     'div',
-                                    { key: c.name, className: 'bg-[#f5f5f7] p-3 rounded-xl border border-black/5 flex flex-col gap-2' },
-                                    h(
-                                        'div',
-                                        { className: 'flex items-center justify-between gap-2' },
-                                        h('div', { className: 'font-semibold text-sm text-[#1d1d1f] truncate', title: c.name }, c.name),
-                                        c.parentChannel && h('span', { className: 'text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white text-[#86868b] border border-black/5 shrink-0' }, c.parentChannel)
-                                    ),
-                                    h(
-                                        'div',
-                                        { className: 'flex justify-between items-end border-t border-black/5 pt-2' },
-                                        h(
+                                    { className: 'space-y-3' },
+                                    topProducts.length > 0
+                                        ? topProducts.map((p) => h(
                                             'div',
-                                            { className: 'flex flex-col' },
-                                            h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'Sales 26 / 25'),
-                                            h('span', { className: 'font-bold text-[#0071e3]' }, `฿${(c.val26 / 1000000).toFixed(2)}M `, h('span', { className: 'text-[10px] font-normal text-[#86868b]' }, `vs ฿${(c.val25 / 1000000).toFixed(2)}M`))
-                                        ),
-                                        h('div', { className: 'flex flex-col text-center' }, h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'Mix'), h('span', { className: 'font-bold text-[#1d1d1f]' }, `${c.pct.toFixed(1)}%`)),
-                                        h(
-                                            'div',
-                                            { className: 'flex flex-col text-right' },
-                                            h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'YoY Grw.'),
+                                            { key: p.name, className: 'bg-[#f5f5f7] p-3 rounded-xl border border-black/5 flex flex-col gap-2' },
+                                            h('div', { className: 'font-semibold text-sm text-[#1d1d1f] truncate', title: p.name }, p.name),
                                             h(
-                                                'span',
-                                                { className: `font-bold ${c.yoy >= 0 ? 'text-[#34c759]' : (c.yoy === null ? 'text-[#86868b]' : 'text-[#ff3b30]')}` },
-                                                c.yoy !== null ? (c.yoy >= 0 ? `▲ ${c.yoy.toFixed(1)}%` : `▼ ${Math.abs(c.yoy).toFixed(1)}%`) : 'New / N/A'
+                                                'div',
+                                                { className: 'flex justify-between items-end border-t border-black/5 pt-2' },
+                                                h('div', { className: 'flex flex-col' }, h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'Sales'), h('span', { className: 'font-bold text-[#34c759]' }, `฿${((p.val26 || 0) / 1000000).toFixed(2)}M`)),
+                                                h('div', { className: 'flex flex-col text-center' }, h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'Mix'), h('span', { className: 'font-bold text-[#1d1d1f]' }, `${(p.pct || 0).toFixed(1)}%`)),
+                                                h(
+                                                    'div',
+                                                    { className: 'flex flex-col text-right' },
+                                                    h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'YoY Grw.'),
+                                                    h(
+                                                        'span',
+                                                        { className: `font-bold ${p.yoy >= 0 ? 'text-[#34c759]' : (p.yoy === null ? 'text-[#86868b]' : 'text-[#ff3b30]')}` },
+                                                        p.yoy !== null ? (p.yoy >= 0 ? `▲ ${p.yoy.toFixed(1)}%` : `▼ ${Math.abs(p.yoy).toFixed(1)}%`) : 'N/A'
+                                                    )
+                                                )
                                             )
-                                        )
-                                    )
-                                ))
+                                        ))
+                                        : h('div', { className: 'bg-[#f5f5f7] p-4 rounded-xl border border-black/5 text-xs text-[#86868b] text-center font-medium' }, 'No positive product sales in this selection.')
+                                )
+                            ),
+                            h(
+                                'div',
+                                null,
+                                h('h4', { className: 'text-xs font-extrabold text-[#86868b] uppercase tracking-wider mb-3 flex items-center gap-2' }, h(Store, { className: 'w-4 h-4 text-[#0071e3]' }), ' Top 3 Sub-Channels'),
+                                h(
+                                    'div',
+                                    { className: 'space-y-3' },
+                                    topChannels.length > 0
+                                        ? topChannels.map((c) => h(
+                                            'div',
+                                            { key: c.name, className: 'bg-[#f5f5f7] p-3 rounded-xl border border-black/5 flex flex-col gap-2' },
+                                            h(
+                                                'div',
+                                                { className: 'flex items-center justify-between gap-2' },
+                                                h('div', { className: 'font-semibold text-sm text-[#1d1d1f] truncate', title: c.name }, c.name),
+                                                c.parentChannel && h('span', { className: 'text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white text-[#86868b] border border-black/5 shrink-0' }, c.parentChannel)
+                                            ),
+                                            h(
+                                                'div',
+                                                { className: 'flex justify-between items-end border-t border-black/5 pt-2' },
+                                                h(
+                                                    'div',
+                                                    { className: 'flex flex-col' },
+                                                    h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'Sales 26 / 25'),
+                                                    h('span', { className: 'font-bold text-[#0071e3]' }, `฿${((c.val26 || 0) / 1000000).toFixed(2)}M `, h('span', { className: 'text-[10px] font-normal text-[#86868b]' }, `vs ฿${((c.val25 || 0) / 1000000).toFixed(2)}M`))
+                                                ),
+                                                h('div', { className: 'flex flex-col text-center' }, h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'Mix'), h('span', { className: 'font-bold text-[#1d1d1f]' }, `${(c.pct || 0).toFixed(1)}%`)),
+                                                h(
+                                                    'div',
+                                                    { className: 'flex flex-col text-right' },
+                                                    h('span', { className: 'text-[10px] text-[#86868b] font-medium' }, 'YoY Grw.'),
+                                                    h(
+                                                        'span',
+                                                        { className: `font-bold ${c.yoy >= 0 ? 'text-[#34c759]' : (c.yoy === null ? 'text-[#86868b]' : 'text-[#ff3b30]')}` },
+                                                        c.yoy !== null ? (c.yoy >= 0 ? `▲ ${c.yoy.toFixed(1)}%` : `▼ ${Math.abs(c.yoy).toFixed(1)}%`) : 'New / N/A'
+                                                    )
+                                                )
+                                            )
+                                        ))
+                                        : h('div', { className: 'bg-[#f5f5f7] p-4 rounded-xl border border-black/5 text-xs text-[#86868b] text-center font-medium' }, 'No positive sub-channel sales in this selection.')
+                                )
                             )
                         )
                     )

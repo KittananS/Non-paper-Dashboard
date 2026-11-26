@@ -97,10 +97,21 @@
 
     const UPDATE_LOGS = [
         {
+            version: 'v2.3.1',
+            date: '26 Nov 2026',
+            badge: 'Hotfix',
+            badgeColor: 'bg-[#0071e3] text-white',
+            title: 'Tap for Insights Viewport Portal & Modal Positioning Fix',
+            highlights: [
+                '🔧 Tap for Insights Modal Portal Fix: แก้ไขปัญหาคลิกปุ่ม TAP FOR INSIGHTS ในกราฟ Sales Trend 2025 vs 2026 แล้วหน้าจอขึ้นฉากสีเทาโดยกล่องข้อมูลหลุดขอบจอ (เกิดจาก CSS Transform Animation ของคอนเทนเนอร์หลักดึงตำแหน่ง Fixed Modal) โดยเปลี่ยนไปเรนเดอร์ผ่าน ReactDOM Portal ที่ระดับ Viewport โดยตรง',
+                '✨ Quick Insights Button: เพิ่มปุ่มลัด Insights ของเดือนล่าสุดบนหัวการ์ด Sales Trend เพื่อให้กดเปิดดู Top 3 Products และ Top 3 Sub-Channels ได้สะดวกทั้งบนคอมพิวเตอร์และมือถือ'
+            ]
+        },
+        {
             version: 'v2.3.0',
             date: '25 Nov 2026',
             badge: 'Commercial Suite',
-            badgeColor: 'bg-[#0071e3] text-white',
+            badgeColor: 'bg-[#34c759]/15 text-[#34c759]',
             title: 'Commercial Intelligence Suite: Churn Radar, Instant Cache, Sub-Channel & Export',
             highlights: [
                 '📉 Churn & Drop-off Radar: เพิ่มระบบตรวจจับลูกค้าเสี่ยง/หยุดซื้อในแท็บ Distribution แยกสถานะ Lost in 2026, Dormant (ห่างหาย ≥ 3 เดือน) และ Sharp Drop (ยอดหดตัว > 30% YoY) พร้อมส่งออกรายชื่อให้ทีมขายติดตามทันที',
